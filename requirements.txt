@@ -1,0 +1,6 @@
+datasets
+pandas
+numpy
+matplotlib
+pytest
+Pillow
