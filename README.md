@@ -29,17 +29,21 @@ pip install -e .
 pytest pilot/tests/ -v
 ```
 
-## One-time setup before running `pilot/pilot.ipynb` in Colab
+## One-time setup before running `pilot/pilot.ipynb`
 
-1. Hugging Face account with access to `ai4bharat/FERMAT` accepted; an HF access
-   token stored as the Colab secret `HF_TOKEN`.
-2. **Push this repo to a GitHub remote** (e.g. `uncertainty-math-vlm`) — the
-   notebook clones it and `pip install -e .`s it each session, so local edits are
-   picked up automatically, and results CSVs get committed and pushed back into
-   `results/` in the same repo at the end of each run. If the repo is private, add
-   a `GH_TOKEN` Colab secret (a GitHub personal access token) so the clone/push
-   steps can authenticate.
-3. Fill in `REPO_URL` in the notebook's auth cell once the remote exists.
+1. Hugging Face account with access to `ai4bharat/FERMAT` accepted, and an HF
+   access token ready.
+2. This repo is already pushed to GitHub (`REPO_URL` in the notebook's auth cell
+   points at it) — the notebook clones it and `pip install -e .`s it each session,
+   so local edits are picked up automatically, and results CSVs get committed and
+   pushed back into `results/` at the end of each run.
+3. **Auth note:** `google.colab.userdata.get()` (the usual Colab-secrets approach)
+   only works when running in the native Colab browser UI. If you're connecting
+   from VS Code's Jupyter interface instead, the notebook's auth cell has you
+   paste `HF_TOKEN` (and `GH_TOKEN`, if the repo is private) directly as string
+   literals. **Fill these in only in your live session — never commit this file
+   back to GitHub with a real token in it**, since that puts the secret in git
+   history permanently. The tracked copy in this repo keeps a placeholder.
 
 ## Status
 
