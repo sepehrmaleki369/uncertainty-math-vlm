@@ -7,3 +7,4 @@ __pycache__/
 .env
 .tokens.json
 *.token
+figures/
