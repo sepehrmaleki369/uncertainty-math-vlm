@@ -58,3 +58,14 @@ def test_majority_cluster_tie_break_is_deterministic_first_encountered():
 def test_majority_cluster_empty_raises():
     with pytest.raises(ValueError):
         majority_cluster([])
+
+
+def test_cluster_entropy_accepts_custom_normalize_fn():
+    # A normalizer that collapses everything to one cluster regardless of
+    # content -- proves the injection point is actually used, not ignored.
+    assert cluster_entropy(["a", "b", "c"], normalize_fn=lambda s: "same") == 0.0
+
+
+def test_majority_cluster_accepts_custom_normalize_fn():
+    result = majority_cluster(["a", "b", "a"], normalize_fn=lambda s: s.upper())
+    assert result == ("A", 2)
