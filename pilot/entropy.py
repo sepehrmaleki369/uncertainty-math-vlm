@@ -9,10 +9,29 @@ pilot; the semantic-clustering upgrade is a later step, not needed now.
 
 import math
 from collections import Counter
-from typing import Callable, Optional, Sequence
+from typing import Callable, Hashable, Optional, Sequence
 
 PARSE_FAILURE_SENTINEL = "<PARSE_FAILURE>"
 _PARSE_FAILURE_SENTINEL = PARSE_FAILURE_SENTINEL  # kept for internal call sites below
+
+
+def entropy_from_labels(labels: Sequence[Hashable]) -> float:
+    """Shannon entropy (nats) over a sequence of pre-assigned cluster labels.
+
+    Shared by cluster_entropy (labels = normalized strings) and
+    pilot.semantic's NLI/embedding clustering (labels = cluster ids from a
+    similarity graph) -- both reduce to "how many distinct groups, how
+    lopsided." Empty input returns 0.0 by convention.
+    """
+    if len(labels) == 0:
+        return 0.0
+    counts = Counter(labels)
+    n = len(labels)
+    entropy = 0.0
+    for count in counts.values():
+        p = count / n
+        entropy -= p * math.log(p)
+    return entropy
 
 
 def normalize_string(s: Optional[str]) -> str:
@@ -45,16 +64,8 @@ def cluster_entropy(
     (e.g. LaTeX answers where exact-string matching is too strict -- see that
     module's docstring for why this pilot needed it).
     """
-    if len(samples) == 0:
-        return 0.0
     normalized = [normalize_fn(s) for s in samples]
-    counts = Counter(normalized)
-    n = len(normalized)
-    entropy = 0.0
-    for count in counts.values():
-        p = count / n
-        entropy -= p * math.log(p)
-    return entropy
+    return entropy_from_labels(normalized)
 
 
 def majority_cluster(

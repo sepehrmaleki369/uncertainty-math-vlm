@@ -1,4 +1,4 @@
-from pilot.canonicalize import canonicalize_math
+from pilot.canonicalize import canonicalize_math, extract_final_answer
 from pilot.entropy import PARSE_FAILURE_SENTINEL, cluster_entropy
 
 
@@ -72,6 +72,59 @@ def test_prose_spelled_out_as_symbols_falls_back():
     result = canonicalize_math("this can be simplified to (zx-y)^2")
     assert result.startswith("text:")
     assert "t*h*i*s" not in result
+
+
+def test_extract_final_answer_none_returns_none():
+    assert extract_final_answer(None) is None
+
+
+def test_extract_final_answer_empty_string_returns_none():
+    assert extract_final_answer("   ") is None
+
+
+def test_extract_final_answer_prefers_explicit_option_over_everything():
+    """MCQ items: the stated option is the substantive answer, even if a
+    derivation with its own final equation follows it."""
+    text = "Option B is correct.\n\\[ 12R^2 = 432 \\Rightarrow R = 6 \\]"
+    assert extract_final_answer(text) == "option b"
+
+
+def test_extract_final_answer_uses_last_option_if_model_corrects_itself():
+    text = "Option A seems right. Wait, re-checking: Option C is correct."
+    assert extract_final_answer(text) == "option c"
+
+
+def test_extract_final_answer_boxed_result():
+    text = r"We derive step by step. \boxed{42}"
+    assert extract_final_answer(text) == "42"
+
+
+def test_extract_final_answer_last_display_math_block():
+    text = r"First \[ x = 1 \] then substituting \[ y = 2x = 2 \]"
+    assert extract_final_answer(text) == "y = 2x = 2"
+
+
+def test_extract_final_answer_single_dollar_inline_math():
+    """Real bug found on pilot data: single-dollar $...$ inline math (as
+    opposed to \\[...\\] or $$...$$) wasn't matched by any pattern at all,
+    causing the extractor to fall through to a garbled last-line result."""
+    text = r"Let $\vec{a} = 3\hat{i}$ and $\vec{b} = \frac{5}{2}\hat{i} - \hat{j}$"
+    assert extract_final_answer(text) == r"\vec{b} = \frac{5}{2}\hat{i} - \hat{j}"
+
+
+def test_extract_final_answer_skips_empty_trailing_align_environment():
+    """Real bug found on pilot data: a dangling \\end{align*} with no
+    captured content was being returned verbatim as the 'final answer'
+    instead of falling back to the actual last meaningful line."""
+    text = "\\begin{align*}\nx = 5\n\\end{align*}\nThe answer is 5."
+    result = extract_final_answer(text)
+    assert result is not None
+    assert "end{align" not in result
+
+
+def test_extract_final_answer_last_line_fallback_for_plain_text():
+    text = "We compute step by step.\nThe final result is 17"
+    assert extract_final_answer(text) == "The final result is 17"
 
 
 def test_integrates_with_cluster_entropy_via_normalize_fn():

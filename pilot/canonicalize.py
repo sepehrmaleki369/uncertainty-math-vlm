@@ -17,8 +17,13 @@ This module tries three tiers, cheapest and most reliable first:
    with prose, not a single expression -- SymPy correctly fails on prose),
    fall back to the structurally-cleaned string from step 1.
 
-Semantic clustering (embedding/NLI-based) is the next upgrade if this proves
-insufficient -- not needed for this pass.
+Even canonicalized, most items here still saturate at max entropy: the
+transcription prompt asks for the FULL derivation, and five independent
+generations paraphrase it differently ("we get" vs "we find", an echoed
+"Answer:" prefix present or absent) even when the underlying math is
+identical. structural_clean's output feeds pilot.semantic's NLI/embedding
+clustering, which is the actual fix for that -- this module only handles the
+syntactic tier.
 """
 
 import re
@@ -45,12 +50,69 @@ _WRAPPER_PATTERNS = [
 ]
 
 
-def _structural_clean(text: str) -> str:
+def structural_clean(text: str) -> str:
     """Strip LaTeX display/environment wrappers and collapse whitespace."""
     for pattern, repl in _WRAPPER_PATTERNS:
         text = pattern.sub(repl, text)
     text = re.sub(r"\s+", " ", text).strip().lower().rstrip(".")
     return text
+
+
+_OPTION_RE = re.compile(r"option\s*[:\-]?\s*([a-dA-D])\b", re.IGNORECASE)
+_BOXED_RE = re.compile(r"\\boxed\{([^{}]*)\}")
+# $$...$$ and \(...\) must be tried before the single-$ pattern -- Python's re
+# tries alternatives in written order at each position, so listing $$ first
+# means a "$$...$$" span matches whole rather than as two spurious single-$
+# matches (observed on real data: item 17's inline $\vec{...}$ math wasn't
+# matched by any pattern at all before this single-$ branch was added).
+_DISPLAY_MATH_RE = re.compile(
+    r"\\\[(.*?)\\\]|\$\$(.*?)\$\$|\\\((.*?)\\\)|\$([^$]*?)\$", re.DOTALL
+)
+_ENV_MARKER_RE = re.compile(r"^\\(begin|end)\{[^{}]*\}$")
+
+
+def extract_final_answer(text: Optional[str]) -> Optional[str]:
+    """Pull just the final answer/result out of a full derivation, tiered by
+    reliability: an explicit multiple-choice option statement, a \\boxed{}
+    result, the last display-math block, or (rarest) the last non-empty line.
+
+    Clustering the WHOLE derivation is what made both canonicalize_math and
+    semantic (NLI/embedding) clustering fail on the real pilot corpus:
+    syntactic matching is too strict because samples paraphrase the
+    scaffolding differently, and semantic matching is too lenient because
+    that same shared scaffolding triggers an entailment-model lexical-overlap
+    bias, burying the one number that actually differs. Comparing only the
+    final answer removes the scaffolding from the comparison entirely.
+    """
+    if text is None:
+        return None
+    cleaned = text.strip()
+    if not cleaned:
+        return None
+
+    option_matches = list(_OPTION_RE.finditer(cleaned))
+    if option_matches:
+        return f"option {option_matches[-1].group(1).lower()}"
+
+    boxed_matches = list(_BOXED_RE.finditer(cleaned))
+    if boxed_matches:
+        return boxed_matches[-1].group(1).strip()
+
+    # Walk matches newest-to-oldest and take the first with real content --
+    # the literal last match is sometimes an empty or align-environment
+    # block (e.g. a lone "\end{align*}" left dangling with no captured text),
+    # which would otherwise silently fall through to the much weaker
+    # last-line tier below even though a good earlier match exists.
+    for match in reversed(_DISPLAY_MATH_RE.findall(cleaned)):
+        content = next((g.strip() for g in match if g and g.strip()), None)
+        if content:
+            return content
+
+    lines = [line.strip() for line in re.split(r"[\n.]", cleaned) if line.strip()]
+    lines = [line for line in lines if not _ENV_MARKER_RE.match(line)]
+    if lines:
+        return lines[-1]
+    return None
 
 
 def canonicalize_math(text: Optional[str]) -> str:
@@ -63,7 +125,7 @@ def canonicalize_math(text: Optional[str]) -> str:
     if text is None:
         return PARSE_FAILURE_SENTINEL
 
-    cleaned = _structural_clean(text)
+    cleaned = structural_clean(text)
     if not cleaned:
         return PARSE_FAILURE_SENTINEL
 
