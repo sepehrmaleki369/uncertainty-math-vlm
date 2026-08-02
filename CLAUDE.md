@@ -6,11 +6,51 @@ it's wrong, on FERMAT (handwritten math) with Qwen2.5-VL-3B. Two arms:
 instability). See `README.md` for setup/layout basics — this file is
 working context for future sessions, not a repeat of that.
 
-## Current findings — read `report/report.tex` for full detail
+## Current findings
 
-Don't re-derive findings from git history; the report is the maintained,
-compiled source of truth (`report/report.pdf` is the rendered version, kept
-in sync with `report/report.tex`). Status as of the last update:
+**The n=300 balanced run (2026-08-02) is the current source of truth, and
+`report/report.tex` has NOT been updated with it** — the user updates the
+report on request only (see the conventions section). The report still
+describes the n=100 state.
+
+### n=300 balanced run — the decisive result
+
+`results/scaleup_n300_bal50_qwen25-vl-3b-instruct_20260802T163202Z.csv`
+(Drive-only; the push 403s). 150 error / 150 clean, K=5 both arms.
+
+- **Perception: replicated and strengthened. AUROC 0.835 [0.787, 0.879]
+  pooled**, 0.830 [0.760, 0.893] in the has_error=1 stratum (the like-for-like
+  comparison against n=100's 0.762), 0.839 [0.772, 0.898] on clean items.
+  Robust to every artifact cut — 0.796 [0.736, 0.852] excluding both parse
+  failures and max-entropy items. Pre-registered verdict: **replicated**.
+- **Reasoning: dead. AUROC 0.522 [0.462, 0.582] pooled — no signal.** The
+  reason is now unambiguous: **the model cannot do the grading task.** At a
+  50/50 split its accuracy is 51.7% against a 0.500 baseline. It answers
+  "there is an error" on 93% of items — 94.7% correct on error items, 8.7% on
+  clean ones. Its old 75% was the 87/13 class imbalance flattering it.
+  Reasoning entropy is also near-degenerate: 42% of items sit at entropy 0 and
+  only 3 values occur in practice.
+- **The stratified hypothesis could not be tested.** The model's bias is so
+  extreme that only 8 of 150 error items were misgraded, below the registered
+  minimum of 30. Verdict: `inconclusive_underpowered`, not the 0.836 point
+  estimate. Same for the clean-stratum inversion (137 wrong / 13 right) —
+  direction well supported (0.239 [0.128, 0.374]) but underpowered by the
+  registered standard.
+- **Replicated side findings:** digit/reasoning self-contradiction 11.0% at
+  n=300 vs 12% at n=100. Parse failures 3.6% / 0.9% vs 4.0% / 1.0%. Temp-0
+  anchor 0/50 non-zero. The max-entropy abstention rule degraded from 14/14
+  (n=100) to 57/61 = 0.934 precision — the perfect version was small-sample
+  optimism, but 93% on 61 items is still usable.
+- **Takeaway for any write-up:** perception entropy works (~0.83, tight CI,
+  robust). Reasoning entropy is a clean negative — *entropy over a model's
+  samples cannot predict correctness when the model performs at chance*.
+  That's a real finding, not a failure to measure.
+
+### Earlier n=100 state (superseded, kept for context)
+
+Don't re-derive findings from git history; the report is the compiled record
+of the n=100 work (`report/report.pdf` is the rendered version, kept in sync
+with `report/report.tex`).
 
 **Every AUROC now carries a bootstrap 95% CI, and they changed the
 conclusions.** At n=100 a single AUROC has a CI of roughly ±0.12 and a paired
