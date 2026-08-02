@@ -1,7 +1,9 @@
 import numpy as np
 import pytest
 
+from pilot.canonicalize import structural_clean
 from pilot.entropy import PARSE_FAILURE_SENTINEL
+from pilot.parsing import parse_grading_reasoning
 from pilot.semantic import (
     embedding_cluster_labels,
     nli_cluster_labels,
@@ -111,3 +113,35 @@ def test_semantic_cluster_entropy_all_same_cluster_is_zero():
 
 def test_semantic_cluster_entropy_empty_input():
     assert semantic_cluster_entropy([], cluster_fn=lambda s: []) == 0.0
+
+
+def test_reasoning_text_entropy_full_pipeline_composition():
+    """Integration test for the reasoning-arm improvement discovered on real
+    data: parse_grading_reasoning's output composes directly with
+    semantic_cluster_entropy, the same way canonicalize_math composes with
+    cluster_entropy for the perception arm. Two raw grading samples that argue
+    the same underlying judgment (verified on real data to often disagree on
+    the parsed digit due to last-token noise -- see parse_grading_reasoning's
+    docstring) should cluster together when their reasoning text mutually
+    entails, regardless of what their own **Error:** digit says."""
+    raw_a = "**Reasoning:** There is an error in the coordinate calculation.\n\n**Error:** 0"
+    raw_b = "**Reasoning:** The coordinate calculation contains a mistake.\n\n**Error:** 1"
+    raw_c = "**Reasoning:** The calculation is fully correct.\n\n**Error:** 0"
+
+    reasonings = [parse_grading_reasoning(r) for r in (raw_a, raw_b, raw_c)]
+    assert None not in reasonings
+
+    # nli_cluster_labels compares structural_clean(text), not the raw text
+    # (lowercased, trailing periods stripped) -- the fake model's lookup table
+    # must be keyed on the same cleaned form the real pipeline compares.
+    cleaned = [structural_clean(r) for r in reasonings]
+    entailing = {
+        (cleaned[0], cleaned[1]),
+        (cleaned[1], cleaned[0]),
+    }
+    labels = nli_cluster_labels(reasonings, _model=FakeNLI(entailing))
+    entropy = semantic_cluster_entropy(reasonings, cluster_fn=lambda s: labels)
+
+    assert labels[0] == labels[1]  # merge despite contradictory digits (0 vs 1)
+    assert labels[2] != labels[0]  # "fully correct" must not merge with "has an error"
+    assert entropy > 0.0  # 2 clusters out of 3 samples -- real, non-degenerate disagreement

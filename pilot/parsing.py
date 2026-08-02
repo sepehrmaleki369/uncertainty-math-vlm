@@ -16,6 +16,7 @@ _ANSWER_PATTERNS = [
     re.compile(r"(?:^|\n)\s*Answer\s*[:：]\s*(.*)", re.DOTALL),
 ]
 _ERROR_RE = re.compile(r"\*\*Error:\*\*\s*([01])")
+_REASONING_RE = re.compile(r"\*\*Reasoning:\*\*\s*(.*?)\s*\*\*Error:\*\*", re.DOTALL)
 
 # Trailing junk left over when the answer was wrapped in a code fence or a
 # full \documentclass{...}\begin{document}...\end{document} block -- cut
@@ -57,6 +58,30 @@ def parse_grading(response_text: str) -> Optional[int]:
     if match is None:
         return None
     return int(match.group(1))
+
+
+def parse_grading_reasoning(response_text: str) -> Optional[str]:
+    """Extract the free-text explanation between **Reasoning:** and **Error:**.
+
+    Discovered on the real 2026-08-01 pilot run: the parsed **Error:** digit is
+    sometimes inconsistent with the model's own reasoning -- 60/494 (12%) of
+    samples have digit=0 while the reasoning text opens by flagging a mistake
+    ("incorrect", "error", "mistake", ...). This looks like decoding noise on
+    the final digit token, independent of the fully-formed judgment already
+    written in the reasoning -- verified on real data by checking that samples
+    with contradictory digits but semantically clustered reasoning genuinely
+    argue the same direction (both say "there is an error", just about
+    different specific details), not that the clustering merged opposed
+    reasonings. See pilot.semantic for the clustering step this feeds into
+    (e.g. semantic_cluster_entropy with nli_cluster_labels), which is not
+    vulnerable to this specific last-token noise the way parse_grading alone
+    is. Matched on 495/500 (99%) of real grading samples.
+    """
+    match = _REASONING_RE.search(response_text)
+    if match is None:
+        return None
+    text = match.group(1).strip()
+    return text or None
 
 
 def grading_matches_label(predicted_error: Optional[int], has_error: bool | int) -> bool:
