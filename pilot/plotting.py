@@ -630,6 +630,22 @@ SCALEUP_PREREGISTRATION = {
     # Perception must not just beat chance, it must reproduce its effect size:
     # the n=100 CI lower bound was 0.697, so a replication should clear 0.65.
     "perception_ci_low_min": 0.65,
+    # AMENDED 2026-08-02, after the FERMAT census (2244 items, 84.8% error) but
+    # BEFORE the n=300 run generated anything. The census confirmed a 50/50
+    # sample is feasible, which exposed a gap in the original block: rebalancing
+    # changes the *perception* task too. On the n=100 data, clean items are
+    # easier to transcribe (54% vs 40% accuracy) and carry lower entropy (0.753
+    # vs 0.902), so moving from 13% clean to 50% clean should inflate pooled
+    # perception AUROC for reasons unrelated to the metric. Pooled perception is
+    # therefore NOT comparable across the two runs; the like-for-like
+    # replication test is the has_error=1 stratum, which scored 0.762
+    # [0.662, 0.855] at n=100 and gets 150 items here.
+    "perception_error_stratum_ci_low_min": 0.65,
+    # The clean stratum had only 13 items at n=100 (AUROC 0.940 [0.762, 1.000],
+    # far too noisy to mean anything). At 150 items it becomes measurable for
+    # the first time -- registered as an observation, with no threshold, because
+    # there is no prior worth predicting against.
+    "perception_clean_stratum": "measured_for_the_first_time_no_threshold",
     # Pooled reasoning on a *balanced* sample. The n=100 pooled value (0.618)
     # was depressed by the 87/13 imbalance; if the stratified story is right,
     # balancing should lift the pooled number to near the within-stratum one.
@@ -669,17 +685,28 @@ def classify_scaleup_result(
     def underpowered(ci):
         return min(ci.get("n_error", 0), ci.get("n_correct", 0)) < prereg["min_minority_class"]
 
-    perception = summary.get("perception")
-    if perception is None:
-        out["perception"] = "not_measured"
-    elif underpowered(perception):
-        out["perception"] = "inconclusive_underpowered"
-    elif perception["ci_low"] >= prereg["perception_ci_low_min"]:
-        out["perception"] = "replicated"
-    elif perception["excludes_chance"]:
-        out["perception"] = "weaker_than_pilot"
-    else:
-        out["perception"] = "failed_to_replicate"
+    def judge_perception(ci, threshold):
+        if ci is None:
+            return "not_measured"
+        if underpowered(ci):
+            return "inconclusive_underpowered"
+        if ci["ci_low"] >= threshold:
+            return "replicated"
+        if ci["excludes_chance"]:
+            return "weaker_than_pilot"
+        return "failed_to_replicate"
+
+    # Pooled perception is reported but is NOT the replication test: the
+    # rebalanced sample is 50% clean vs the pilot's 13%, and clean items are
+    # easier to transcribe, so this number is expected to drift upward on
+    # composition alone. The has_error=1 stratum is the like-for-like test.
+    out["perception_pooled_not_comparable"] = judge_perception(
+        summary.get("perception"), prereg["perception_ci_low_min"]
+    )
+    out["perception"] = judge_perception(
+        summary.get("perception_error_stratum"),
+        prereg["perception_error_stratum_ci_low_min"],
+    )
 
     pooled = summary.get("reasoning_pooled")
     if pooled is None:

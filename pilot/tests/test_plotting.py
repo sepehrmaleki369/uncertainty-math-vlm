@@ -588,6 +588,7 @@ def test_prereg_block_is_dated_and_not_silently_retuned():
     the date and thresholds so a later edit has to be deliberate."""
     assert SCALEUP_PREREGISTRATION["registered"] == "2026-08-02"
     assert SCALEUP_PREREGISTRATION["perception_ci_low_min"] == 0.65
+    assert SCALEUP_PREREGISTRATION["perception_error_stratum_ci_low_min"] == 0.65
     assert SCALEUP_PREREGISTRATION["reasoning_stratum_auroc_min"] == 0.70
     assert SCALEUP_PREREGISTRATION["clean_stratum_auroc_max"] == 0.50
     assert SCALEUP_PREREGISTRATION["min_minority_class"] == 30
@@ -596,6 +597,7 @@ def test_prereg_block_is_dated_and_not_silently_retuned():
 def test_classify_scaleup_all_hypotheses_confirmed():
     out = classify_scaleup_result({
         "perception": _ci(0.79, 0.70),
+        "perception_error_stratum": _ci(0.77, 0.68),
         "reasoning_pooled": _ci(0.70, 0.60),
         "reasoning_error_stratum": _ci(0.75, 0.62),
         "reasoning_clean_stratum": _ci(0.15, 0.02),
@@ -609,13 +611,33 @@ def test_classify_scaleup_all_hypotheses_confirmed():
 def test_classify_scaleup_perception_weaker_but_still_real():
     """Beats chance but not the pilot's effect size -- a distinct outcome from
     both 'replicated' and 'failed', and the most likely one if n=100 was lucky."""
-    out = classify_scaleup_result({"perception": _ci(0.62, 0.55)})
+    out = classify_scaleup_result({"perception_error_stratum": _ci(0.62, 0.55)})
     assert out["perception"] == "weaker_than_pilot"
 
 
 def test_classify_scaleup_perception_failure():
-    out = classify_scaleup_result({"perception": _ci(0.53, 0.44)})
+    out = classify_scaleup_result({"perception_error_stratum": _ci(0.53, 0.44)})
     assert out["perception"] == "failed_to_replicate"
+
+
+def test_classify_scaleup_perception_verdict_uses_the_stratum_not_the_pool():
+    """Amended pre-registration (2026-08-02, after the census, before the run):
+    the rebalanced sample is 50% clean vs the pilot's 13%, and clean items are
+    easier to transcribe (54% vs 40% accuracy at n=100). Pooled perception is
+    therefore expected to drift up on composition alone, so the replication
+    verdict must read the has_error=1 stratum. Here the pool looks like a
+    replication and the stratum does not -- the verdict must follow the stratum."""
+    out = classify_scaleup_result({
+        "perception": _ci(0.85, 0.78),                  # flattered by composition
+        "perception_error_stratum": _ci(0.60, 0.52),    # the honest comparison
+    })
+    assert out["perception"] == "weaker_than_pilot"
+    assert out["perception_pooled_not_comparable"] == "replicated"
+
+
+def test_classify_scaleup_perception_not_measured_without_the_stratum():
+    out = classify_scaleup_result({"perception": _ci(0.79, 0.70)})
+    assert out["perception"] == "not_measured"
 
 
 def test_classify_scaleup_stratified_prediction_can_fail():
@@ -638,7 +660,7 @@ def test_classify_scaleup_inversion_judged_independently():
 
 def test_classify_scaleup_underpowered_guard():
     out = classify_scaleup_result({
-        "perception": _ci(0.85, 0.72, n_error=12, n_correct=200),
+        "perception_error_stratum": _ci(0.85, 0.72, n_error=12, n_correct=200),
         "reasoning_error_stratum": _ci(0.90, 0.80, n_error=8, n_correct=200),
     })
     assert out["perception"] == "inconclusive_underpowered"
@@ -666,8 +688,8 @@ def test_classify_scaleup_nan_clean_stratum_is_not_measured():
 
 def test_classify_scaleup_boundary_values_land_on_the_confirming_side():
     out = classify_scaleup_result({
-        "perception": _ci(0.80, 0.65),           # exactly the threshold
-        "reasoning_error_stratum": _ci(0.70, 0.58),  # exactly the threshold
+        "perception_error_stratum": _ci(0.80, 0.65),  # exactly the threshold
+        "reasoning_error_stratum": _ci(0.70, 0.58),   # exactly the threshold
     })
     assert out["perception"] == "replicated"
     assert out["reasoning_stratified"] == "confirmed"
