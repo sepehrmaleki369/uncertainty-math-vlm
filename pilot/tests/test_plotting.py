@@ -5,6 +5,8 @@ import pytest
 
 from pilot.plotting import (
     REQUIRED_COLUMNS,
+    SCALEUP_PREREGISTRATION,
+    classify_scaleup_result,
     auroc_sensitivity,
     bootstrap_auroc_ci,
     bootstrap_auroc_difference_ci,
@@ -568,3 +570,104 @@ def test_classify_inconclusive_underpowered_at_boundary():
     }
     assert classify_k_resample_result(summary_14) == "inconclusive_underpowered"
     assert classify_k_resample_result(summary_15) == "confirmed_sharper"
+
+
+# --- classify_scaleup_result (pre-registered thresholds) ---
+
+
+def _ci(auroc, ci_low, n_error=50, n_correct=50):
+    return {
+        "auroc": auroc, "ci_low": ci_low, "ci_high": min(1.0, ci_low + 0.2),
+        "n_error": n_error, "n_correct": n_correct,
+        "excludes_chance": ci_low > 0.5,
+    }
+
+
+def test_prereg_block_is_dated_and_not_silently_retuned():
+    """The pre-registration's whole value is that it predates the data. Lock
+    the date and thresholds so a later edit has to be deliberate."""
+    assert SCALEUP_PREREGISTRATION["registered"] == "2026-08-02"
+    assert SCALEUP_PREREGISTRATION["perception_ci_low_min"] == 0.65
+    assert SCALEUP_PREREGISTRATION["reasoning_stratum_auroc_min"] == 0.70
+    assert SCALEUP_PREREGISTRATION["clean_stratum_auroc_max"] == 0.50
+    assert SCALEUP_PREREGISTRATION["min_minority_class"] == 30
+
+
+def test_classify_scaleup_all_hypotheses_confirmed():
+    out = classify_scaleup_result({
+        "perception": _ci(0.79, 0.70),
+        "reasoning_pooled": _ci(0.70, 0.60),
+        "reasoning_error_stratum": _ci(0.75, 0.62),
+        "reasoning_clean_stratum": _ci(0.15, 0.02),
+    })
+    assert out["perception"] == "replicated"
+    assert out["reasoning_pooled"] == "signal_confirmed"
+    assert out["reasoning_stratified"] == "confirmed"
+    assert out["clean_stratum_inversion"] == "confirmed"
+
+
+def test_classify_scaleup_perception_weaker_but_still_real():
+    """Beats chance but not the pilot's effect size -- a distinct outcome from
+    both 'replicated' and 'failed', and the most likely one if n=100 was lucky."""
+    out = classify_scaleup_result({"perception": _ci(0.62, 0.55)})
+    assert out["perception"] == "weaker_than_pilot"
+
+
+def test_classify_scaleup_perception_failure():
+    out = classify_scaleup_result({"perception": _ci(0.53, 0.44)})
+    assert out["perception"] == "failed_to_replicate"
+
+
+def test_classify_scaleup_stratified_prediction_can_fail():
+    """The point of pre-registering: this must be able to come out 'not
+    confirmed'. 0.68 is below the registered 0.70 even though it beats chance."""
+    out = classify_scaleup_result({"reasoning_error_stratum": _ci(0.68, 0.56)})
+    assert out["reasoning_stratified"] == "not_confirmed"
+
+
+def test_classify_scaleup_inversion_judged_independently():
+    """Signal real but inversion absent -- would mean the bias explanation for
+    the pooled collapse is wrong, so these must not be collapsed into one verdict."""
+    out = classify_scaleup_result({
+        "reasoning_error_stratum": _ci(0.75, 0.62),
+        "reasoning_clean_stratum": _ci(0.72, 0.60),
+    })
+    assert out["reasoning_stratified"] == "confirmed"
+    assert out["clean_stratum_inversion"] == "not_confirmed"
+
+
+def test_classify_scaleup_underpowered_guard():
+    out = classify_scaleup_result({
+        "perception": _ci(0.85, 0.72, n_error=12, n_correct=200),
+        "reasoning_error_stratum": _ci(0.90, 0.80, n_error=8, n_correct=200),
+    })
+    assert out["perception"] == "inconclusive_underpowered"
+    assert out["reasoning_stratified"] == "inconclusive_underpowered"
+
+
+def test_classify_scaleup_missing_keys_are_not_measured():
+    out = classify_scaleup_result({})
+    assert out["perception"] == "not_measured"
+    assert out["reasoning_pooled"] == "not_measured"
+    assert out["reasoning_stratified"] == "not_measured"
+    assert out["clean_stratum_inversion"] == "not_measured"
+
+
+def test_classify_scaleup_nan_clean_stratum_is_not_measured():
+    """A stratum with a single correctness class yields nan, which must not be
+    read as 'inversion confirmed' by a naive < comparison."""
+    out = classify_scaleup_result({
+        "reasoning_clean_stratum": {"auroc": float("nan"), "ci_low": float("nan"),
+                                    "n_error": 40, "n_correct": 0,
+                                    "excludes_chance": False},
+    })
+    assert out["clean_stratum_inversion"] == "not_measured"
+
+
+def test_classify_scaleup_boundary_values_land_on_the_confirming_side():
+    out = classify_scaleup_result({
+        "perception": _ci(0.80, 0.65),           # exactly the threshold
+        "reasoning_error_stratum": _ci(0.70, 0.58),  # exactly the threshold
+    })
+    assert out["perception"] == "replicated"
+    assert out["reasoning_stratified"] == "confirmed"

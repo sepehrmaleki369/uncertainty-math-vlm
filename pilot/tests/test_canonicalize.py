@@ -1,4 +1,9 @@
-from pilot.canonicalize import canonicalize_math, extract_final_answer
+from pilot.canonicalize import (
+    canonical_answer_label,
+    canonicalize_math,
+    extract_final_answer,
+)
+from pilot.entropy import majority_cluster, normalize_string
 from pilot.entropy import PARSE_FAILURE_SENTINEL, cluster_entropy
 
 
@@ -138,3 +143,41 @@ def test_integrates_with_cluster_entropy_via_normalize_fn():
         r"\frac{11}{4}\log |x+1|+C",
     ]
     assert cluster_entropy(samples, normalize_fn=canonicalize_math) == 0.0
+
+
+# --- canonical_answer_label ---
+
+
+def test_canonical_answer_label_matches_majority_cluster_output():
+    """Regression test for a real bug found while building the n=300 scale-up
+    notebook (2026-08-02): majority_cluster normalizes (lowercases) the labels
+    it returns, so a ground truth that skipped normalize_string never matched
+    any sympy-parsed equation. Both sides must go through the same pipeline.
+
+    On the real n=100 data this scored 36/100 correct instead of 42/100 and
+    dropped perception AUROC 0.788 -> 0.757, with no error raised."""
+    samples = [r"\( x = 1 \)", r"\( x=1 \)", r"\( x = 1 \)"]
+    labels = [canonical_answer_label(s) for s in samples]
+    majority, _ = majority_cluster(labels)
+    ground_truth = canonical_answer_label(r"Thus, \( x = 1 \) is the answer.")
+    assert majority == ground_truth
+
+
+def test_canonical_answer_label_is_lowercased():
+    """The specific shape that broke: sympy renders equations as 'Eq(...)',
+    majority_cluster lowercases it to 'eq(...)'."""
+    label = canonical_answer_label(r"\( x = 1 \)")
+    assert label == label.lower()
+
+
+def test_canonical_answer_label_is_idempotent_under_normalize():
+    label = canonical_answer_label(r"\( x = 1 \)")
+    assert normalize_string(label) == label
+
+
+def test_canonical_answer_label_handles_none():
+    assert canonical_answer_label(None) == normalize_string(PARSE_FAILURE_SENTINEL)
+
+
+def test_canonical_answer_label_differs_for_different_answers():
+    assert canonical_answer_label(r"\( x = 1 \)") != canonical_answer_label(r"\( x = 2 \)")

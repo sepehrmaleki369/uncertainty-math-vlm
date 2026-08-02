@@ -616,6 +616,109 @@ def classify_k_resample_result(summary: dict) -> str:
     return "null_at_k5_was_noise"
 
 
+# Registered 2026-08-02, BEFORE the n=300 scale-up run was executed. The
+# reasoning-arm stratified result (0.756 within the has_error stratum, 0.891 at
+# K=15) was discovered post-hoc on n=100, which is its main weakness -- these
+# thresholds convert it into a falsifiable prediction. Do not tune them after
+# seeing the scale-up data; add a new dated block instead and say which one a
+# reported number was judged against.
+SCALEUP_PREREGISTRATION = {
+    "registered": "2026-08-02",
+    "basis": "n=100 pilot: perception 0.788 [0.697, 0.869]; reasoning digit "
+             "pooled 0.618 [0.489, 0.741]; reasoning digit within has_error "
+             "stratum 0.756 [0.618, 0.876]",
+    # Perception must not just beat chance, it must reproduce its effect size:
+    # the n=100 CI lower bound was 0.697, so a replication should clear 0.65.
+    "perception_ci_low_min": 0.65,
+    # Pooled reasoning on a *balanced* sample. The n=100 pooled value (0.618)
+    # was depressed by the 87/13 imbalance; if the stratified story is right,
+    # balancing should lift the pooled number to near the within-stratum one.
+    "reasoning_pooled_ci_low_min": 0.55,
+    # The central pre-registered prediction: within has_error=True items,
+    # reasoning entropy predicts grading errors at 0.70 or better.
+    "reasoning_stratum_auroc_min": 0.70,
+    # The boldest, most falsifiable part: the model's error-present bias should
+    # make entropy *inverted* on clean items. Predicted before seeing the data.
+    "clean_stratum_auroc_max": 0.50,
+    # Below this, decline to conclude rather than reading a wide interval.
+    "min_minority_class": 30,
+}
+
+
+def classify_scaleup_result(
+    summary: dict, prereg: Optional[dict] = None
+) -> dict:
+    """Judge a scale-up run against SCALEUP_PREREGISTRATION, per hypothesis.
+
+    A pure function over already-computed numbers, in the same spirit as
+    classify_k_resample_result: the number that gets reported is the number
+    that was tested, against thresholds fixed before the data existed.
+
+    ``summary`` is expected to carry (all optional -- missing keys yield
+    "not_measured" rather than raising, so a partial run can still be judged):
+      perception:            bootstrap_auroc_ci dict
+      reasoning_pooled:      bootstrap_auroc_ci dict
+      reasoning_error_stratum / reasoning_clean_stratum: bootstrap_auroc_ci dicts
+
+    Verdicts are deliberately blunt strings, not scores -- the point is that a
+    result lands in a bucket chosen in advance.
+    """
+    prereg = prereg or SCALEUP_PREREGISTRATION
+    out = {"prereg_registered": prereg["registered"]}
+
+    def underpowered(ci):
+        return min(ci.get("n_error", 0), ci.get("n_correct", 0)) < prereg["min_minority_class"]
+
+    perception = summary.get("perception")
+    if perception is None:
+        out["perception"] = "not_measured"
+    elif underpowered(perception):
+        out["perception"] = "inconclusive_underpowered"
+    elif perception["ci_low"] >= prereg["perception_ci_low_min"]:
+        out["perception"] = "replicated"
+    elif perception["excludes_chance"]:
+        out["perception"] = "weaker_than_pilot"
+    else:
+        out["perception"] = "failed_to_replicate"
+
+    pooled = summary.get("reasoning_pooled")
+    if pooled is None:
+        out["reasoning_pooled"] = "not_measured"
+    elif underpowered(pooled):
+        out["reasoning_pooled"] = "inconclusive_underpowered"
+    elif pooled["ci_low"] >= prereg["reasoning_pooled_ci_low_min"]:
+        out["reasoning_pooled"] = "signal_confirmed"
+    else:
+        out["reasoning_pooled"] = "no_signal"
+
+    err = summary.get("reasoning_error_stratum")
+    clean = summary.get("reasoning_clean_stratum")
+    if err is None:
+        out["reasoning_stratified"] = "not_measured"
+    elif underpowered(err):
+        out["reasoning_stratified"] = "inconclusive_underpowered"
+    elif (
+        err["auroc"] >= prereg["reasoning_stratum_auroc_min"]
+        and err["excludes_chance"]
+    ):
+        out["reasoning_stratified"] = "confirmed"
+    else:
+        out["reasoning_stratified"] = "not_confirmed"
+
+    # Judged separately: the inversion prediction can fail while the main
+    # stratified prediction holds, and that combination is informative -- it
+    # would mean the signal is real but the bias explanation for the pooled
+    # collapse is wrong.
+    if clean is None or math.isnan(clean.get("auroc", float("nan"))):
+        out["clean_stratum_inversion"] = "not_measured"
+    elif clean["auroc"] < prereg["clean_stratum_auroc_max"]:
+        out["clean_stratum_inversion"] = "confirmed"
+    else:
+        out["clean_stratum_inversion"] = "not_confirmed"
+
+    return out
+
+
 def main(results_csv: str, output_dir: str = "figures") -> None:
     """Load results, run the integrity checks, save the two box plots."""
     df = load_results(results_csv)

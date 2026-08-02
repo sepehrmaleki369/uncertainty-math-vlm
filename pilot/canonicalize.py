@@ -32,7 +32,7 @@ from typing import Optional
 import sympy
 from sympy.parsing.latex import parse_latex
 
-from pilot.entropy import PARSE_FAILURE_SENTINEL
+from pilot.entropy import PARSE_FAILURE_SENTINEL, normalize_string
 
 # Above this length, the text is almost certainly a multi-step derivation
 # with prose rather than a single expression -- skip the SymPy attempt
@@ -154,3 +154,23 @@ def canonicalize_math(text: Optional[str]) -> str:
             pass  # not a parseable single expression -- fall through
 
     return f"text:{cleaned}"
+
+
+def canonical_answer_label(text: Optional[str]) -> str:
+    """Full pipeline from raw transcription text to a perception cluster label.
+
+    extract_final_answer -> canonicalize_math -> normalize_string, in that
+    order. Exists so the K sampled transcriptions and the ground-truth answer
+    are put through *exactly* the same transformation before being compared.
+
+    That symmetry is the whole point. pilot.entropy.majority_cluster
+    normalizes the labels it returns (lowercasing among other things), so
+    comparing its output against a ground truth that skipped normalize_string
+    silently fails on any answer whose canonical form contains an uppercase
+    character. On the real n=100 data that meant every sympy-parsed equation
+    ("sympy:Eq(x, 1)" vs. "sympy:eq(x, 1)") counted as a mismatch, scoring
+    36/100 correct instead of 42/100 and dropping perception AUROC from 0.788
+    to 0.757 -- a silent, plausible-looking wrong answer. Route both sides
+    through this function rather than composing the three steps by hand.
+    """
+    return normalize_string(canonicalize_math(extract_final_answer(text)))
