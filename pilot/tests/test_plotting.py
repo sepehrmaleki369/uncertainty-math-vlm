@@ -5,6 +5,9 @@ import pytest
 
 from pilot.plotting import (
     REQUIRED_COLUMNS,
+    auroc_sensitivity,
+    bootstrap_auroc_ci,
+    bootstrap_auroc_difference_ci,
     check_parse_failure_rate,
     check_temperature_zero_anchor,
     classify_k_resample_result,
@@ -152,6 +155,212 @@ def test_compute_auroc_handles_ties():
 def test_compute_auroc_empty_class_returns_nan():
     df = pd.DataFrame({"entropy": [0.1, 0.2, 0.3], "correct": [True, True, True]})
     assert math.isnan(compute_auroc(df, "entropy", "correct"))
+
+
+# --- bootstrap_auroc_ci ---
+
+
+def _k5_baseline_frame():
+    """The real 2026-07-31 reasoning-arm distribution as a literal fixture --
+    same construction as test_compute_auroc_reproduces_real_k5_baseline_distribution."""
+    values = [0.0, 0.5004024235381879, 0.6730116670092565, 0.9502705392332348, 1.0549201679861442]
+    correct_counts = [31, 29, 12, 1, 2]
+    incorrect_counts = [7, 7, 10, 1, 0]
+    entropy, correct = [], []
+    for v, c in zip(values, correct_counts):
+        entropy += [v] * c
+        correct += [True] * c
+    for v, c in zip(values, incorrect_counts):
+        entropy += [v] * c
+        correct += [False] * c
+    return pd.DataFrame({"reasoning_entropy": entropy, "grading_correct": correct})
+
+
+def test_bootstrap_auroc_ci_point_estimate_matches_compute_auroc():
+    df = _k5_baseline_frame()
+    result = bootstrap_auroc_ci(df, "reasoning_entropy", "grading_correct", n_boot=200)
+    assert result["auroc"] == pytest.approx(
+        compute_auroc(df, "reasoning_entropy", "grading_correct")
+    )
+
+
+def test_bootstrap_auroc_ci_brackets_the_point_estimate():
+    df = _k5_baseline_frame()
+    r = bootstrap_auroc_ci(df, "reasoning_entropy", "grading_correct", n_boot=2000)
+    assert r["ci_low"] < r["auroc"] < r["ci_high"]
+    assert r["n_items"] == 100
+    assert r["n_error"] == 25 and r["n_correct"] == 75
+
+
+def test_bootstrap_auroc_ci_real_reasoning_arm_does_not_exclude_chance():
+    """The finding that motivated adding CIs at all (2026-08-02): the reasoning
+    arm's headline AUROC 0.6184 was written up as a real-but-weak signal, but its
+    95% CI includes 0.5 at n=100 -- it is not distinguishable from chance. This
+    locks in that conclusion so a future change can't quietly restore the
+    stronger claim."""
+    df = _k5_baseline_frame()
+    r = bootstrap_auroc_ci(df, "reasoning_entropy", "grading_correct", n_boot=10000, seed=0)
+    assert r["auroc"] == pytest.approx(0.6184, abs=1e-4)
+    assert r["ci_low"] < 0.5
+    assert r["excludes_chance"] is False
+
+
+def test_bootstrap_auroc_ci_strong_separation_excludes_chance():
+    df = pd.DataFrame(
+        {"entropy": [0.0, 0.05, 0.1, 0.15, 0.2] * 6 + [0.8, 0.85, 0.9, 0.95, 1.0] * 6,
+         "correct": [True] * 30 + [False] * 30}
+    )
+    r = bootstrap_auroc_ci(df, "entropy", "correct", n_boot=2000)
+    assert r["excludes_chance"] is True
+    assert r["ci_low"] > 0.5
+
+
+def test_bootstrap_auroc_ci_is_deterministic_for_a_seed():
+    df = _k5_baseline_frame()
+    kwargs = dict(n_boot=500, seed=7)
+    a = bootstrap_auroc_ci(df, "reasoning_entropy", "grading_correct", **kwargs)
+    b = bootstrap_auroc_ci(df, "reasoning_entropy", "grading_correct", **kwargs)
+    assert (a["ci_low"], a["ci_high"]) == (b["ci_low"], b["ci_high"])
+
+
+def test_bootstrap_auroc_ci_single_class_returns_nan_ci():
+    df = pd.DataFrame({"entropy": [0.1, 0.2, 0.3], "correct": [True, True, True]})
+    r = bootstrap_auroc_ci(df, "entropy", "correct", n_boot=50)
+    assert math.isnan(r["auroc"]) and math.isnan(r["ci_low"])
+    assert r["excludes_chance"] is False
+
+
+# --- bootstrap_auroc_difference_ci ---
+
+
+def test_bootstrap_auroc_difference_paired_resample_keeps_item_pairing():
+    """A paired difference CI must be narrower than what you'd conclude from two
+    overlapping marginal CIs when the two metrics are strongly correlated across
+    items -- that correlation is exactly what pairing preserves and what
+    comparing two separate CIs throws away."""
+    # entropy_b is entropy_a plus a small constant shift: perfectly correlated,
+    # so the *difference* in AUROC is near-zero with a tight interval, even
+    # though each marginal AUROC has a wide interval at this n.
+    entropy = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0] * 5
+    correct = [True, True, False, True, False, False] * 5
+    df = pd.DataFrame({"ent_a": entropy, "ent_b": entropy, "correct": correct})
+    r = bootstrap_auroc_difference_ci(df, "ent_a", "correct", "ent_b", "correct", n_boot=1000)
+    assert r["difference"] == pytest.approx(0.0)
+    assert r["ci_low"] == pytest.approx(0.0) and r["ci_high"] == pytest.approx(0.0)
+    assert r["difference_excludes_zero"] is False
+
+
+def test_bootstrap_auroc_difference_detects_a_real_gap():
+    n = 40
+    df = pd.DataFrame(
+        {
+            "good": list(range(n // 2)) + list(range(100, 100 + n // 2)),  # separates
+            "useless": [0.5] * n,  # no signal
+            "correct": [True] * (n // 2) + [False] * (n // 2),
+        }
+    )
+    r = bootstrap_auroc_difference_ci(df, "good", "correct", "useless", "correct", n_boot=2000)
+    assert r["difference"] == pytest.approx(0.5)
+    assert r["difference_excludes_zero"] is True
+
+
+def test_bootstrap_auroc_difference_reports_differing_error_counts():
+    """The K=5 vs K=15 comparison scores the two AUROCs against *different*
+    correctness labels (grading_correct flips as K changes). The interval can't
+    see that confound, so the counts have to be surfaced for the caller."""
+    df = pd.DataFrame(
+        {
+            "ent_a": [0.1, 0.2, 0.3, 0.4],
+            "ent_b": [0.1, 0.2, 0.3, 0.4],
+            "correct_a": [True, True, False, False],
+            "correct_b": [True, True, True, False],
+        }
+    )
+    r = bootstrap_auroc_difference_ci(df, "ent_a", "correct_a", "ent_b", "correct_b", n_boot=100)
+    assert r["n_error_a"] == 2
+    assert r["n_error_b"] == 1
+
+
+def test_bootstrap_auroc_difference_length_mismatch_raises():
+    df = pd.DataFrame(
+        {
+            "ent_a": [0.1, 0.2, 0.3, 0.4],
+            "ent_b": [0.1, None, 0.3, 0.4],
+            "correct": [True, True, False, False],
+        }
+    )
+    with pytest.raises(ValueError, match="equal-length"):
+        bootstrap_auroc_difference_ci(df, "ent_a", "correct", "ent_b", "correct", n_boot=10)
+
+
+# --- auroc_sensitivity ---
+
+
+def test_auroc_sensitivity_reports_all_cuts():
+    df = pd.DataFrame(
+        {
+            "entropy": [0.0, 0.5, math.log(5), 0.2, math.log(5), 0.9],
+            "correct": [True, True, False, True, False, False],
+            "n_transcription_parse_failures": [0, 1, 0, 0, 2, 0],
+        }
+    )
+    out = auroc_sensitivity(df, "entropy", "correct", "n_transcription_parse_failures", k=5, n_boot=100)
+    assert set(out) == {"full", "excl_parse_failures", "excl_max_entropy", "excl_both", "robust"}
+    assert out["full"]["n_items"] == 6
+    assert out["excl_parse_failures"]["n_items"] == 4  # drops the two failure rows
+    assert out["excl_max_entropy"]["n_items"] == 4  # drops the two ln(5) rows
+    assert out["excl_both"]["n_items"] == 3  # rows 1 and 4 overlap on both cuts
+
+
+def test_auroc_sensitivity_flags_a_pure_max_entropy_artifact():
+    """The artifact this function exists to catch: entropy is flat and
+    uninformative everywhere except a max-entropy cell that happens to be
+    all-incorrect. AUROC looks respectable on the full set but there is nothing
+    left once that cell is removed."""
+    df = pd.DataFrame(
+        {
+            "entropy": [0.5] * 20 + [math.log(5)] * 8,
+            "correct": [True] * 10 + [False] * 10 + [False] * 8,
+            "fails": [0] * 28,
+        }
+    )
+    out = auroc_sensitivity(df, "entropy", "correct", "fails", k=5, n_boot=1000)
+    assert out["full"]["auroc"] > 0.6  # looks like signal
+    assert out["excl_max_entropy"]["auroc"] == pytest.approx(0.5)  # nothing underneath
+    assert out["robust"] is False
+
+
+def test_auroc_sensitivity_real_perception_arm_is_robust():
+    """Regression test for the 2026-08-02 sensitivity check on the real
+    perception arm: the headline 0.788 was challenged as a possible
+    parse-failure / max-entropy artifact and survived every cut, holding at
+    0.707 with the CI still excluding 0.5 under the harshest simultaneous cut.
+    Fixture reproduces the real perception_entropy x correctness crosstab."""
+    values = [0.0, 0.5004024235381879, 0.6730116670092565, 0.9502705392332348,
+              1.0549201679861442, 1.3321790402101223, math.log(5)]
+    correct_counts = [11, 15, 2, 5, 4, 5, 0]  # sums to 42, matches real n_correct
+    incorrect_counts = [3, 7, 5, 9, 3, 17, 14]  # sums to 58, matches real n_incorrect
+    entropy, correct = [], []
+    for v, c in zip(values, correct_counts):
+        entropy += [v] * c
+        correct += [True] * c
+    for v, c in zip(values, incorrect_counts):
+        entropy += [v] * c
+        correct += [False] * c
+    df = pd.DataFrame(
+        {"perception_entropy": entropy, "transcription_correct": correct,
+         "n_transcription_parse_failures": [0] * 100}
+    )
+    out = auroc_sensitivity(
+        df, "perception_entropy", "transcription_correct",
+        "n_transcription_parse_failures", k=5, n_boot=10000, seed=0,
+    )
+    assert out["full"]["auroc"] == pytest.approx(0.788, abs=0.005)
+    assert out["full"]["excludes_chance"] is True
+    # 14 all-incorrect max-entropy items removed -- signal degrades but survives.
+    assert out["excl_max_entropy"]["auroc"] == pytest.approx(0.721, abs=0.005)
+    assert out["excl_max_entropy"]["excludes_chance"] is True
+    assert out["robust"] is True
 
 
 # --- join_k_resample ---

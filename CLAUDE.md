@@ -12,22 +12,52 @@ Don't re-derive findings from git history; the report is the maintained,
 compiled source of truth (`report/report.pdf` is the rendered version, kept
 in sync with `report/report.tex`). Status as of the last update:
 
-- **Perception entropy: working, AUROC 0.79.** Two prior approaches failed
-  first (exact-string clustering on the full derivation — too strict, 83%
-  pinned at max entropy; naive NLI/embedding clustering — over-merged, 95%
-  implausible correctness). Fix: extract just the final answer span
-  (`pilot/canonicalize.py:extract_final_answer`) before clustering, not the
-  whole derivation.
-- **Reasoning entropy, digit-only: working but weak** (AUROC 0.62 at K=5,
-  0.665 at K=15 — real but close to a structural ceiling for a binary signal).
-- **Reasoning entropy, text-clustering: works at K=5 (AUROC 0.70), fails at
-  K=15 (AUROC 0.52, worse than digit-only).** Root cause: NLI + union-find
-  transitive cascade merging — see `pilot/semantic.py:nli_cluster_labels`'s
-  docstring for the mechanism and a real example. **Do not use
-  `nli_cluster_labels`/`semantic_cluster_entropy` at K > 5 without either
-  re-verifying for that specific use case or replacing the union-find step
-  with a stricter merge criterion** (e.g. minimum intra-cluster pairwise
-  agreement fraction, not any single transitive chain).
+**Every AUROC now carries a bootstrap 95% CI, and they changed the
+conclusions.** At n=100 a single AUROC has a CI of roughly ±0.12 and a paired
+difference roughly ±0.15, so most of the differences this pilot chased are
+inside sampling error. Always report a CI alongside an AUROC here, and use
+`bootstrap_auroc_difference_ci` (paired, same resampled items) to compare two
+conditions — never "one CI excludes 0.5 and the other doesn't", which is the
+difference-in-significance fallacy and is exactly how the reasoning-text
+result got overstated the first time.
+
+- **Perception entropy: working and verified, AUROC 0.788 [0.697, 0.869].**
+  Two prior approaches failed first (exact-string clustering on the full
+  derivation — too strict, 83% pinned at max entropy; naive NLI/embedding
+  clustering — over-merged, 95% implausible correctness). Fix: extract just
+  the final answer span (`pilot/canonicalize.py:extract_final_answer`) before
+  clustering, not the whole derivation. Note this final path uses exact-string
+  `cluster_entropy`, **not** NLI — the headline result never touches
+  `pilot/semantic.py`. Survives every artifact cut (`auroc_sensitivity`):
+  0.707 [0.587, 0.819] excluding both parse failures and max-entropy items.
+  Side finding: all 14 items where the 5 transcriptions fully disagreed were
+  wrong (precision 1.00, recall 0.24 as an abstention rule).
+- **Reasoning entropy: not statistically resolved at n=100.** Digit-only is
+  0.618 [0.489, 0.741] at K=5 — the CI *includes chance*. K=15 gives 0.665
+  [0.514, 0.800], but the paired gain over K=5 is −0.047 [−0.178, +0.090]:
+  more sampling bought nothing measurable. Text-clustering is 0.702
+  [0.579, 0.817] at K=5, which beats chance on its own but **not** the
+  digit-only baseline it was meant to improve on (paired +0.083
+  [−0.064, +0.233]). Don't describe it as a validated improvement.
+- **Reasoning entropy, text-clustering at K=15: fails, AUROC 0.520
+  [0.378, 0.664].** The paired K=5 → K=15 degradation (+0.182 [+0.037, +0.330]
+  in favour of K=5) is the *only* reasoning-arm comparison that resolves at
+  this n. Root cause: NLI + union-find transitive cascade merging — see
+  `pilot/semantic.py:nli_cluster_labels`'s docstring for the mechanism and a
+  real example. **Do not use `nli_cluster_labels`/`semantic_cluster_entropy`
+  at K > 5 without either re-verifying for that specific use case or replacing
+  the union-find step with a stricter merge criterion** (e.g. minimum
+  intra-cluster pairwise agreement fraction, not any single transitive chain).
+- **n=100 is the binding constraint on everything else.** The agreed next step
+  is scaling the existing 3B pipeline to 300–500 items — *before* fixing the
+  cascade bug, trying 7B, or testing token-level confidence, since none of
+  those can be evaluated against a ±0.15 error bar. Also dump the pairwise NLI
+  entailment matrix on the next GPU run: it makes every future clustering
+  variant a free offline experiment.
+- **Independent of all the above: the model self-contradicts in 12% of grading
+  samples** (60/494 have `**Error:** 0` while their own `**Reasoning:**` opens
+  by flagging a mistake). That's a direct count, not an AUROC comparison, so
+  the CI work doesn't touch it.
 
 ## Repo-specific conventions
 
@@ -67,6 +97,13 @@ in sync with `report/report.tex`). Status as of the last update:
   (lexical-overlap over-merging, transitive cascade merging). A plausibility
   check against other known numbers, plus spot-checking individual
   clustering decisions, catches both.
+- **Check whether a difference is resolvable before explaining it.** A large
+  amount of effort here went into mechanistically explaining AUROC gaps that
+  turned out to be inside the error bar. Compute the CI first; if the paired
+  interval spans zero, the honest finding is "unresolved at this n", and any
+  mechanism you find is a hypothesis about the direction, not a cause of a
+  measured effect. (The cascade bug is real and reproduces as a unit test —
+  but the 0.702→0.520 *magnitude* attributed to it is poorly determined.)
 
 ## Testing
 

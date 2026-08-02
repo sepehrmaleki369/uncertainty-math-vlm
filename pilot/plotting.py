@@ -223,26 +223,223 @@ def summarize_results(df: pd.DataFrame) -> dict:
     return summary
 
 
+def _average_ranks(values: np.ndarray) -> np.ndarray:
+    """Average (tie-corrected) ranks, 1-based -- same convention as
+    pandas' rank(method="average"), but on a bare array so the bootstrap
+    loop doesn't pay for DataFrame construction 10k times."""
+    order = np.argsort(values, kind="mergesort")
+    ordered = values[order]
+    ranks = np.empty(len(values), dtype=float)
+    i = 0
+    while i < len(values):
+        j = i
+        while j + 1 < len(values) and ordered[j + 1] == ordered[i]:
+            j += 1
+        ranks[order[i : j + 1]] = (i + j) / 2.0 + 1.0
+        i = j + 1
+    return ranks
+
+
+def _auroc_from_arrays(entropy: np.ndarray, is_error: np.ndarray) -> float:
+    """Mann-Whitney AUROC for entropy ranking the is_error==True items above
+    the rest. Returns nan if either class is empty."""
+    pos = entropy[is_error]
+    neg = entropy[~is_error]
+    n_pos, n_neg = len(pos), len(neg)
+    if n_pos == 0 or n_neg == 0:
+        return float("nan")
+    ranks = _average_ranks(np.concatenate([pos, neg]))
+    return float((ranks[:n_pos].sum() - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg))
+
+
+def _error_arrays(
+    df: pd.DataFrame, entropy_col: str, correctness_col: str
+) -> tuple[np.ndarray, np.ndarray]:
+    """(entropy, is_error) arrays with rows missing an entropy value dropped."""
+    is_error = ~_as_bool(df[correctness_col])
+    entropy = df[entropy_col]
+    keep = entropy.notna()
+    return entropy[keep].to_numpy(dtype=float), is_error[keep].to_numpy(dtype=bool)
+
+
 def compute_auroc(df: pd.DataFrame, entropy_col: str, correctness_col: str) -> float:
     """AUROC for entropy_col predicting a correctness_col error, via the
     Mann-Whitney rank-sum identity: AUROC = (sum of ranks of the "incorrect"
     class - n_pos*(n_pos+1)/2) / (n_pos * n_neg). No scikit-learn dependency;
-    pandas' average-rank tie handling matches Mann-Whitney's. Verified against
-    the real 2026-07-31 100-item CSV (reasoning_entropy/grading_correct):
-    reproduces 0.6184, matching scipy.stats.mannwhitneyu independently.
+    average-rank tie handling matches Mann-Whitney's, which matters here --
+    K=5 entropy only takes 7 distinct values, so ties are the norm, not an
+    edge case. Verified against the real 2026-07-31 100-item CSV
+    (reasoning_entropy/grading_correct): reproduces 0.6184, matching
+    scipy.stats.mannwhitneyu independently.
 
     Returns nan if either class is empty (AUROC is undefined with one class).
     """
-    correct = _as_bool(df[correctness_col])
-    pos = df.loc[~correct, entropy_col].dropna()  # "positive" = predicting an error
-    neg = df.loc[correct, entropy_col].dropna()
-    n_pos, n_neg = len(pos), len(neg)
-    if n_pos == 0 or n_neg == 0:
-        return float("nan")
-    combined = pd.concat([pos, neg], ignore_index=True)
-    ranks = combined.rank(method="average")
-    rank_sum_pos = ranks.iloc[:n_pos].sum()
-    return (rank_sum_pos - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg)
+    return _auroc_from_arrays(*_error_arrays(df, entropy_col, correctness_col))
+
+
+def bootstrap_auroc_ci(
+    df: pd.DataFrame,
+    entropy_col: str,
+    correctness_col: str,
+    n_boot: int = 10000,
+    seed: int = 0,
+    alpha: float = 0.05,
+) -> dict:
+    """Percentile bootstrap CI for compute_auroc, resampling items with replacement.
+
+    Exists because every AUROC in this pilot is computed on n=100 items with a
+    minority class of 18-58, where the sampling error is large enough to decide
+    whether a reported difference means anything. Measured on the real data: the
+    reasoning arm's headline 0.618 has a 95% CI of [0.489, 0.742] -- it includes
+    0.5, i.e. that result is not distinguishable from chance, which the
+    point estimate alone completely hides.
+
+    `excludes_chance` is the field to actually branch on when writing up a
+    result, rather than eyeballing whether a point estimate "looks" predictive.
+    Bootstrap replicates that degenerate to a single class (possible when the
+    minority class is small) are skipped rather than counted as 0.5.
+    """
+    entropy, is_error = _error_arrays(df, entropy_col, correctness_col)
+    observed = _auroc_from_arrays(entropy, is_error)
+
+    rng = np.random.default_rng(seed)
+    n = len(entropy)
+    replicates = []
+    if n > 0:
+        for _ in range(n_boot):
+            idx = rng.integers(0, n, size=n)
+            value = _auroc_from_arrays(entropy[idx], is_error[idx])
+            if not math.isnan(value):
+                replicates.append(value)
+
+    if not replicates:
+        ci_low = ci_high = float("nan")
+    else:
+        ci_low = float(np.percentile(replicates, 100 * alpha / 2))
+        ci_high = float(np.percentile(replicates, 100 * (1 - alpha / 2)))
+
+    return {
+        "auroc": observed,
+        "ci_low": ci_low,
+        "ci_high": ci_high,
+        "n_items": int(n),
+        "n_error": int(is_error.sum()),
+        "n_correct": int((~is_error).sum()),
+        "n_boot_valid": len(replicates),
+        # The claim "this beats chance" reduced to one testable field.
+        "excludes_chance": bool(ci_low > 0.5) if replicates else False,
+    }
+
+
+def bootstrap_auroc_difference_ci(
+    df: pd.DataFrame,
+    entropy_col_a: str,
+    correctness_col_a: str,
+    entropy_col_b: str,
+    correctness_col_b: str,
+    n_boot: int = 10000,
+    seed: int = 0,
+    alpha: float = 0.05,
+) -> dict:
+    """Paired bootstrap CI for (AUROC_a - AUROC_b) over the same items.
+
+    The right test for "does condition A beat condition B" when both are
+    measured on one item set: resample items once per replicate and recompute
+    *both* AUROCs on that same resample, so the shared-item correlation is kept
+    rather than treated as two independent samples. Comparing two separately
+    computed CIs for overlap instead is the standard error here -- it is a
+    strictly more conservative and less informative test.
+
+    `difference_excludes_zero` is the field to branch on. Note this tests only
+    sampling error: if the two conditions also disagree about *which* items are
+    errors (e.g. the K=5 and K=15 grading labels differ), the comparison carries
+    that confound regardless of what this interval says -- see n_error_a /
+    n_error_b, which make it visible.
+    """
+    entropy_a, is_error_a = _error_arrays(df, entropy_col_a, correctness_col_a)
+    entropy_b, is_error_b = _error_arrays(df, entropy_col_b, correctness_col_b)
+    if len(entropy_a) != len(entropy_b):
+        raise ValueError(
+            f"paired comparison needs equal-length columns after dropping NaNs, "
+            f"got {len(entropy_a)} for {entropy_col_a} and {len(entropy_b)} for {entropy_col_b}"
+        )
+
+    observed = _auroc_from_arrays(entropy_a, is_error_a) - _auroc_from_arrays(
+        entropy_b, is_error_b
+    )
+
+    rng = np.random.default_rng(seed)
+    n = len(entropy_a)
+    replicates = []
+    for _ in range(n_boot):
+        idx = rng.integers(0, n, size=n)  # one resample, both metrics -- keeps pairing
+        a = _auroc_from_arrays(entropy_a[idx], is_error_a[idx])
+        b = _auroc_from_arrays(entropy_b[idx], is_error_b[idx])
+        if not (math.isnan(a) or math.isnan(b)):
+            replicates.append(a - b)
+
+    if not replicates:
+        ci_low = ci_high = float("nan")
+    else:
+        ci_low = float(np.percentile(replicates, 100 * alpha / 2))
+        ci_high = float(np.percentile(replicates, 100 * (1 - alpha / 2)))
+
+    return {
+        "difference": observed,
+        "ci_low": ci_low,
+        "ci_high": ci_high,
+        "n_items": int(n),
+        "n_error_a": int(is_error_a.sum()),
+        "n_error_b": int(is_error_b.sum()),
+        "n_boot_valid": len(replicates),
+        "difference_excludes_zero": bool(ci_low > 0 or ci_high < 0) if replicates else False,
+    }
+
+
+def auroc_sensitivity(
+    df: pd.DataFrame,
+    entropy_col: str,
+    correctness_col: str,
+    failure_col: str,
+    k: int = 5,
+    n_boot: int = 10000,
+    seed: int = 0,
+) -> dict:
+    """AUROC with CIs under the cuts that would expose a degenerate-signal artifact.
+
+    A cluster-entropy AUROC can be manufactured two ways that have nothing to do
+    with the model being usefully uncertain:
+      - parse failures get their own cluster (PARSE_FAILURE_SENTINEL), so an
+        unparseable sample inflates entropy *and* tends to be scored incorrect --
+        the metric would then be measuring the parser, not the model;
+      - items pinned at max entropy ln(k) can carry the whole ranking if that
+        cell happens to be all-incorrect, leaving nothing in the middle.
+    Dropping each, and both together, says how much of the signal is left.
+
+    Run on the real perception arm (2026-08-02): 0.788 full -> 0.773 without
+    parse failures -> 0.721 without max-entropy items -> 0.707 without both,
+    CI still excluding 0.5 at n=74. So neither cut explains the result.
+    """
+    at_max = np.isclose(df[entropy_col].astype(float), math.log(k))
+    clean = df[failure_col].fillna(0).astype(int) == 0
+
+    subsets = {
+        "full": df,
+        "excl_parse_failures": df[clean],
+        "excl_max_entropy": df[~at_max],
+        "excl_both": df[clean & ~at_max],
+    }
+    out = {}
+    for name, subset in subsets.items():
+        if len(subset) == 0:
+            out[name] = None
+            continue
+        out[name] = bootstrap_auroc_ci(
+            subset, entropy_col, correctness_col, n_boot=n_boot, seed=seed
+        )
+    # The headline survives only if the harshest simultaneous cut still beats chance.
+    out["robust"] = bool(out["excl_both"] and out["excl_both"]["excludes_chance"])
+    return out
 
 
 def join_k_resample(baseline_df: pd.DataFrame, resample_df: pd.DataFrame) -> pd.DataFrame:

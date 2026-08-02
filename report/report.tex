@@ -10,8 +10,10 @@
 
 \definecolor{darkgreen}{RGB}{0,120,0}
 \definecolor{darkred}{RGB}{180,0,0}
+\definecolor{darkamber}{RGB}{160,100,0}
 \newcommand{\worked}[1]{\textcolor{darkgreen}{\textbf{#1}}}
 \newcommand{\failed}[1]{\textcolor{darkred}{\textbf{#1}}}
+\newcommand{\unresolved}[1]{\textcolor{darkamber}{\textbf{#1}}}
 
 \title{Uncertainty Signal Pilot: Perception and Reasoning Entropy\\
 \large FERMAT Handwritten Math, Qwen2.5-VL-3B}
@@ -26,24 +28,28 @@ This pilot tests whether two entropy-based uncertainty signals -- \emph{percepti
 entropy} (instability in transcribing a handwritten math answer) and
 \emph{reasoning entropy} (instability in grading whether an answer contains an
 error) -- carry real signal about model correctness, on 100 items from the
-FERMAT dataset with Qwen2.5-VL-3B. Perception entropy required two failed
-approaches before a working one was found; the final version achieves
-AUROC~$=0.79$ with clearly visible separation between correct and incorrect
-items. Reasoning entropy's digit-only pipeline was clean from the start but the
-signal is weak (AUROC~$=0.62$ at $K=5$); resampling to $K=15$ confirmed the
-signal is real (the exact tie between correct/incorrect medians at $K=5$
-breaks) but only modestly stronger (AUROC~$=0.665$). A follow-up experiment
-clustering the model's own \verb|**Reasoning:**| explanation text -- rather than
-only its parsed \verb|**Error:**| digit -- found a substantially stronger signal
-at $K=5$ (AUROC~$=0.702$, without any additional sampling), traced to a
-concrete cause: in 12\% of samples the model's final digit contradicts its own
-just-written reasoning, and the digit is the noisier of the two. A GPU-accelerated
-confirmation at $K=15$ reproduced the $K=5$ number exactly but found the
-technique does \emph{not} generalize: AUROC collapsed to 0.520 (worse than
-digit-only), traced to transitive cascade over-merging in the clustering
-algorithm that gets worse as the number of pairwise comparisons grows. The
-$K=5$ result stands on its own; the technique needs a structural fix before
-further use at higher $K$.
+FERMAT dataset with Qwen2.5-VL-3B. \textbf{Perception entropy is the one result
+that resolves statistically}: AUROC~$=0.788$, 95\% CI $[0.697, 0.869]$, and it
+survives every artifact check applied to it -- removing all parse failures, all
+max-entropy items, and both together each leave the CI excluding chance (0.707,
+$[0.587, 0.819]$, at $n=74$ under the harshest cut). Reasoning entropy does not
+resolve at this sample size. Its digit-only signal is AUROC~$=0.618$ at $K=5$
+with a CI of $[0.489, 0.741]$ -- \emph{including} chance. Resampling to $K=15$
+raised the point estimate to 0.665 $[0.514, 0.800]$, but a paired test shows
+that change is not distinguishable from zero. A follow-up experiment clustering
+the model's own \verb|**Reasoning:**| explanation text rather than its parsed
+\verb|**Error:**| digit reached 0.702 $[0.579, 0.817]$ at $K=5$; that value does
+exclude chance on its own, but the \emph{paired} difference against the
+digit-only baseline it was meant to beat is $+0.083$ $[-0.064, +0.233]$ -- so
+the improvement itself is unproven. It also has a real mechanical defect:
+at $K=15$ it falls to 0.520, and the paired $K=5$ vs. $K=15$ degradation
+($+0.182$ in favour of $K=5$, $[+0.037, +0.330]$) is the one reasoning-arm comparison that does
+survive, consistent with a diagnosed transitive cascade over-merging bug in the
+clustering algorithm. The honest summary is that perception entropy shows a
+clear association with errors, reasoning entropy is directionally suggestive
+but not statistically resolved at $n=100$, and $K=15$ provides no reliable
+improvement at this sample size. Sample size, not technique, is the binding
+constraint on every open question here.
 \end{abstract}
 
 \section{Goal}
@@ -52,8 +58,19 @@ Given a vision-language model transcribing and grading handwritten math answers,
 does the entropy of its own repeated outputs -- how much it disagrees with
 itself across independent samples -- predict when it is actually wrong? This is
 a fast, scoped-down pilot to check whether either signal exists at all, not the
-full study: no bootstrap confidence intervals, no baseline suite, no conformal
-calibration, no human double grading, no full-dataset run.
+full study: no baseline suite, no conformal calibration, no human double
+grading, no full-dataset run.
+
+Every AUROC below is reported with a 95\% bootstrap confidence interval
+(10{,}000 item-level resamples, seed 0; \texttt{pilot.plotting.bootstrap\_auroc\_ci}).
+These were added late, after the substantive experiments were complete, and
+they materially changed what this report can claim -- several differences it
+originally presented as findings turn out to be within sampling error at
+$n=100$. Where two conditions are compared, the comparison uses a
+\emph{paired} bootstrap over the same resampled items
+(\texttt{bootstrap\_auroc\_difference\_ci}) rather than checking whether two
+marginal intervals overlap, which is a strictly weaker and commonly misread
+test.
 
 \section{Setup}
 
@@ -135,6 +152,7 @@ same syntactic/canonicalization approach as Attempt~1.
 Metric & Value \\
 \midrule
 AUROC (perception entropy $\rightarrow$ transcription error) & \textbf{0.788} \\
+\quad 95\% CI & $[0.697, 0.869]$ \\
 Items at max entropy & 14/100 \\
 Transcription correct & 42/100 \\
 Median entropy, correct group ($n=42$) & 0.500 \\
@@ -146,9 +164,51 @@ Mean entropy, incorrect group & 1.099 \\
 \end{center}
 
 This is the strongest result in the pilot: real, visible separation between
-correct and incorrect items (Figure~\ref{fig:both-arms}, left panel).
+correct and incorrect items (Figure~\ref{fig:both-arms}, left panel), and the
+only arm whose confidence interval excludes chance by a clear margin.
 
-\section{Reasoning Entropy: Clean Pipeline, Weak but Real Signal}
+\subsection{Sensitivity: is 0.788 an artifact?}
+\label{sec:perception-sensitivity}
+
+An entropy AUROC can be manufactured two ways that have nothing to do with the
+model being usefully uncertain, and both are live concerns here. First, parse
+failures receive their own cluster label, so an unparseable sample inflates
+entropy \emph{and} tends to be scored incorrect -- the metric would then be
+measuring the parser rather than the model. Second, $K=5$ entropy takes only 7
+distinct values, and the 14 items pinned at $\ln 5$ are \emph{all} incorrect;
+if that single cell carried the ranking, there would be no graded signal
+underneath it. Each cut was rerun with its own CI
+(\texttt{pilot.plotting.auroc\_sensitivity}):
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+Subset & $n$ & AUROC & 95\% CI \\
+\midrule
+Full & 100 & 0.788 & $[0.697, 0.869]$ \\
+Excluding all parse failures & 85 & 0.773 & $[0.672, 0.865]$ \\
+Excluding max-entropy items & 86 & 0.721 & $[0.611, 0.822]$ \\
+Excluding both & 74 & \textbf{0.707} & $[0.587, 0.819]$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Neither cut explains the result. Dropping all 15 parse-failure items moves the
+estimate by 0.015, and only 3 of the 14 max-entropy items had a parse failure
+at all (mean entropy 0.99 for parse-failure items vs. 0.864 for clean ones --
+a small gap, not a confound). Under the harshest simultaneous cut the interval
+still excludes 0.5. The underlying distribution is monotone rather than
+concentrated in one cell: of items at zero entropy 11/14 were transcribed
+correctly, falling steadily to 0/14 at maximum entropy.
+
+That top cell is worth stating as a result rather than treated only as a
+robustness threat: \textbf{every one of the 14 items where all five
+transcriptions disagreed was wrong} -- precision 1.00 as an abstention rule,
+recall 0.24 of all 58 errors. On $n=100$ a zero-false-positive cell of size 14
+is suggestive rather than established, but it is the most directly actionable
+thing in the pilot.
+
+\section{Reasoning Entropy: Clean Pipeline, Unresolved Signal}
 
 Unlike perception, the reasoning/grading pipeline required no comparable fix.
 It clusters a single parsed binary digit (error present/absent) rather than
@@ -164,6 +224,7 @@ items against the stored results: zero mismatches.
 Metric & Value \\
 \midrule
 AUROC (reasoning entropy $\rightarrow$ grading error) & 0.618 \\
+\quad 95\% CI & $[0.489, 0.741]$ \\
 Grading accuracy & 75\% \\
 Median entropy, correct group ($n=75$) & 0.5004 \\
 Median entropy, incorrect group ($n=25$) & 0.5004 \\
@@ -171,9 +232,15 @@ Median entropy, incorrect group ($n=25$) & 0.5004 \\
 \end{tabular}
 \end{center}
 
-The medians are \emph{exactly} tied. With only 5 samples of a binary outcome,
-there are just 3 realistic entropy values (unanimous, a 4--1 split, a 3--2
-split), which structurally limits how well two groups can be told apart by
+\textbf{This interval includes 0.5.} With 25 items in the minority class, an
+AUROC of 0.618 is not distinguishable from chance, and earlier drafts of this
+report describing it as a ``real but weak'' signal overstated it. Everything
+downstream in this section was motivated by trying to strengthen a number that
+was never established in the first place.
+
+The medians are also \emph{exactly} tied. With only 5 samples of a binary
+outcome, there are just 3 realistic entropy values (unanimous, a 4--1 split, a
+3--2 split), which structurally limits how well two groups can be told apart by
 this statistic.
 
 \subsection{$K=15$ follow-up: is the weak signal a real ceiling, or under-sampling?}
@@ -188,6 +255,7 @@ samples and drawing 10 more), keeping perception untouched.
 Metric & $K=5$ & $K=15$ \\
 \midrule
 AUROC & 0.618 & 0.665 \\
+\quad 95\% CI & $[0.489, 0.741]$ & $[0.514, 0.800]$ \\
 Grading accuracy & 75\% & 82\% \\
 Distinct entropy values reached & 5 & 13 \\
 Median entropy, correct group & 0.500 & 0.439 \\
@@ -196,16 +264,27 @@ Median entropy, incorrect group & 0.500 & 0.608 \\
 \end{tabular}
 \end{center}
 
-The exact median tie \emph{does} break at $K=15$ (Figure~\ref{fig:k-comparison}) --
-real evidence that $K=5$ was not measuring nothing. But the improvement is
-modest, not dramatic: a pre-registered decision rule (AUROC $\geq 0.72$
-\emph{and} the median tie breaking, to count as ``sharper''; $0.55$--$0.72$ as
-``real but modest''; below $0.55$ as ``noise'') classifies this result as
-\textbf{confirmed\_modest}. This pointed at a different question: is more
-sampling the right lever at all, or is the \emph{digit itself} too coarse a
-readout of the model's judgment?
+The exact median tie \emph{does} break at $K=15$ (Figure~\ref{fig:k-comparison}),
+and the $K=15$ interval does clear 0.5 -- though only just. A pre-registered
+decision rule (AUROC $\geq 0.72$ \emph{and} the median tie breaking, to count as
+``sharper''; $0.55$--$0.72$ as ``real but modest''; below $0.55$ as ``noise'')
+classifies this as \textbf{confirmed\_modest}.
 
-\subsection{Reasoning-text clustering: a stronger, less noisy signal \worked{(worked)}}
+That classification should be read with the paired comparison in mind, because
+the apparent $0.618 \rightarrow 0.665$ gain is \emph{not} evidence that more
+sampling helped: the paired difference is $-0.047$ with a 95\% CI of
+$[-0.178, +0.090]$, comfortably spanning zero. The tie breaking is a genuine
+structural consequence of having 13 reachable entropy values instead of 5, but
+tripling $K$ bought no measurable discrimination. Note also that grading
+accuracy itself moved (75\% $\rightarrow$ 82\%), so the two AUROCs are scored
+against different correctness labels -- 25 errors vs. 18 -- which the paired
+interval cannot correct for.
+
+This pointed at a different question: is more sampling the right lever at all,
+or is the \emph{digit itself} too coarse a readout of the model's judgment?
+
+\subsection{Reasoning-text clustering: a promising readout, an unproven improvement \unresolved{(unresolved)}}
+\label{sec:reasoning-text-k5}
 
 The grading prompt asks the model to write a \verb|**Reasoning:**| explanation
 before its \verb|**Error:**| digit. Every analysis so far discarded that
@@ -220,11 +299,29 @@ no additional GPU cost.
 Metric & Digit-only & Reasoning-text \\
 \midrule
 AUROC & 0.618 & \textbf{0.702} \\
+\quad 95\% CI & $[0.489, 0.741]$ & $[0.579, 0.817]$ \\
 Median entropy, correct group ($n=75$) & 0.500 & 0.950 \\
 Median entropy, incorrect group ($n=25$) & 0.500 (tied) & 1.332 \\
+\midrule
+\multicolumn{3}{l}{\emph{Paired difference} (text $-$ digit, same items, same labels):} \\
+\multicolumn{3}{r}{$+0.083$, \quad 95\% CI $[-0.064, +0.233]$} \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+\textbf{The improvement is not statistically established.} Reasoning-text
+clustering at $K=5$ does clear chance on its own terms ($[0.579, 0.817]$ excludes
+0.5) where the digit-only baseline does not ($[0.489, 0.741]$ does not) -- but
+that pattern is precisely the ``difference in significance is not a significant
+difference'' trap. The correct test is the paired one, and its interval spans
+zero. An earlier draft of this report called this ``a stronger, less noisy
+signal'' and ``arguably the most interesting result of the reasoning-arm
+investigation''; on the evidence available at $n=100$, that claim is not
+supported. What survives is narrower and still worth having: reasoning-text
+clustering is the only reasoning-arm readout whose own interval excludes chance,
+and it has a documented mechanism (below) for why it should be less noisy than
+the digit. That makes it the right candidate to test at larger $n$, not a
+demonstrated win.
 
 Given that the same NLI approach caused Attempt 2's over-merging failure on
 perception, this result was not trusted without directly checking for the same
@@ -244,6 +341,12 @@ fully-formed judgment already written. At $K=5$, reasoning-text clustering is
 not an artifact of NLI bias; it is a readout that is not vulnerable to this
 specific noise source the way the digit alone is (Figure~\ref{fig:reasoning-text}).
 
+This 12\% self-contradiction rate is a measurement about the model, not about
+the clustering method, and it is unaffected by everything the confidence
+intervals overturn -- it is a direct count over 494 parsed samples, not an
+AUROC comparison. It stands as an independent finding regardless of whether
+reasoning-text entropy ever proves to be the better predictor.
+
 \subsection{$K=15$ GPU confirmation: the $K=5$ result does not generalize \failed{(failed)}}
 \label{sec:k15-cascade-failure}
 
@@ -260,14 +363,28 @@ revealed the $K=15$ result does not hold up:
 Metric & $K=5$ & $K=15$ \\
 \midrule
 AUROC (reasoning-text) & 0.702 & \textbf{0.520} \\
+\quad 95\% CI & $[0.579, 0.817]$ & $[0.378, 0.664]$ \\
 Items with a digit split & 61/100 & 87/100 \\
 Cross-digit cluster merges & 55 & \textbf{1187} \\
+\midrule
+\multicolumn{3}{l}{\emph{Paired difference} ($K=5$ $-$ $K=15$, same items):} \\
+\multicolumn{3}{r}{$+0.182$, \quad 95\% CI $[+0.037, +0.330]$} \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-0.520 is barely better than chance, and worse than the $K=15$ digit-only
-result (0.665). The cross-digit merge count grew far faster than the
+The $K=15$ interval includes 0.5, so the technique is not distinguishable from
+chance at that $K$. More usefully, the degradation from $K=5$ to $K=15$ is the
+\emph{only} reasoning-arm comparison in this report whose paired interval
+excludes zero -- this is the one place where the data can actually tell two
+conditions apart. It carries one caveat that the interval cannot absorb:
+grading accuracy differs between the two runs (25 errors vs. 18), so the two
+AUROCs are scored against different label sets. The mechanistic evidence below
+is what makes the degradation credible rather than the interval alone.
+
+The paired comparison against the digit-only baseline at $K=15$ is
+$-0.145$, 95\% CI $[-0.317, +0.037]$: directionally worse, not resolvably so.
+The cross-digit merge count grew far faster than the
 $\sim 10\times$ increase in available pairs ($\binom{15}{2}=105$ vs.
 $\binom{5}{2}=10$) would predict -- a $\sim 21\times$ increase in merges from a
 $\sim 10\times$ increase in comparisons. Re-clustering individual items locally
@@ -286,13 +403,17 @@ collapse the aggregate signal to near-random. More pairwise comparisons mean
 more chances for a single false-positive entailment call to cascade, and
 union-find has no mechanism to catch or bound that once it happens.
 
-The $K=5$ finding (AUROC 0.702) stands on its own -- it was independently
-verified against real data, not merely computed once. But it does not
-generalize to $K=15$ under the current clustering method, and should not be
-presented as validated at scale. A structural fix (e.g. requiring a minimum
-fraction of pairwise agreement within a cluster rather than any transitive
-chain, or a stricter/larger NLI model) would need to precede any further use
-of this technique at higher $K$.
+The mechanism is established: the cascade was found by re-clustering real items
+and reading actual cluster membership, and it reproduces as a unit test. What
+the confidence intervals add is a bound on how much of the \emph{aggregate}
+0.702 $\rightarrow$ 0.520 drop can be attributed to it -- the paired interval
+$[+0.037, +0.330]$ is wide, so the degradation is real in direction but poorly
+determined in magnitude. A structural fix (e.g. requiring a minimum fraction of
+pairwise agreement within a cluster rather than any transitive chain, or a
+stricter/larger NLI model) would need to precede any further use of this
+technique at higher $K$ -- though at $n=100$ such a fix could not be evaluated
+with any precision either, which is why sample size is the recommended next
+lever rather than the algorithm.
 
 \section{Integrity Checks}
 
@@ -324,27 +445,53 @@ a full-width colon); widening the pattern recovered most of the missed samples.
 \section{Summary}
 
 \begin{center}
-\begin{tabular}{lccc}
+\begin{tabular}{llcl}
 \toprule
-Arm & Status & AUROC & Notes \\
+Arm & Status & AUROC (95\% CI) & Notes \\
 \midrule
-Perception (final) & \worked{Working} & 0.788 & Strong, visible separation \\
+Perception (final) & \worked{Working} & \textbf{0.788} $[0.697, 0.869]$ & Robust to all artifact cuts \\
 Perception (attempt 1) & \failed{Failed} & -- & 83\% pinned at max entropy \\
 Perception (attempt 2) & \failed{Failed} & -- & Over-merged, 95\% implausible \\
-Reasoning, digit-only ($K=5$) & \worked{Working} & 0.618 & Real but weak, medians tied \\
-Reasoning, digit-only ($K=15$) & \worked{Working} & 0.665 & Confirmed modest, near ceiling \\
-Reasoning, text-clustering ($K=5$) & \worked{Working} & \textbf{0.702} & Best result at $K=5$; validated \\
-Reasoning, text-clustering ($K=15$) & \failed{Failed} & 0.520 & Cascade over-merging; does not generalize \\
+Reasoning, digit ($K=5$) & \unresolved{Unresolved} & 0.618 $[0.489, 0.741]$ & CI includes chance \\
+Reasoning, digit ($K=15$) & \unresolved{Unresolved} & 0.665 $[0.514, 0.800]$ & No paired gain over $K=5$ \\
+Reasoning, text ($K=5$) & \unresolved{Unresolved} & 0.702 $[0.579, 0.817]$ & Beats chance, not the baseline \\
+Reasoning, text ($K=15$) & \failed{Failed} & 0.520 $[0.378, 0.664]$ & Cascade over-merging \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+Reading the table by point estimate alone reverses two of its conclusions, so
+the paired comparisons are collected here explicitly. Exactly one of the five
+differences this pilot examined can be resolved at $n=100$ -- and it is a
+degradation, not a gain:
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+Comparison & Paired difference (95\% CI) & Resolved? \\
+\midrule
+Reasoning text $-$ digit, $K=5$ & $+0.083$ $[-0.064, +0.233]$ & No \\
+Reasoning text $-$ digit, $K=15$ & $-0.145$ $[-0.317, +0.037]$ & No \\
+Reasoning digit, $K=5 - K=15$ & $-0.047$ $[-0.178, +0.090]$ & No \\
+Reasoning text, $K=5 - K=15$ & $+0.182$ $[+0.037, +0.330]$ & \worked{Yes} \\
+Perception $-$ best reasoning arm & $+0.086$ $[-0.073, +0.243]$ & No$^{\dagger}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent{\small $^{\dagger}$ Perception and reasoning predict errors on
+\emph{different tasks} with different base rates, so this row is descriptive
+only -- a paired interval is not the right instrument for it. Perception's
+standing rests on its own CI excluding chance and surviving
+\S\ref{sec:perception-sensitivity}'s cuts, not on beating the reasoning arm.}
 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{figures/final_both_arms_n100.png}
   \caption{Final result for both arms, $n=100$. Left: perception entropy by
-  transcription correctness (AUROC 0.79). Right: reasoning entropy by grading
-  correctness at $K=5$ (AUROC 0.62).}
+  transcription correctness (AUROC 0.788, 95\% CI $[0.697, 0.869]$). Right:
+  reasoning entropy by grading correctness at $K=5$ (AUROC 0.618, 95\% CI
+  $[0.489, 0.741]$ -- includes chance).}
   \label{fig:both-arms}
 \end{figure}
 
@@ -352,8 +499,10 @@ Reasoning, text-clustering ($K=15$) & \failed{Failed} & 0.520 & Cascade over-mer
   \centering
   \includegraphics[width=\textwidth]{figures/k5_vs_k15_comparison.png}
   \caption{Reasoning entropy before ($K=5$) and after ($K=15$) resampling, same
-  100 items. The exact median tie at $K=5$ breaks at $K=15$, but the overall
-  separation remains modest.}
+  100 items. The exact median tie at $K=5$ breaks at $K=15$ -- a structural
+  consequence of 13 reachable entropy values instead of 5 -- but the paired
+  AUROC difference is $-0.047$, 95\% CI $[-0.178, +0.090]$: no measurable gain
+  in discrimination.}
   \label{fig:k-comparison}
 \end{figure}
 
@@ -363,20 +512,32 @@ Reasoning, text-clustering ($K=15$) & \failed{Failed} & 0.520 & Cascade over-mer
   \caption{Reasoning entropy at $K=5$: clustering the model's reasoning text
   (left, AUROC 0.702) vs. the digit-only baseline (right, AUROC 0.618), same
   100 items. The reasoning-text approach separates the incorrect group's
-  median well above the correct group's; the digit-only approach ties them
-  exactly.}
+  median above the correct group's; the digit-only approach ties them exactly.
+  The visible gap is not statistically resolved, however: the paired difference
+  is $+0.083$, 95\% CI $[-0.064, +0.233]$
+  (\S\ref{sec:reasoning-text-k5}).}
   \label{fig:reasoning-text}
 \end{figure}
 
 \section{Limitations}
 
 \begin{itemize}
-  \item \textbf{Single model, single run size.} All results are Qwen2.5-VL-3B
-    on 100 items; no comparison to a larger model (7B) or a baseline
-    uncertainty method.
-  \item \textbf{No statistical inference.} No confidence intervals, no
-    significance testing (DeLong's test, bootstrap) -- explicitly out of
-    scope for this pass.
+  \item \textbf{$n=100$ is the binding constraint on every open question.}
+    This is the central limitation, and it subsumes several others. With a
+    minority class of 18--58 items, the 95\% CI on a single AUROC spans roughly
+    $\pm 0.12$ and on a paired difference roughly $\pm 0.15$. Four of the five
+    comparisons this pilot ran are therefore unresolvable, including the two it
+    was designed to answer. Any further work that does not increase $n$ --
+    a larger model, a fixed clustering algorithm, a new prompt design -- would
+    produce another point estimate with the same error bar and would not
+    settle anything.
+  \item \textbf{Single model.} All results are Qwen2.5-VL-3B; no comparison to
+    a larger model (7B) or to a baseline uncertainty method.
+  \item \textbf{Confidence intervals were added retrospectively.} The
+    experiments were designed, run, and initially written up without them; the
+    intervals were computed afterwards on the same data. They correct the
+    report's claims but cannot retroactively supply the statistical power the
+    experiments were never sized for.
   \item \textbf{Perception correctness label is strict.} Transcription
     correctness requires the extracted final answer to match ground truth
     after canonicalization; some ``incorrect'' classifications are plausibly
@@ -390,34 +551,56 @@ Reasoning, text-clustering ($K=15$) & \failed{Failed} & 0.520 & Cascade over-mer
     binary-outcome information limit applies to \emph{this} grading task
     design; a differently-posed prompt (e.g. eliciting a confidence score
     rather than a forced binary decision) was not tested.
-  \item \textbf{Reasoning-text clustering is confirmed to work at $K=5$ only,
-    and confirmed to fail at $K=15$.} Not merely unconfirmed at scale -- tested
-    and found to collapse to near-random (AUROC 0.520) due to transitive
-    cascade over-merging (\S\ref{sec:k15-cascade-failure}). The underlying cross-encoder is also a
-    small, general-purpose NLI model rather than one tuned for mathematical
-    reasoning text, which may independently limit how far this approach
-    can go even after the cascade issue is fixed.
+  \item \textbf{Reasoning-text clustering has a confirmed mechanical defect at
+    $K=15$.} Tested and found to collapse to near-random (AUROC 0.520) due to
+    transitive cascade over-merging (\S\ref{sec:k15-cascade-failure}). The
+    mechanism is verified by direct inspection of cluster membership; the
+    magnitude of its effect on aggregate AUROC is not well determined at this
+    $n$. The underlying cross-encoder is also a small, general-purpose NLI
+    model rather than one tuned for mathematical reasoning text, which may
+    independently limit how far this approach can go even after the cascade
+    issue is fixed.
 \end{itemize}
 
 \section{Recommended Next Steps}
 
+The ordering below follows from the limitation above: with four of five
+comparisons unresolvable at $n=100$, increasing $n$ dominates every other
+available lever, and should precede them rather than follow them.
+
 \begin{enumerate}
-  \item \textbf{Fix the clustering algorithm's cascade fragility before
-    trusting reasoning-text clustering at any $K > 5$.} Replace or constrain
+  \item \textbf{Scale the existing 3B pipeline to 300--500 items.} This is the
+    highest-value next run and the cheapest of the scaling options: the
+    pipeline already works, no quantization or model-loading changes are
+    needed, and the cost is roughly linear in items. At $n=400$ the CI on a
+    single AUROC narrows from about $\pm 0.12$ to about $\pm 0.06$, which is
+    the difference between ``suggestive'' and ``settled'' for every reasoning
+    comparison in this report. Re-running the same five comparisons at that $n$
+    requires no new analysis code -- \texttt{pilot.plotting} already implements
+    all of it.
+  \item \textbf{Dump the pairwise NLI entailment matrix on the next GPU run.}
+    A cheap byproduct with disproportionate value: the expensive part of any
+    clustering variant is the $O(K^2)$ NLI inference, so persisting that matrix
+    once makes every future merge-criterion experiment a free, instant, offline
+    computation. Do this regardless of which other step is taken.
+  \item \textbf{Then fix the clustering cascade fragility.} Replace or constrain
     the union-find transitive merge -- e.g. require a minimum fraction of
     pairwise agreement within a cluster (a clique-style criterion) rather than
     any single chain of pairwise links, so one false-positive entailment call
-    cannot silently absorb a whole subgroup. Re-run the $K=15$ confirmation
-    after the fix.
+    cannot silently absorb a whole subgroup. Deliberately sequenced after the
+    scale-up: the fix is principled and cheap, but its effect could not be
+    measured against a $\pm 0.15$ error bar, and evaluating several candidate
+    criteria against $n=100$ would amount to fitting the merge rule to noise.
   \item \textbf{Token-level confidence as an alternative reasoning signal.}
     Instead of inferring uncertainty from repeated discrete sampling, use the
     model's own next-token probability for the 0/1 decision at generation
     time. A richer, more direct signal, immune to the clustering-cascade
     problem entirely since it does not require sample-to-sample comparison --
     but requires new sampling code and a new run to validate.
-  \item \textbf{Scale to a stronger model (7B) or the full dataset} only after
-    resolving the above -- the reasoning arm's best \emph{currently trustworthy}
-    result is 0.702 at $K=5$ specifically, not a number to scale up naively.
+  \item \textbf{Compare against a stronger model (7B) last.} A 7B run at
+    $n=100$ would return a second point estimate with the same $\pm 0.12$
+    interval as the first, which could not be distinguished from the 3B result
+    -- the comparison only becomes informative once $n$ supports it.
 \end{enumerate}
 
 \end{document}
