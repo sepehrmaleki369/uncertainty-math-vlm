@@ -442,6 +442,72 @@ def auroc_sensitivity(
     return out
 
 
+def stratified_auroc(
+    df: pd.DataFrame,
+    entropy_col: str,
+    correctness_col: str,
+    stratum_col: str,
+    n_boot: int = 10000,
+    seed: int = 0,
+) -> dict:
+    """AUROC pooled and within each level of stratum_col, to expose sign reversal.
+
+    Motivated by a real finding on the grading arm (2026-08-02). The FERMAT
+    sample is 87/13 imbalanced on ``has_error``, and the model has a strong
+    prior toward answering "there is an error" -- it graded 12 of the 13 clean
+    answers as containing an error, 6 of them unanimously. Those items are
+    *confidently* wrong, so entropy has no disagreement to detect and ranks
+    them backwards. Pooling them with the 87 error-containing items cancels a
+    genuine signal: reasoning entropy scores 0.756 within the majority stratum
+    but only 0.618 pooled.
+
+    A pooled AUROC over a stratum where the predictor's direction reverses is
+    not a weaker version of the within-stratum result -- it is a different and
+    largely meaningless quantity. ``sign_reversal`` flags that case.
+
+    Strata with a single correctness class yield nan (AUROC undefined) and are
+    reported rather than dropped, since an all-wrong stratum is itself the
+    finding.
+    """
+    out = {"pooled": bootstrap_auroc_ci(df, entropy_col, correctness_col, n_boot, seed)}
+    strata = {}
+    for level, subset in df.groupby(stratum_col):
+        strata[level] = bootstrap_auroc_ci(
+            subset, entropy_col, correctness_col, n_boot, seed
+        )
+    out["strata"] = strata
+
+    valid = [s["auroc"] for s in strata.values() if not math.isnan(s["auroc"])]
+    out["sign_reversal"] = bool(
+        len(valid) > 1 and max(valid) > 0.5 and min(valid) < 0.5
+    )
+    # Pooling is misleading when a stratum reverses direction *and* the pooled
+    # estimate sits below the best stratum -- the shape of a Simpson's paradox.
+    out["pooled_understates"] = bool(
+        valid and out["pooled"]["auroc"] < max(valid) - 0.05
+    )
+    return out
+
+
+def majority_class_baseline(df: pd.DataFrame, label_col: str) -> dict:
+    """Accuracy of always predicting the most common label.
+
+    Worth reporting next to any accuracy on this project: the grading task is
+    87/13 imbalanced, so a constant "there is an error" predictor scores 0.87
+    while the model's majority vote scores 0.75 at K=5 and 0.82 at K=15. An
+    accuracy figure that loses to a constant is not evidence the model can do
+    the task, and any uncertainty metric layered on it inherits that problem.
+    """
+    labels = _as_bool(df[label_col])
+    frac_true = float(labels.mean())
+    return {
+        "n": int(len(labels)),
+        "frac_positive": frac_true,
+        "majority_label": bool(frac_true >= 0.5),
+        "baseline_accuracy": max(frac_true, 1.0 - frac_true),
+    }
+
+
 def join_k_resample(baseline_df: pd.DataFrame, resample_df: pd.DataFrame) -> pd.DataFrame:
     """Inner-join a baseline results CSV with a grading K-resample CSV on
     (orig_q, pert_a) -- orig_q alone repeats across perturbed variants of the

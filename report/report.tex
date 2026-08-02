@@ -415,6 +415,89 @@ technique at higher $K$ -- though at $n=100$ such a fix could not be evaluated
 with any precision either, which is why sample size is the recommended next
 lever rather than the algorithm.
 
+\subsection{Manual inspection: why the reasoning arm underperforms}
+\label{sec:reasoning-diagnosis}
+
+The confidence intervals establish that the reasoning signal is unresolved but
+say nothing about \emph{why}. To separate the three plausible causes --
+clustering, prompt ambiguity, and the model simply being confidently wrong --
+individual failure cases were read directly, selected from the two informative
+quadrants: low entropy but graded wrong, and high entropy but graded right.
+
+\paragraph{The grading task is close to degenerate.} The 100-item sample is
+\textbf{87/13} on the ground-truth \verb|has_error| label. A constant ``there
+is an error'' predictor therefore scores \textbf{0.87}, while the model's
+majority vote scores 0.75 at $K=5$ and 0.82 at $K=15$. \emph{The model loses to
+the trivial baseline.} The model also answers ``error'' in 383 of 495 parsed
+samples and for 86 of 100 items, and identifies only \textbf{1 of the 13 clean
+answers} correctly. Grading accuracy is therefore not a meaningful measure of
+task competence here, and an uncertainty metric layered on top of it inherits
+the problem.
+
+\paragraph{The dominant failure is confident wrongness, not clustering.} Of the
+7 items with low entropy ($<0.3$) that were graded wrong, 6 have a clean
+ground-truth answer: the model invented an error and all five samples agreed.
+Entropy cannot flag these -- there is no disagreement to measure. Reading the
+6 unanimous cases, they are arithmetic and recall failures rather than
+defensible disagreements: on $2x^2 - 4x + 3 = 0$ the model asserts $b = -9$
+and computes a discriminant from it; on the distance between $(1,7)$ and
+$(4,2)$ it states the formula should be $\sqrt{(1+4)^2 + (7-2)^2}$; in another
+it declares $2ab = 29 - 9$ incorrect and then derives the same value the
+answer gave. Only one of the six resembles prompt ambiguity (objecting to the
+\emph{method} used to eliminate a variable rather than to the result) -- and
+even there the model's proposed alternative does not work. \textbf{Clustering
+is not implicated in any of them}: the digit-only pipeline clusters an atomic
+0/1 token, and these items are unanimous.
+
+\paragraph{Pooling hides a signal that works.} Because the model's bias runs
+one way, entropy's predictive direction reverses between strata
+(\texttt{pilot.plotting.stratified\_auroc}):
+
+\begin{center}
+\begin{tabular}{llccc}
+\toprule
+Configuration & Stratum & $n$ & $n_{\text{wrong}}$ & AUROC (95\% CI) \\
+\midrule
+Digit, $K=5$  & pooled              & 100 & 25 & 0.618 $[0.489, 0.739]$ \\
+              & has error (gt$=$1)  & 87  & 13 & \textbf{0.756} $[0.618, 0.876]$ \\
+              & clean (gt$=$0)      & 13  & 12 & 0.125 $[0.000, 0.250]$ \\
+\midrule
+Digit, $K=15$ & pooled              & 100 & 18 & 0.665 $[0.512, 0.799]$ \\
+              & has error (gt$=$1)  & 87  & 6  & \textbf{0.891} $[0.813, 0.955]$ \\
+              & clean (gt$=$0)      & 13  & 12 & 0.000 $[0.000, 0.000]$ \\
+\midrule
+Text, $K=5$   & pooled              & 100 & 25 & 0.702 $[0.579, 0.817]$ \\
+              & has error (gt$=$1)  & 87  & 13 & 0.770 $[0.635, 0.890]$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Within the majority stratum the digit-only signal is considerably stronger than
+anything reported elsewhere in this document, and it \emph{improves} with $K$
+(0.756 $\rightarrow$ 0.891) -- reversing, within this stratum, the pooled
+finding that $K=15$ bought nothing. Within the 13 clean items it is inverted:
+the model is confidently wrong there, and the single item it graded correctly
+is the one where it was most uncertain. Pooling two strata whose predictor runs
+in opposite directions does not produce a weaker version of the real effect; it
+produces a different quantity that describes neither.
+
+\paragraph{This is a hypothesis, not a result.} The stratification was chosen
+after seeing the pooled numbers, so it is post-hoc subgroup analysis and is not
+protected by the confidence intervals shown. The $K=15$ majority stratum rests
+on only 6 misgraded items, where bootstrap intervals are optimistic, and the
+13-item clean stratum is far too small to estimate anything from. The
+defensible claim is narrower than the table looks: \emph{the reasoning metric's
+weakness is attributable to the model's systematic error-present bias on a
+severely imbalanced label, not to the entropy measure or its clustering}, and
+the stratified comparison should be pre-registered and re-run on the larger
+sample rather than reported as a finding now.
+
+\paragraph{Consequence for the study design.} A grading task where 87\% of
+items share one label cannot support this question well regardless of $n$.
+The scale-up should rebalance the grading subset toward roughly 50/50 on
+\verb|has_error| -- otherwise a larger sample buys tighter intervals around a
+quantity that is still mostly measuring class imbalance.
+
 \section{Integrity Checks}
 
 Both entropy signals depend on the sampling and parsing pipeline actually
@@ -547,6 +630,17 @@ standing rests on its own CI excluding chance and surviving
     42\%. This biases the reported accuracy conservatively, not favorably.
   \item \textbf{No human double-grading.} Ground-truth labels are taken as
     given from the dataset.
+  \item \textbf{The grading task is 87/13 imbalanced and the model loses to
+    the constant baseline.} Always answering ``there is an error'' scores 0.87
+    against the model's 0.75 ($K=5$) and 0.82 ($K=15$). Every reasoning-arm
+    number in this report is computed on top of a correctness label that the
+    model cannot beat trivially, which limits what any of them can mean
+    (\S\ref{sec:reasoning-diagnosis}).
+  \item \textbf{The reasoning-arm stratification is post-hoc.} The split by
+    ground-truth label was chosen after seeing the pooled result. Its
+    intervals do not account for that, the $K=15$ majority stratum has only 6
+    misgraded items, and the clean stratum has 13 items total. It is a
+    hypothesis for the next run, not a finding.
   \item \textbf{Reasoning entropy's ceiling is model- and task-specific.} The
     binary-outcome information limit applies to \emph{this} grading task
     design; a differently-posed prompt (e.g. eliciting a confidence score
@@ -569,15 +663,19 @@ comparisons unresolvable at $n=100$, increasing $n$ dominates every other
 available lever, and should precede them rather than follow them.
 
 \begin{enumerate}
-  \item \textbf{Scale the existing 3B pipeline to 300--500 items.} This is the
-    highest-value next run and the cheapest of the scaling options: the
-    pipeline already works, no quantization or model-loading changes are
-    needed, and the cost is roughly linear in items. At $n=400$ the CI on a
-    single AUROC narrows from about $\pm 0.12$ to about $\pm 0.06$, which is
-    the difference between ``suggestive'' and ``settled'' for every reasoning
-    comparison in this report. Re-running the same five comparisons at that $n$
-    requires no new analysis code -- \texttt{pilot.plotting} already implements
-    all of it.
+  \item \textbf{Scale the existing 3B pipeline to 300--500 items, rebalancing
+    the grading subset.} This is the highest-value next run and the cheapest of
+    the scaling options: the pipeline already works, no quantization or
+    model-loading changes are needed, and the cost is roughly linear in items.
+    At $n=400$ the CI on a single AUROC narrows from about $\pm 0.12$ to about
+    $\pm 0.06$, which is the difference between ``suggestive'' and ``settled''
+    for every reasoning comparison in this report. Critically, sample the
+    grading items toward roughly 50/50 on \verb|has_error| rather than
+    inheriting FERMAT's 87/13 split (\S\ref{sec:reasoning-diagnosis}) --
+    otherwise the extra items buy precision around a quantity dominated by
+    class imbalance. Pre-register the stratified comparison before running it.
+    Re-running the analysis at that $n$ requires no new code --
+    \texttt{pilot.plotting} already implements all of it.
   \item \textbf{Dump the pairwise NLI entailment matrix on the next GPU run.}
     A cheap byproduct with disproportionate value: the expensive part of any
     clustering variant is the $O(K^2)$ NLI inference, so persisting that matrix

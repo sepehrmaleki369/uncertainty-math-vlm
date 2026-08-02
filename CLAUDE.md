@@ -48,10 +48,26 @@ result got overstated the first time.
   at K > 5 without either re-verifying for that specific use case or replacing
   the union-find step with a stricter merge criterion** (e.g. minimum
   intra-cluster pairwise agreement fraction, not any single transitive chain).
+- **Root cause of the reasoning arm's weakness (found by manual case
+  inspection, 2026-08-02): class imbalance + a systematic model bias, NOT
+  clustering.** The sample is 87/13 on `has_error`, so a constant "there is an
+  error" predictor scores 0.87 and beats the model's 0.75 (K=5) / 0.82 (K=15).
+  The model says "error" for 86/100 items and gets only 1 of 13 clean answers
+  right — on 6 of those 13 all five samples agree, so entropy has no
+  disagreement to detect. Reading those cases, they're arithmetic/recall
+  failures (asserting `b=-9` for `2x²-4x+3`, mis-stating the distance
+  formula), not prompt ambiguity. Consequence: entropy's direction *reverses*
+  between strata — within gt=1 it's 0.756 [0.618, 0.876] at K=5 and 0.891
+  [0.813, 0.955] at K=15, within gt=0 it's inverted, and pooling cancels them
+  to 0.618/0.665. Use `stratified_auroc` before interpreting any pooled AUROC
+  here. **This stratification is post-hoc** — a hypothesis to pre-register for
+  the next run, not a finding.
 - **n=100 is the binding constraint on everything else.** The agreed next step
   is scaling the existing 3B pipeline to 300–500 items — *before* fixing the
   cascade bug, trying 7B, or testing token-level confidence, since none of
-  those can be evaluated against a ±0.15 error bar. Also dump the pairwise NLI
+  those can be evaluated against a ±0.15 error bar. **Rebalance the grading
+  subset toward ~50/50 on `has_error` when scaling**, or the extra items just
+  buy precision around a class-imbalance artifact. Also dump the pairwise NLI
   entailment matrix on the next GPU run: it makes every future clustering
   variant a free offline experiment.
 - **Independent of all the above: the model self-contradicts in 12% of grading

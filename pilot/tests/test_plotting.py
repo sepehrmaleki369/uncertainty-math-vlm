@@ -14,6 +14,8 @@ from pilot.plotting import (
     compute_auroc,
     join_k_resample,
     load_results,
+    majority_class_baseline,
+    stratified_auroc,
     summarize_k_comparison,
     summarize_results,
 )
@@ -361,6 +363,74 @@ def test_auroc_sensitivity_real_perception_arm_is_robust():
     assert out["excl_max_entropy"]["auroc"] == pytest.approx(0.721, abs=0.005)
     assert out["excl_max_entropy"]["excludes_chance"] is True
     assert out["robust"] is True
+
+
+# --- stratified_auroc / majority_class_baseline ---
+
+
+def test_stratified_auroc_detects_sign_reversal():
+    """The grading-arm shape: entropy predicts errors in the large stratum and
+    predicts them backwards in the small one, so pooling cancels the signal."""
+    # Majority stratum: entropy ranks errors high (good).
+    maj = pd.DataFrame({
+        "entropy": [0.1] * 20 + [0.9] * 10,
+        "correct": [True] * 20 + [False] * 10,
+        "gt": [1] * 30,
+    })
+    # Minority stratum: model is confidently wrong -- low entropy, all wrong.
+    minor = pd.DataFrame({
+        "entropy": [0.1] * 9 + [0.9],
+        "correct": [False] * 9 + [True],
+        "gt": [0] * 10,
+    })
+    df = pd.concat([maj, minor], ignore_index=True)
+    out = stratified_auroc(df, "entropy", "correct", "gt", n_boot=500)
+    assert out["strata"][1]["auroc"] > 0.9
+    assert out["strata"][0]["auroc"] < 0.1
+    assert out["sign_reversal"] is True
+    assert out["pooled_understates"] is True
+    assert out["pooled"]["auroc"] < out["strata"][1]["auroc"]
+
+
+def test_stratified_auroc_no_reversal_when_strata_agree():
+    df = pd.DataFrame({
+        "entropy": [0.1, 0.2, 0.8, 0.9] * 4,
+        "correct": [True, True, False, False] * 4,
+        "gt": [1] * 8 + [0] * 8,
+    })
+    out = stratified_auroc(df, "entropy", "correct", "gt", n_boot=200)
+    assert out["sign_reversal"] is False
+
+
+def test_stratified_auroc_reports_single_class_stratum_as_nan():
+    """An all-wrong stratum is the finding, not a row to silently drop."""
+    df = pd.DataFrame({
+        "entropy": [0.1, 0.9, 0.2, 0.8],
+        "correct": [True, False, False, False],
+        "gt": [1, 1, 0, 0],
+    })
+    out = stratified_auroc(df, "entropy", "correct", "gt", n_boot=100)
+    assert 0 in out["strata"]
+    assert math.isnan(out["strata"][0]["auroc"])
+    assert out["strata"][0]["n_error"] == 2
+
+
+def test_majority_class_baseline_beats_a_weak_model():
+    """Regression test for the 2026-08-02 grading-arm finding: the FERMAT
+    sample is 87/13 on has_error, so a constant 'there is an error' predictor
+    scores 0.87 while the model's K=5 majority vote scores 0.75."""
+    df = pd.DataFrame({"has_error": [True] * 87 + [False] * 13})
+    base = majority_class_baseline(df, "has_error")
+    assert base["baseline_accuracy"] == pytest.approx(0.87)
+    assert base["majority_label"] is True
+    assert base["baseline_accuracy"] > 0.75  # the model's actual grading accuracy
+
+
+def test_majority_class_baseline_handles_minority_majority():
+    df = pd.DataFrame({"label": [False] * 9 + [True]})
+    base = majority_class_baseline(df, "label")
+    assert base["baseline_accuracy"] == pytest.approx(0.9)
+    assert base["majority_label"] is False
 
 
 # --- join_k_resample ---
