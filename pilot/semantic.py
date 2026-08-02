@@ -109,6 +109,24 @@ def nli_cluster_labels(
     cross-encoder NLI model. Transitively merged via union-find, so if A~B
     and B~C then A, B, C all share one cluster even if A and C weren't
     directly compared as mutually entailing.
+
+    KNOWN FAILURE MODE, confirmed on real data (2026-08-02 grading K=15
+    confirmation): this transitivity is a liability at higher K. The number
+    of pairwise comparisons grows as O(K^2), so does the chance that at least
+    one comparison is a false-positive "entailment" call -- and a single bad
+    link can silently merge two genuinely opposed clusters into one, since
+    union-find never requires the *whole* cluster to mutually agree, only a
+    connected chain of pairwise links. At K=5 this was rare enough not to
+    matter (55 cross-digit merges across 61 split items, verified benign --
+    both texts argued the same direction despite a noisy digit). At K=15 it
+    produced 1187 cross-digit merges and collapsed AUROC from 0.702 to 0.520;
+    a re-clustered item was found with 11/15 samples merged into one cluster
+    despite half arguing "error present" and half arguing "no error". Do not
+    trust this function's output at K > 5 without either verifying the
+    specific use case the way the K=5 grading-reasoning result was verified,
+    or replacing the union-find step with a stricter criterion (e.g. a
+    minimum fraction of pairwise agreement within a cluster, not any single
+    transitive chain).
     """
     model = _model if _model is not None else _get_nli_model()
     position_to_real_idx, texts = _prepare_batch(samples)

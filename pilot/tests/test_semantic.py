@@ -70,6 +70,41 @@ def test_nli_cluster_labels_transitive_merge():
     assert labels[0] == labels[1] == labels[2]
 
 
+def test_nli_cluster_labels_transitivity_can_cascade_opposed_samples():
+    """Documents a real, confirmed failure mode (see nli_cluster_labels'
+    docstring) rather than asserting it doesn't happen -- it does, and the
+    function has no defense against it. On the real K=15 grading-reasoning
+    confirmation this merged 11/15 samples into one cluster despite half
+    arguing "error present" and half arguing "no error": a single
+    false-positive pairwise link (bridge~error, bridge~no_error) is enough
+    for union-find to fuse two genuinely opposed groups into one, because
+    transitive merging never requires whole-cluster mutual agreement, only a
+    connected chain. This is not a bug in the test -- it is why
+    nli_cluster_labels is documented as untrustworthy at K > 5 without
+    separate verification."""
+    error_text = "There is an error: the coefficient is wrong."
+    no_error_text = "There is no error: the coefficient is correct."
+    bridge = "The coefficient in question is discussed at length here."
+    samples = [error_text, no_error_text, bridge]
+
+    # nli_cluster_labels compares structural_clean(text) (lowercased, trailing
+    # periods stripped), not the raw text -- the fake model's lookup table
+    # must be keyed on the same cleaned form the real pipeline compares.
+    c_error, c_no_error, c_bridge = (structural_clean(s) for s in samples)
+
+    # bridge mutually entails BOTH sides despite them being opposed to each
+    # other -- exactly the false-positive-link shape found on real data.
+    entailing = {
+        (c_bridge, c_error), (c_error, c_bridge),
+        (c_bridge, c_no_error), (c_no_error, c_bridge),
+    }
+    labels = nli_cluster_labels(samples, _model=FakeNLI(entailing))
+    # This assertion is the documented failure, not the desired behavior --
+    # error_text and no_error_text end up in the same cluster via bridge,
+    # even though they were never found to directly entail each other.
+    assert labels[0] == labels[1] == labels[2]
+
+
 def test_nli_cluster_labels_parse_failures_isolated():
     samples = [None, "the answer is 36", None]
     labels = nli_cluster_labels(samples, _model=FakeNLI(set()))

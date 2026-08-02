@@ -35,9 +35,15 @@ signal is real (the exact tie between correct/incorrect medians at $K=5$
 breaks) but only modestly stronger (AUROC~$=0.665$). A follow-up experiment
 clustering the model's own \verb|**Reasoning:**| explanation text -- rather than
 only its parsed \verb|**Error:**| digit -- found a substantially stronger signal
-(AUROC~$=0.702$ at $K=5$, without any additional sampling), traced to a
+at $K=5$ (AUROC~$=0.702$, without any additional sampling), traced to a
 concrete cause: in 12\% of samples the model's final digit contradicts its own
-just-written reasoning, and the digit is the noisier of the two.
+just-written reasoning, and the digit is the noisier of the two. A GPU-accelerated
+confirmation at $K=15$ reproduced the $K=5$ number exactly but found the
+technique does \emph{not} generalize: AUROC collapsed to 0.520 (worse than
+digit-only), traced to transitive cascade over-merging in the clustering
+algorithm that gets worse as the number of pairwise comparisons grows. The
+$K=5$ result stands on its own; the technique needs a structural fix before
+further use at higher $K$.
 \end{abstract}
 
 \section{Goal}
@@ -234,15 +240,59 @@ their own reasoning opens by flagging a mistake (``incorrect,'' ``error,''
 ``mistake,'' ...). The model is self-contradicting within single samples --
 writing a reasoning that argues for an error, then emitting the opposite digit
 anyway, plausibly decoding noise on the final token, independent of the
-fully-formed judgment already written. Reasoning-text clustering is not an
-artifact of NLI bias; it is a readout that is not vulnerable to this specific
-noise source the way the digit alone is (Figure~\ref{fig:reasoning-text}).
+fully-formed judgment already written. At $K=5$, reasoning-text clustering is
+not an artifact of NLI bias; it is a readout that is not vulnerable to this
+specific noise source the way the digit alone is (Figure~\ref{fig:reasoning-text}).
 
-A GPU-accelerated confirmation of this result at $K=15$ (impractical on local
-CPU -- $O(K^2)$ pairwise NLI comparisons make a full 100-item pass at $K=15$
-take 1--2 hours locally) is in progress via a dedicated Colab notebook
-(\texttt{pilot/02\_reasoning\_text\_entropy.ipynb}); results were not yet
-available at the time of writing.
+\subsection{$K=15$ GPU confirmation: the $K=5$ result does not generalize \failed{(failed)}}
+\label{sec:k15-cascade-failure}
+
+A GPU-accelerated confirmation at $K=15$ (impractical on local CPU -- a single
+item's 105 pairwise NLI comparisons took 35s locally; GPU reduced the full
+100-item pass to 58s) was run via a dedicated notebook
+(\texttt{pilot/02\_reasoning\_text\_entropy.ipynb}). It reproduced the $K=5$
+result almost exactly (AUROC 0.7019 vs. the 0.702 found locally), then
+revealed the $K=15$ result does not hold up:
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+Metric & $K=5$ & $K=15$ \\
+\midrule
+AUROC (reasoning-text) & 0.702 & \textbf{0.520} \\
+Items with a digit split & 61/100 & 87/100 \\
+Cross-digit cluster merges & 55 & \textbf{1187} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+0.520 is barely better than chance, and worse than the $K=15$ digit-only
+result (0.665). The cross-digit merge count grew far faster than the
+$\sim 10\times$ increase in available pairs ($\binom{15}{2}=105$ vs.
+$\binom{5}{2}=10$) would predict -- a $\sim 21\times$ increase in merges from a
+$\sim 10\times$ increase in comparisons. Re-clustering individual items locally
+to inspect actual cluster membership found the cause: \textbf{transitive
+cascade merging}. The clustering method unions any two samples whose reasoning
+mutually entails, then merges transitively (union-find) -- so a single
+mistaken pairwise link can silently absorb an entire subgroup into a cluster
+that does not actually agree. One item's largest cluster contained 11 of 15
+samples, mixing digit=1 samples arguing \emph{``incorrectly multiplies by 5
+instead of 9/5''} with digit=0 samples arguing \emph{``does not contain any
+apparent...errors''} -- genuinely opposed conclusions, merged together. This
+is not universal: a second inspected item's largest cluster (7/15 samples) was
+entirely digit=0 with consistent reasoning, correctly merged. The failure is
+concentrated in a subset of items, but at $K=15$ that subset is large enough to
+collapse the aggregate signal to near-random. More pairwise comparisons mean
+more chances for a single false-positive entailment call to cascade, and
+union-find has no mechanism to catch or bound that once it happens.
+
+The $K=5$ finding (AUROC 0.702) stands on its own -- it was independently
+verified against real data, not merely computed once. But it does not
+generalize to $K=15$ under the current clustering method, and should not be
+presented as validated at scale. A structural fix (e.g. requiring a minimum
+fraction of pairwise agreement within a cluster rather than any transitive
+chain, or a stricter/larger NLI model) would need to precede any further use
+of this technique at higher $K$.
 
 \section{Integrity Checks}
 
@@ -283,8 +333,8 @@ Perception (attempt 1) & \failed{Failed} & -- & 83\% pinned at max entropy \\
 Perception (attempt 2) & \failed{Failed} & -- & Over-merged, 95\% implausible \\
 Reasoning, digit-only ($K=5$) & \worked{Working} & 0.618 & Real but weak, medians tied \\
 Reasoning, digit-only ($K=15$) & \worked{Working} & 0.665 & Confirmed modest, near ceiling \\
-Reasoning, text-clustering ($K=5$) & \worked{Working} & \textbf{0.702} & Best reasoning-arm result; validated \\
-Reasoning, text-clustering ($K=15$) & \emph{pending} & -- & GPU confirmation in progress \\
+Reasoning, text-clustering ($K=5$) & \worked{Working} & \textbf{0.702} & Best result at $K=5$; validated \\
+Reasoning, text-clustering ($K=15$) & \failed{Failed} & 0.520 & Cascade over-merging; does not generalize \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -340,29 +390,34 @@ Reasoning, text-clustering ($K=15$) & \emph{pending} & -- & GPU confirmation in 
     binary-outcome information limit applies to \emph{this} grading task
     design; a differently-posed prompt (e.g. eliciting a confidence score
     rather than a forced binary decision) was not tested.
-  \item \textbf{Reasoning-text clustering is validated at $K=5$ only.} The
-    cross-digit merge check (55 cases, 8 manually inspected) supports that the
-    AUROC~$=0.702$ result is not the same NLI over-merging bias found in
-    perception Attempt~2, but this has not yet been confirmed at $K=15$, and
-    the underlying cross-encoder is a small, general-purpose NLI model rather
-    than one tuned for mathematical reasoning text.
+  \item \textbf{Reasoning-text clustering is confirmed to work at $K=5$ only,
+    and confirmed to fail at $K=15$.} Not merely unconfirmed at scale -- tested
+    and found to collapse to near-random (AUROC 0.520) due to transitive
+    cascade over-merging (\S\ref{sec:k15-cascade-failure}). The underlying cross-encoder is also a
+    small, general-purpose NLI model rather than one tuned for mathematical
+    reasoning text, which may independently limit how far this approach
+    can go even after the cascade issue is fixed.
 \end{itemize}
 
 \section{Recommended Next Steps}
 
 \begin{enumerate}
-  \item \textbf{Complete the $K=15$ GPU confirmation} of reasoning-text
-    clustering (\texttt{pilot/02\_reasoning\_text\_entropy.ipynb}) and fold the
-    result into this report. The $K=5$ result is validated but a second, larger
-    $K$ strengthens confidence the same way it did for the digit-only signal.
+  \item \textbf{Fix the clustering algorithm's cascade fragility before
+    trusting reasoning-text clustering at any $K > 5$.} Replace or constrain
+    the union-find transitive merge -- e.g. require a minimum fraction of
+    pairwise agreement within a cluster (a clique-style criterion) rather than
+    any single chain of pairwise links, so one false-positive entailment call
+    cannot silently absorb a whole subgroup. Re-run the $K=15$ confirmation
+    after the fix.
   \item \textbf{Token-level confidence as an alternative reasoning signal.}
     Instead of inferring uncertainty from repeated discrete sampling, use the
     model's own next-token probability for the 0/1 decision at generation
-    time. A richer, more direct signal, but requires new sampling code and a
-    new run to validate.
+    time. A richer, more direct signal, immune to the clustering-cascade
+    problem entirely since it does not require sample-to-sample comparison --
+    but requires new sampling code and a new run to validate.
   \item \textbf{Scale to a stronger model (7B) or the full dataset} only after
-    deciding whether the reasoning arm's current best result (0.702) is
-    acceptable as-is or worth the additional investment above.
+    resolving the above -- the reasoning arm's best \emph{currently trustworthy}
+    result is 0.702 at $K=5$ specifically, not a number to scale up naively.
 \end{enumerate}
 
 \end{document}
