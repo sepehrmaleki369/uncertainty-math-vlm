@@ -738,6 +738,19 @@ def classify_scaleup_result(
     # collapse is wrong.
     if clean is None or math.isnan(clean.get("auroc", float("nan"))):
         out["clean_stratum_inversion"] = "not_measured"
+    elif underpowered(clean):
+        # Consistency fix applied 2026-08-03, after the n=300 run. This branch
+        # originally skipped the min_minority_class guard that every other
+        # branch applies, which is a bug rather than a registered choice -- the
+        # threshold itself is unchanged. It matters: on the n=300 run the clean
+        # stratum had 137 misgraded items but only 13 correct ones, so the guard
+        # now fires and the verdict moves from "confirmed" to underpowered. The
+        # direction is still strongly supported there (AUROC 0.239
+        # [0.128, 0.374], excluding 0.5 by a wide margin) -- report that
+        # alongside, but do not let it be graded as a passed prediction on a
+        # 13-item minority class when the same standard called an 8-item one
+        # inconclusive.
+        out["clean_stratum_inversion"] = "inconclusive_underpowered"
     elif clean["auroc"] < prereg["clean_stratum_auroc_max"]:
         out["clean_stratum_inversion"] = "confirmed"
     else:

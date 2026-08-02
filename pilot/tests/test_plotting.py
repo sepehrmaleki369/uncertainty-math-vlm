@@ -693,3 +693,23 @@ def test_classify_scaleup_boundary_values_land_on_the_confirming_side():
     })
     assert out["perception"] == "replicated"
     assert out["reasoning_stratified"] == "confirmed"
+
+
+def test_classify_scaleup_inversion_respects_the_power_guard():
+    """Regression test for a consistency bug found on the 2026-08-02 n=300 run:
+    the inversion branch skipped the min_minority_class guard that every other
+    branch applies. The real clean stratum had 137 misgraded items but only 13
+    correct ones, so a strongly-inverted AUROC was being graded as a passed
+    prediction on a minority class smaller than the one that had just been
+    called inconclusive in the error stratum."""
+    out = classify_scaleup_result({
+        "reasoning_clean_stratum": _ci(0.239, 0.128, n_error=137, n_correct=13),
+    })
+    assert out["clean_stratum_inversion"] == "inconclusive_underpowered"
+
+
+def test_classify_scaleup_inversion_confirms_when_adequately_powered():
+    out = classify_scaleup_result({
+        "reasoning_clean_stratum": _ci(0.24, 0.13, n_error=120, n_correct=60),
+    })
+    assert out["clean_stratum_inversion"] == "confirmed"
