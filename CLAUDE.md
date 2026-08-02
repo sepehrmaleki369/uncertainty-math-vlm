@@ -77,6 +77,11 @@ result got overstated the first time.
 
 ## Repo-specific conventions
 
+- **Don't touch `report/` unless explicitly asked.** As of 2026-08-02 the user
+  updates the report on request only. Run the analysis, write and test the
+  code, report findings in chat — then say a finding would change the report
+  and let them decide. This means `report/report.tex` may lag behind what's
+  been found; that's intentional, not a gap to close.
 - **Notebooks**: use the `NotebookEdit` tool, not `Edit` — `pilot.ipynb` and
   `pilot/02_reasoning_text_entropy.ipynb` will reject direct `Edit` calls.
   For multi-cell inserts, a small Python script (`json.load` → mutate
