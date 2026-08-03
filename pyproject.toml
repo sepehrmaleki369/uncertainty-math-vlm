@@ -6,6 +6,24 @@ build-backend = "setuptools.build_meta"
 name = "pilot"
 version = "0.1.0"
 requires-python = ">=3.10"
+# Declared here, not only in requirements.txt: the Colab notebooks install this
+# package with `pip install -e repo/` and never read requirements.txt, so an
+# undeclared dependency is simply absent there. That is not hypothetical --
+# canonicalize.py needs SymPy's LaTeX parser, which needs the antlr4 runtime,
+# and without it every answer silently falls back to the plain-text tier.
+# Mathematically identical answers then land in different clusters, inflating
+# entropy and deflating accuracy. Observed on the 2026-08-02 n=300 run: 43 of
+# 300 items scored differently in Colab than on a local re-run of the same raw
+# samples (118/300 correct vs 141/300).
+#
+# antlr4 is pinned exactly because SymPy's LaTeX parser requires a matching
+# runtime version and fails at import otherwise. SymPy itself is a range, not
+# an exact pin, because torch depends on it and an exact pin fights the
+# preinstalled Colab torch.
+dependencies = [
+    "sympy>=1.13,<2",
+    "antlr4-python3-runtime==4.11",
+]
 
 [tool.setuptools.packages.find]
 include = ["pilot*"]

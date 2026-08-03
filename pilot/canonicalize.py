@@ -26,6 +26,7 @@ clustering, which is the actual fix for that -- this module only handles the
 syntactic tier.
 """
 
+import logging
 import re
 from typing import Optional
 
@@ -33,6 +34,44 @@ import sympy
 from sympy.parsing.latex import parse_latex
 
 from pilot.entropy import PARSE_FAILURE_SENTINEL, normalize_string
+
+logger = logging.getLogger(__name__)
+
+
+def latex_parser_available() -> bool:
+    """Whether SymPy's LaTeX parser actually works in this environment.
+
+    parse_latex needs the antlr4 runtime at a version matching SymPy's, and
+    raises ImportError at call time -- not import time -- when it is missing or
+    mismatched. canonicalize_math catches that and falls back to the plain-text
+    tier, which is correct behaviour but silent: entropy comes out higher and
+    accuracy lower, with no error anywhere.
+
+    That silence cost us real confusion. On the 2026-08-02 n=300 Colab run, 43
+    of 300 items scored differently from a local re-run of the identical raw
+    samples (118/300 correct vs 141/300), because the Colab environment parsed
+    less successfully. Call this at the start of any scoring run and record the
+    answer alongside the results.
+    """
+    try:
+        parse_latex("x = 1")
+        return True
+    except Exception:  # ImportError, antlr version errors, parser internals
+        return False
+
+
+def warn_if_latex_parser_missing() -> bool:
+    """Log a loud warning if canonicalization will silently degrade. Returns availability."""
+    available = latex_parser_available()
+    if not available:
+        logger.warning(
+            "SymPy's LaTeX parser is unavailable (needs antlr4-python3-runtime==4.11). "
+            "canonicalize_math will fall back to plain-text matching for every answer, "
+            "which inflates entropy and deflates accuracy. Results will NOT be "
+            "comparable to runs where the parser worked. Install the pinned "
+            "dependency before scoring."
+        )
+    return available
 
 # Above this length, the text is almost certainly a multi-step derivation
 # with prose rather than a single expression -- skip the SymPy attempt

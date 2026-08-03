@@ -2,6 +2,7 @@ from pilot.canonicalize import (
     canonical_answer_label,
     canonicalize_math,
     extract_final_answer,
+    latex_parser_available,
 )
 from pilot.entropy import majority_cluster, normalize_string
 from pilot.entropy import PARSE_FAILURE_SENTINEL, cluster_entropy
@@ -181,3 +182,36 @@ def test_canonical_answer_label_handles_none():
 
 def test_canonical_answer_label_differs_for_different_answers():
     assert canonical_answer_label(r"\( x = 1 \)") != canonical_answer_label(r"\( x = 2 \)")
+
+
+# --- LaTeX parser availability ---
+
+
+def test_latex_parser_is_available_in_this_environment():
+    """Fails loudly if antlr4-python3-runtime is missing or version-mismatched.
+
+    Without it, parse_latex raises at call time, canonicalize_math falls back to
+    plain-text matching for every answer, and results silently stop being
+    comparable to runs where the parser worked. That happened on the 2026-08-02
+    n=300 Colab run: 43 of 300 items scored differently from a local re-run of
+    the identical raw samples (118/300 correct vs 141/300). This test turns that
+    silent environment difference into a failing test."""
+    assert latex_parser_available() is True
+
+
+def test_sympy_tier_is_actually_reached():
+    """The parser being importable is not enough -- canonicalize_math must
+    actually route a simple expression through the SymPy tier, not the text
+    fallback. This is the behaviour the whole perception metric depends on."""
+    label = canonicalize_math(r"x = 1")
+    assert label.startswith("sympy:"), f"fell back to text tier: {label!r}"
+
+
+def test_equivalent_latex_spellings_collapse_via_sympy():
+    """The concrete win the SymPy tier buys: two spellings of the same
+    expression must land in one cluster. If the parser is unavailable these
+    become distinct strings and entropy is overstated."""
+    a = canonicalize_math(r"\frac{1}{2}x")
+    b = canonicalize_math(r"\frac{ 1 }{ 2 } x")
+    assert a == b
+    assert a.startswith("sympy:")
