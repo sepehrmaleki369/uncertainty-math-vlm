@@ -1,6 +1,6 @@
 \documentclass[11pt]{article}
 
-\usepackage[margin=0.85in]{geometry}
+\usepackage[margin=0.8in]{geometry}
 \usepackage{booktabs}
 \usepackage{amsmath}
 \usepackage{xcolor}
@@ -10,7 +10,7 @@
 \newcommand{\worked}[1]{\textcolor{darkgreen}{\textbf{#1}}}
 \newcommand{\failed}[1]{\textcolor{darkred}{\textbf{#1}}}
 
-\setlength{\parskip}{0.3em}
+\setlength{\parskip}{0.25em}
 
 % Tighter section spacing without pulling in titlesec (not in this TeX install).
 \makeatletter
@@ -66,11 +66,10 @@ Grading & 0.522 $[0.462, 0.582]$ & 0.517 (chance = 0.500) & \failed{no signal} \
 
 \subsection*{Transcription: the signal is real \worked{(works)}}
 
-When the model cannot read the handwriting it genuinely wavers, and that
-wavering tracks its errors. The result survives every check applied: removing
-all parse failures and all maximum-entropy items simultaneously still leaves
-AUROC $=0.796$ $[0.736, 0.852]$ at $n=206$. It replicates an earlier $n=100$
-pilot (0.788) on a like-for-like comparison.
+When the model cannot read the handwriting it wavers, and that wavering tracks
+its errors. Removing all parse failures and all maximum-entropy items
+simultaneously still leaves AUROC $=0.796$ $[0.736, 0.852]$ at $n=206$, and it
+replicates an earlier $n=100$ pilot (0.788).
 
 One directly usable rule falls out of it: \textbf{when all five transcriptions
 disagree, the model is wrong 57 times out of 61 (93.4\% precision)}, catching
@@ -78,8 +77,8 @@ disagree, the model is wrong 57 times out of 61 (93.4\% precision)}, catching
 ground truth. Two real items show what the signal looks like:
 
 \begin{center}
-\small
-\begin{tabular}{@{}p{0.16\linewidth}p{0.78\linewidth}@{}}
+\footnotesize
+\begin{tabular}{@{}p{0.15\linewidth}p{0.80\linewidth}@{}}
 \toprule
 \multicolumn{2}{@{}l}{\textbf{Entropy 0 --- five identical readings, and correct}} \\
 \midrule
@@ -95,22 +94,28 @@ ground truth & $A - B \neq B - A$ \\
 \end{tabular}
 \end{center}
 
-\noindent The second item is genuinely hard handwriting; the model cannot settle
-on a reading and every attempt differs. That instability is the signal.
+\noindent The second is genuinely hard handwriting: the model cannot settle on a
+reading, and every attempt differs. That instability is the signal.
 
-Notably, only 3 of 300 items were both fully consistent \emph{and} scored wrong
---- and inspecting all three, each is a scoring artifact rather than a model
-error (e.g.\ the model answering \texttt{option a} against a ground truth
-written as \texttt{\textbackslash text\{A\}}). So the model is almost never
-confidently wrong here, and the 0.393 accuracy above is an undercount.
+Only 3 of 300 items were both fully consistent \emph{and} scored wrong, and
+inspecting all three, each is a scoring artifact rather than a model error
+(e.g.\ the model answering \texttt{option a} against a ground truth written
+\texttt{\textbackslash text\{A\}}). The 0.393 accuracy is therefore a strict
+lower bound: relaxing the match to ignore formatting gives 0.527, and accepting
+the model's answer when it appears within the ground-truth line gives 0.640.
+
+Crucially, \textbf{the AUROC is stable across all of these}: 0.835 strict,
+0.785 ignoring formatting, 0.777 under the loosest rule, and 0.814 when the
+whole pipeline is re-run under a different \LaTeX{}-parser version. The signal
+does not depend on how strictly correctness is scored.
 
 \subsection*{Grading: no signal, because the model cannot do the task \failed{(fails)}}
 
-The reason matters more than the number. FERMAT is 84.8\% error-containing.
-On a sample inheriting that imbalance the model scored 75\% --- which looks
-reasonable until you notice that always answering ``there is an error,''
-without looking at anything, scores 87\%. The model was \emph{below} the
-do-nothing baseline. On a balanced set the flattery disappears:
+The reason matters more than the number. FERMAT is 84.8\% error-containing, and
+on a sample inheriting that imbalance the model scored 75\% --- which looks
+reasonable until you notice that always answering ``there is an error,'' without
+looking at anything, scores 87\%. The model was \emph{below} the do-nothing
+baseline. On a balanced set the flattery disappears:
 
 \begin{center}
 \begin{tabular}{lc}
@@ -142,10 +147,10 @@ was at its most consistent exactly when it was wrong, insisting on errors that
 were not there. Low entropy there is actively misleading, not merely uninformative.
 
 So the headline is not ``entropy does not work for reasoning.'' It is
-\textbf{sampling-based uncertainty inherits the model's competence}: it can flag
-errors for a model that knows something, and tells you nothing about a model
-that is guessing. Establishing that required rebalancing the evaluation set;
-on the original imbalanced data the problem was invisible.
+\textbf{sampling-based uncertainty inherits the model's competence}: it flags
+errors for a model that knows something, and says nothing about one that is
+guessing. Establishing this required rebalancing the evaluation set --- on the
+original imbalanced data the problem was invisible.
 
 \section*{Next step}
 
@@ -163,9 +168,8 @@ no new model runs.
 
 \vspace{0.5em}
 \noindent\rule{\linewidth}{0.4pt}\\
-{\small Full methodology, the two failed approaches that preceded the working
-transcription metric, the $n=100$ pilot, and the diagnostic work behind the
-grading result are in \texttt{report/report.pdf}. All analysis code is unit
-tested in \texttt{pilot/}.}
+{\small Full methodology, the two earlier failed approaches, the $n=100$ pilot
+and the diagnostic work are in \texttt{report/report.pdf}; analysis code is
+unit tested in \texttt{pilot/}.}
 
 \end{document}
