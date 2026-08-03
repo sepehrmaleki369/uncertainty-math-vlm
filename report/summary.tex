@@ -36,9 +36,9 @@
 Can a model tell us when it is wrong, without an answer key? We test one idea:
 sample the model's answer $K=5$ times and measure how much it disagrees with
 itself (Shannon entropy over the clustered answers). If disagreement tracks
-error, it is a free error detector at deployment time. We test this on two
-tasks: \textbf{transcribing} a handwritten math solution, and \textbf{grading}
-whether that solution contains a mistake.
+error, it is a free error detector at deployment time. Two tasks:
+\textbf{transcribing} a handwritten math solution, and \textbf{grading} whether
+that solution contains a mistake.
 
 \section*{Setup}
 
@@ -75,7 +75,34 @@ pilot (0.788) on a like-for-like comparison.
 One directly usable rule falls out of it: \textbf{when all five transcriptions
 disagree, the model is wrong 57 times out of 61 (93.4\% precision)}, catching
 31\% of all transcription errors. That is an abstention rule requiring no
-ground truth.
+ground truth. Two real items show what the signal looks like:
+
+\begin{center}
+\small
+\begin{tabular}{@{}p{0.16\linewidth}p{0.78\linewidth}@{}}
+\toprule
+\multicolumn{2}{@{}l}{\textbf{Entropy 0 --- five identical readings, and correct}} \\
+\midrule
+ground truth & \texttt{option d} \\
+5 samples & \texttt{option d}, \texttt{option d}, \texttt{option d}, \texttt{option d}, \texttt{option d} \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Maximum entropy --- five different readings, and wrong}} \\
+\midrule
+ground truth & $A - B \neq B - A$ \\
+5 samples & $A - B = \{1,3,5\}$ and $B - A = \{8\}$ \quad|\quad $A = B \neq B - A$ \quad|\quad
+             $A = B \neq B = A$ \quad|\quad $A \neq B$ \quad|\quad $A \neq B \neq B - A$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The second item is genuinely hard handwriting; the model cannot settle
+on a reading and every attempt differs. That instability is the signal.
+
+Notably, only 3 of 300 items were both fully consistent \emph{and} scored wrong
+--- and inspecting all three, each is a scoring artifact rather than a model
+error (e.g.\ the model answering \texttt{option a} against a ground truth
+written as \texttt{\textbackslash text\{A\}}). So the model is almost never
+confidently wrong here, and the 0.393 accuracy above is an undercount.
 
 \subsection*{Grading: no signal, because the model cannot do the task \failed{(fails)}}
 
@@ -103,11 +130,11 @@ across the entire run. There is nothing for entropy to measure.
 
 \section*{What this means}
 
-Entropy measures \emph{self-consistency}, never correctness. The two are
-separate quantities, and the method only works when they happen to align ---
-i.e.\ when a model is steady while right and wavers while wrong. That holds for
-transcription here. It fails for grading, because a confidently wrong model is
-indistinguishable from a confidently right one: both look steady.
+Entropy measures \emph{self-consistency}, never correctness. The method only
+works when the two align --- when a model is steady while right and wavers while
+wrong. That holds for transcription here. It fails for grading, because a
+confidently wrong model is indistinguishable from a confidently right one: both
+look steady.
 
 The clearest evidence is a sub-result: on the correct solutions, grading AUROC
 is \textbf{0.239} --- below 0.5, meaning entropy ran \emph{backwards}. The model
@@ -131,8 +158,8 @@ result stands for this task family; if it clears roughly 0.65--0.70, the
 entropy question becomes answerable and the existing analysis applies unchanged.
 
 The transcription result is deployable as-is and deserves an operating-point
-analysis (precision/recall across thresholds, conformal calibration for
-guaranteed coverage). That needs no new model runs.
+analysis (precision/recall across thresholds, conformal calibration). That needs
+no new model runs.
 
 \vspace{0.5em}
 \noindent\rule{\linewidth}{0.4pt}\\
