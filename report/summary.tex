@@ -1,6 +1,6 @@
 \documentclass[11pt]{article}
 
-\usepackage[margin=0.8in]{geometry}
+\usepackage[margin=0.78in]{geometry}
 \usepackage{booktabs}
 \usepackage{amsmath}
 \usepackage{xcolor}
@@ -10,7 +10,8 @@
 \newcommand{\worked}[1]{\textcolor{darkgreen}{\textbf{#1}}}
 \newcommand{\failed}[1]{\textcolor{darkred}{\textbf{#1}}}
 
-\setlength{\parskip}{0.25em}
+\setlength{\parskip}{0.18em}
+\linespread{0.99}\selectfont
 
 % Tighter section spacing without pulling in titlesec (not in this TeX install).
 \makeatletter
@@ -33,143 +34,147 @@
 
 \section*{The question}
 
-Can a model tell us when it is wrong, without an answer key? We test one idea:
-sample the model's answer $K=5$ times and measure how much it disagrees with
-itself (Shannon entropy over the clustered answers). If disagreement tracks
-error, it is a free error detector at deployment time. Two tasks:
-\textbf{transcribing} a handwritten math solution, and \textbf{grading} whether
-that solution contains a mistake.
+Can a model tell us when it is wrong, without seeing the answer key? We tested
+one idea. Ask the model the same question five times, then measure how much its
+five answers disagree with each other (Shannon entropy). If the model disagrees
+with itself more on the items it gets wrong, that gives us a free way to catch
+errors in real use, where nobody knows the right answer yet.
+
+We tested this on two tasks: reading a handwritten math solution, and judging
+whether that solution contains a mistake.
 
 \section*{Setup}
 
-Qwen2.5-VL-3B on FERMAT. $K=5$ samples at temperature 0.7 per prompt, plus 2
-greedy samples as a determinism check. Entropy is computed only from the
-model's own outputs; correctness is scored separately against ground truth.
-AUROC measures whether the two line up --- concretely, how often a randomly
-chosen wrong item has higher entropy than a randomly chosen correct one.
-Intervals are 95\% bootstrap CIs (10{,}000 resamples). $n=300$ items, sampled
-to a balanced 150/150 split on whether the solution contains an error, with
-thresholds registered before the run.
+Qwen2.5-VL-3B on FERMAT. Five samples per prompt at temperature 0.7, plus two
+greedy samples to check the sampling code works. Entropy is computed only from
+the model's own five answers; correctness is scored separately against ground
+truth. AUROC tells us whether the two line up: it is how often a randomly picked
+wrong item had more disagreement than a randomly picked correct one, so 0.5
+means no relationship. Ranges are 95\% bootstrap confidence intervals. We ran
+300 items, half containing a mistake and half not, with thresholds fixed in
+advance.
 
 \section*{Results}
 
 \begin{center}
+\small
 \begin{tabular}{lccl}
 \toprule
 Task & AUROC (95\% CI) & Model accuracy & Verdict \\
 \midrule
-Transcription & \textbf{0.835} $[0.787, 0.879]$ & 0.393 & \worked{entropy predicts error} \\
-Grading & 0.522 $[0.462, 0.582]$ & 0.517 (chance = 0.500) & \failed{no signal} \\
+Reading handwriting & \textbf{0.835} $[0.787, 0.879]$ & 0.393 & \worked{entropy predicts error} \\
+Judging mistakes & 0.522 $[0.462, 0.582]$ & 0.517 (chance = 0.500) & \failed{no signal} \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\subsection*{Transcription: the signal is real \worked{(works)}}
+\subsection*{Reading handwriting: it works \worked{(works)}}
 
-When the model cannot read the handwriting it wavers, and that wavering tracks
-its errors. Removing all parse failures and all maximum-entropy items
-simultaneously still leaves AUROC $=0.796$ $[0.736, 0.852]$ at $n=206$, and it
-replicates an earlier $n=100$ pilot (0.788).
+When the model cannot read the handwriting it genuinely wavers, and that
+wavering lines up with its mistakes. The result holds under every check we ran.
+Throwing away every item where parsing failed and every item with maximum
+disagreement still leaves AUROC 0.796 $[0.736, 0.852]$ on the remaining 206
+items, and it matches an earlier 100 item pilot that gave 0.788.
 
-One directly usable rule falls out of it: \textbf{when all five transcriptions
-disagree, the model is wrong 57 times out of 61 (93.4\% precision)}, catching
-31\% of all transcription errors. That is an abstention rule requiring no
-ground truth. Two real items show what the signal looks like:
+A simple rule comes out of this. \textbf{When all five readings differ, the model
+is wrong 57 times out of 61, or 93.4\%.} That catches 31\% of all reading
+errors, and you can apply it without knowing the right answer. Two real items:
 
 \begin{center}
 \footnotesize
 \begin{tabular}{@{}p{0.15\linewidth}p{0.80\linewidth}@{}}
 \toprule
-\multicolumn{2}{@{}l}{\textbf{Entropy 0 --- five identical readings, and correct}} \\
+\multicolumn{2}{@{}l}{\textbf{Five identical readings, and correct}} \\
 \midrule
-ground truth & \texttt{option d} \\
-5 samples & \texttt{option d}, \texttt{option d}, \texttt{option d}, \texttt{option d}, \texttt{option d} \\
+correct answer & \texttt{option d} \\
+5 readings & \texttt{option d}, \texttt{option d}, \texttt{option d}, \texttt{option d}, \texttt{option d} \\
 \midrule
-\multicolumn{2}{@{}l}{\textbf{Maximum entropy --- five different readings, and wrong}} \\
+\multicolumn{2}{@{}l}{\textbf{Five different readings, and wrong}} \\
 \midrule
-ground truth & $A - B \neq B - A$ \\
-5 samples & $A - B = \{1,3,5\}$ and $B - A = \{8\}$ \quad|\quad $A = B \neq B - A$ \quad|\quad
+correct answer & $A - B \neq B - A$ \\
+5 readings & $A - B = \{1,3,5\}$ and $B - A = \{8\}$ \quad|\quad $A = B \neq B - A$ \quad|\quad
              $A = B \neq B = A$ \quad|\quad $A \neq B$ \quad|\quad $A \neq B \neq B - A$ \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\noindent The second is genuinely hard handwriting: the model cannot settle on a
-reading, and every attempt differs. That instability is the signal.
+\noindent The second is genuinely messy handwriting. The model cannot settle on
+a reading and every attempt is different. That instability is the signal.
 
-Only 3 of 300 items were both fully consistent \emph{and} scored wrong, and
-inspecting all three, each is a scoring artifact rather than a model error
-(e.g.\ the model answering \texttt{option a} against a ground truth written
-\texttt{\textbackslash text\{A\}}). The 0.393 accuracy is therefore a strict
-lower bound: relaxing the match to ignore formatting gives 0.527, and accepting
-the model's answer when it appears within the ground-truth line gives 0.640.
+Only 3 of the 300 items had all five readings agreeing and were still scored
+wrong, and all three are scoring quirks rather than real mistakes, for example
+the model answering \texttt{option a} where the correct answer was written
+\texttt{\textbackslash text\{A\}}. So the 0.393 accuracy is a strict lower
+bound, not our best estimate: ignoring formatting gives 0.527, and accepting the
+model's answer when it appears inside the correct line gives 0.640.
 
-Crucially, \textbf{the AUROC is stable across all of these}: 0.835 strict,
+Importantly, \textbf{the AUROC barely moves across all of these}: 0.835 strict,
 0.785 ignoring formatting, 0.777 under the loosest rule, and 0.814 when the
-whole pipeline is re-run under a different \LaTeX{}-parser version. The signal
-does not depend on how strictly correctness is scored.
+whole pipeline is re-run with a different \LaTeX{} parser. The signal does not
+depend on how strictly we score correctness.
 
-\subsection*{Grading: no signal, because the model cannot do the task \failed{(fails)}}
+\subsection*{Judging mistakes: no signal, because the model cannot do the task \failed{(fails)}}
 
-The reason matters more than the number. FERMAT is 84.8\% error-containing, and
-on a sample inheriting that imbalance the model scored 75\% --- which looks
-reasonable until you notice that always answering ``there is an error,'' without
-looking at anything, scores 87\%. The model was \emph{below} the do-nothing
-baseline. On a balanced set the flattery disappears:
+The reason matters more than the number. In FERMAT, 84.8\% of solutions contain
+a mistake. On a sample with that same imbalance the model scored 75\%, which
+sounds reasonable until you notice that always answering ``yes there is a
+mistake'', without looking at anything, scores 87\%. The model was doing worse
+than that. On a balanced set the flattery disappears:
 
 \begin{center}
+\small
 \begin{tabular}{lc}
 \toprule
-Grading accuracy (balanced) & \textbf{0.517} \quad (chance $=0.500$) \\
-\quad on solutions that do contain an error & 0.947 \\
+Accuracy on the balanced set & \textbf{0.517} \quad (chance $=0.500$) \\
+\quad on solutions that do contain a mistake & 0.947 \\
 \quad on solutions that are correct & \textbf{0.087} \\
-Answers ``there is an error'' & 93\% of all items \\
+Answers ``there is a mistake'' & 93\% of all items \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The model has one firm opinion --- that everything contains a mistake --- and
-repeats it, so it is perfectly self-consistent almost everywhere: 42\% of items
-had all five samples identical, and only three distinct entropy values occurred
-across the entire run. There is nothing for entropy to measure.
+The model has one firm opinion, that every solution contains a mistake, and it
+repeats it. So it almost never disagrees with itself: 42\% of items had all five
+answers identical, and only three different entropy values appeared in the whole
+run. There is nothing for entropy to measure.
 
 \section*{What this means}
 
-Entropy measures \emph{self-consistency}, never correctness. The method only
-works when the two align --- when a model is steady while right and wavers while
-wrong. That holds for transcription here. It fails for grading, because a
-confidently wrong model is indistinguishable from a confidently right one: both
-look steady.
+Entropy measures whether a model is consistent with itself. It never looks at
+whether the model is right. The method only works when those two things go
+together, meaning the model is steady when it is right and wavers when it is
+wrong. That holds for reading handwriting. It fails for judging mistakes,
+because a model that is confidently wrong looks exactly like one that is
+confidently right. Both look steady.
 
-The clearest evidence is a sub-result: on the correct solutions, grading AUROC
-is \textbf{0.239} --- below 0.5, meaning entropy ran \emph{backwards}. The model
-was at its most consistent exactly when it was wrong, insisting on errors that
-were not there. Low entropy there is actively misleading, not merely uninformative.
+The clearest evidence is a smaller result. On the solutions that were actually
+correct, AUROC is \textbf{0.239}, which is below 0.5. That means entropy ran
+backwards. The model was at its most consistent exactly when it was wrong,
+insisting on mistakes that were not there. Low disagreement there is actively
+misleading, not just uninformative.
 
-So the headline is not ``entropy does not work for reasoning.'' It is
-\textbf{sampling-based uncertainty inherits the model's competence}: it flags
-errors for a model that knows something, and says nothing about one that is
-guessing. Establishing this required rebalancing the evaluation set --- on the
+So the headline is not that entropy fails for reasoning. It is that
+\textbf{this kind of uncertainty inherits the model's ability}. It can flag
+errors for a model that knows something, and it tells you nothing about a model
+that is guessing. We only found this by rebalancing the test set. On the
 original imbalanced data the problem was invisible.
 
 \section*{Next step}
 
-The grading conclusion is about \emph{this model}, not the method. The natural
-test is to repeat the grading arm with a stronger model (7B, or a text-only
-model given the ground-truth transcription) --- gated on a capability check
-first: measure grading accuracy against the 0.500 baseline \emph{before}
-computing any uncertainty metric. If it still grades at chance, the negative
-result stands for this task family; if it clears roughly 0.65--0.70, the
-entropy question becomes answerable and the existing analysis applies unchanged.
+The judging result is about this model, not the method. The obvious test is a
+stronger model (7B, or a text-only model given the correct transcription), with
+one condition: check its accuracy against the 0.500 baseline first, before
+computing any uncertainty numbers. If it still scores near chance, the negative
+result holds for this kind of task. If it reaches roughly 0.65 to 0.70, the
+question becomes answerable again and our existing code applies unchanged.
 
-The transcription result is deployable as-is and deserves an operating-point
-analysis (precision/recall across thresholds, conformal calibration). That needs
-no new model runs.
+The handwriting result is usable as it stands and deserves a threshold analysis:
+how precision and recall trade off as the cutoff moves, and conformal
+calibration for a guaranteed error rate. That needs no new model runs.
 
-\vspace{0.5em}
+\vspace{0.4em}
 \noindent\rule{\linewidth}{0.4pt}\\
-{\small Full methodology, the two earlier failed approaches, the $n=100$ pilot
-and the diagnostic work are in \texttt{report/report.pdf}; analysis code is
-unit tested in \texttt{pilot/}.}
+{\small Full methodology, the earlier failed approaches and the 100 item pilot
+are in \texttt{report/report.pdf}; code is unit tested in \texttt{pilot/}.}
 
 \end{document}
