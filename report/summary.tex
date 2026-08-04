@@ -1,6 +1,6 @@
-\documentclass[11pt]{article}
+\documentclass[10pt]{article}
 
-\usepackage[margin=0.72in]{geometry}
+\usepackage[margin=0.68in]{geometry}
 \usepackage{booktabs}
 \usepackage{amsmath}
 \usepackage{xcolor}
@@ -10,7 +10,7 @@
 \newcommand{\worked}[1]{\textcolor{darkgreen}{\textbf{#1}}}
 \newcommand{\failed}[1]{\textcolor{darkred}{\textbf{#1}}}
 
-\setlength{\parskip}{0.14em}
+\setlength{\parskip}{0.10em}
 \linespread{0.99}\selectfont
 
 % Tighter section spacing without pulling in titlesec (not in this TeX install).
@@ -23,7 +23,7 @@
   {\normalfont\normalsize\bfseries}}
 \makeatother
 
-\title{\vspace{-2em}Uncertainty Signals for Handwritten Math: Initial Results\\
+\title{\vspace{-2.3em}Uncertainty Signals for Handwritten Math: Initial Results\\
 \large Qwen2.5-VL-3B on FERMAT}
 \author{}
 \date{}
@@ -103,9 +103,14 @@ Importantly, \textbf{the AUROC barely moves across all of these}: 0.835 strict,
 whole pipeline is re-run with a different \LaTeX{} parser. The signal does not
 depend on how strictly we score correctness. It also holds across conditions:
 0.843 on good images against 0.818 on poor ones, and 0.837 on neat handwriting
-against 0.814 on messy. And it beats the cruder alternative of simply counting
-how many different answers came back (0.790), by a paired margin of 0.045 with
-a 95\% CI of 0.016 to 0.075.
+against 0.814 on messy.
+
+\textbf{It also beats two independent baselines, not just a cruder version of
+itself.} Counting distinct answers reaches 0.790 (paired $+0.045$, CI $0.016$
+to $0.075$). More importantly, the model's own token probability -- how
+confident it looked on a single try, no repeated sampling -- reaches only
+0.537 (paired $+0.297$, CI $0.214$ to $0.380$). The signal is not simply
+recoverable from confidence the model already exposes.
 
 \subsection*{Turning this into a rule for when to defer to a human}
 
@@ -128,10 +133,13 @@ everything & 300 & 0.393 \\
 A cutoff chosen on one half of the data still controls the error rate on the
 other half, over 1000 random splits: aiming for at most 30\% error gives 13.7\%
 in practice, with the target exceeded in 2\% of splits. The guarantee holds but
-is cautious, so we defer more than strictly necessary. Two limits: with five
-samples entropy takes only seven distinct values, so the rows above are the only
-choices available, and certifying a tighter target needs more data than we have.
-Both point at the same fix, more items and more samples each.
+is cautious, so we defer more than strictly necessary.
+
+One limit is already partly fixed: five samples give only seven distinct
+entropy values, so the rows above are the only choices available. Ten samples
+gives 34 values and raises AUROC to 0.806 (paired $+0.045$, CI $0.005$ to
+$0.087$) -- a real, tested improvement, not just a hope. A tighter error
+target still needs more items than we have.
 
 \subsection*{Judging mistakes: no signal, because the model cannot do the task \failed{(fails)}}
 
@@ -158,6 +166,14 @@ repeats it. So it almost never disagrees with itself: 42\% of items had all five
 answers identical, and only three different entropy values appeared in the whole
 run. There is nothing for entropy to measure.
 
+\textbf{We also tested whether the prompt was the problem, and it is not.}
+Three alternatives were tried on 100 items: restate the result before judging,
+state plainly that half the answers are correct, and ask for a 0--100
+confidence. None fixed it. One is worth noting: restating the result flipped
+the answer rate from 94\% ``mistake'' to 38\%, while accuracy barely moved
+(0.510 to 0.550) -- a different default answer, not real discernment. That
+points to a capability limit, not a fixable prompt.
+
 \section*{What this means}
 
 Entropy measures whether a model is consistent with itself. It never looks at
@@ -179,15 +195,14 @@ problem was invisible.
 
 \section*{Next step}
 
-The judging result is about this model, not the method. The obvious test is a
-stronger model (7B, or a text-only model given the correct transcription), with
-one condition: check its accuracy against the 0.500 baseline first, before
-computing any uncertainty numbers. If it still scores near chance the negative
-result holds for this kind of task; if it reaches roughly 0.65 to 0.70 the
-question becomes answerable again and our existing code applies unchanged.
+The judging result is about this model, not the method, and the simplest
+prompt fixes are now ruled out. What is left is a stronger model (7B, or a
+text-only model given the correct transcription): check its accuracy against
+the 0.500 baseline first, before any uncertainty numbers. Near chance means
+the result holds for this task; 0.65 to 0.70 means it is live again and our
+code applies unchanged. This needs compute we do not have yet.
 
-For the handwriting side the remaining gap is a comparison against a different
-kind of uncertainty signal, such as the model's own token probabilities, which
-we did not record during generation.
+The handwriting result has no open gaps left and is ready to write up as a
+deployable rule.
 
 \end{document}

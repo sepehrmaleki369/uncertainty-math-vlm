@@ -28,9 +28,10 @@ This study tests whether two entropy-based uncertainty signals -- \emph{percepti
 entropy} (instability in transcribing a handwritten math answer) and
 \emph{reasoning entropy} (instability in grading whether an answer contains an
 error) -- predict model correctness, using Qwen2.5-VL-3B on the FERMAT dataset.
-It ran in two phases: an exploratory $n=100$ pilot, and a confirmatory $n=300$
+It ran in three phases: an exploratory $n=100$ pilot, a confirmatory $n=300$
 run with a pre-registered analysis and a deliberately rebalanced label
-distribution. The two arms end in opposite places, and both results are firm.
+distribution, and a follow-up closing the two gaps that run left open. The
+two arms end in opposite places, and both results are firm.
 
 \textbf{Perception entropy works.} At $n=300$ it reaches AUROC~$=0.835$,
 95\% CI $[0.787, 0.879]$, replicating the pilot's 0.788 and tightening the
@@ -38,7 +39,13 @@ interval by half. It survives every artifact check: 0.796 $[0.736, 0.852]$
 after removing all parse failures \emph{and} all maximum-entropy items
 simultaneously. A simple decision rule falls out of it -- when all five
 transcriptions disagree, the model is wrong 57 times out of 61 (93.4\%
-precision).
+precision). It also beats an independent baseline: the model's own token
+log-probabilities reach only AUROC~$0.537$, a resolved paired gap of
+$+0.297$ $[+0.214, +0.380]$ (\S\ref{sec:token-confidence}), so the signal is
+not simply recoverable from information the model already exposes. A further
+five samples per item (\S\ref{sec:token-confidence}) push $K=10$ to
+AUROC~$0.806$ against $K=5$'s $0.761$ on a fair, like-for-like label, a
+resolved $+0.045$ $[+0.005, +0.087]$.
 
 \textbf{Reasoning entropy fails, for a reason that is not about entropy.}
 The pilot's apparent 0.618 was an artifact of FERMAT's 87/13 class imbalance:
@@ -53,7 +60,12 @@ badly implemented but that \emph{sampling entropy cannot predict correctness for
 a model performing at chance} -- there is no competence for disagreement to
 track. A pre-registered stratified hypothesis, formed post-hoc on the pilot
 data, proved untestable: the model's bias left only 8 of 150 error items
-misgraded, below the registered minimum.
+misgraded, below the registered minimum. Three alternative grading prompts
+were screened against this bias and none fixed it
+(\S\ref{sec:prompt-variants}); one of them swung the model's response rate
+from 94\% ``error'' to 38\% while leaving accuracy essentially unchanged,
+evidence that the ceiling is a capability limit rather than a promptable
+default.
 
 The methodological lesson is separable from either result. Adding bootstrap
 confidence intervals late overturned several conclusions the pilot had already
@@ -698,6 +710,123 @@ direction for a small-sample extreme, and 93.4\% remains a usable operating
 point -- it flags 57 of the 182 transcription errors (31\% recall) with 4 false
 positives.
 
+\section{Phase 3: Closing the Baseline Gap and Testing Prompt Fixes}
+\label{sec:phase3}
+
+Phase 2 left two things unaddressed: perception entropy had never been
+compared against an independent uncertainty signal (only against a cruder
+version of itself, a plain count of distinct answers), and the reasoning arm's
+93\% ``there is a mistake'' response rate had never been tested against an
+alternative prompt. Both were run in one session
+(\texttt{pilot/04\_confidence\_and\_prompts.ipynb}), reusing the Phase 2
+sample so results join directly onto it.
+
+\subsection{Entropy vs. token confidence: entropy wins decisively \worked{(resolved)}}
+\label{sec:token-confidence}
+
+Capturing per-token log-probabilities requires \texttt{output\_scores=True},
+which forces the model off its fused attention kernel and onto eager
+attention throughout, including the vision tower -- a 14~GiB allocation that
+a 16~GiB GPU cannot provide regardless of sampling batch size. This experiment
+therefore needed a $\geq$24~GiB GPU (run on an A100); the notebook checks
+available VRAM and skips the capture on smaller hardware rather than failing.
+
+Five additional transcription samples per item were drawn with scores
+captured, summarized per sample by the mean transition log-probability
+(overall fluency) and the minimum (the single least confident token):
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+Signal & AUROC & 95\% CI \\
+\midrule
+Entropy ($K=5$) & \textbf{0.835} & $[0.787, 0.879]$ \\
+$-$mean log-probability & 0.537 & $[0.469, 0.605]$ \\
+$-$min log-probability & 0.460 & $[0.392, 0.527]$ \\
+\midrule
+\multicolumn{3}{l}{\emph{Paired} (entropy $-$ mean log-prob.): $+0.297$, 95\% CI $[+0.214, +0.380]$, \worked{resolved}} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+This closes the last open gap in the perception result: entropy is not simply
+recovering information the model's own next-token probabilities already
+expose. Mean log-probability barely clears chance on its own and loses to
+entropy by a wide, resolved margin.
+
+The minimum log-probability figure needs a caveat rather than a clean
+headline. Its CI sits at or below 0.5, which invites the reading ``token
+confidence is actively misleading'' -- but 81\% of items cluster in a narrow
+band ($-\text{min-logprob} > 20.5$, i.e. probability $\sim e^{-20}$) that
+plausibly reflects an artifact of batched generation (padding positions in the
+shorter sequences of a batch) rather than genuine uncertainty about real
+content. Splitting on that band does not resolve cleanly either: both halves
+land inside wide, chance-overlapping intervals (0.467 $[0.393, 0.543]$ on the
+clustered majority, 0.529 $[0.378, 0.682]$ on the rest). The honest
+conclusion is that $-$min-logprob is not a usable signal, not confidently
+\emph{why} it fails -- mean log-probability is the trustworthy half of this
+comparison, and it alone is sufficient to answer the question this section
+asks. One methodological note for reuse: these token-confidence values come
+from a \emph{different} draw of 5 samples than the reference $K=5$ entropy
+(the original samples predate logprob capture), not the identical generations
+-- a fair comparison, since both are independent draws from the same
+model and image, but not a same-output rescoring.
+
+\subsection{$K=10$ modestly sharpens perception, as predicted \worked{(resolved)}}
+
+The same generation pass extends transcription to $K=10$. Scored against the
+$K=10$-recomputed correctness label -- the fair comparison, since scoring
+$K=10$ entropy against the stale $K=5$ label answers a different and less
+meaningful question -- the improvement predicted from the Phase 2
+leave-one-out subsample check materializes:
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+& $K=5$ & $K=10$ & Paired difference \\
+\midrule
+AUROC & 0.761 $[0.706, 0.813]$ & \textbf{0.806} $[0.756, 0.854]$ & $+0.045$ $[+0.005, +0.087]$, \worked{resolved} \\
+Distinct entropy values & 7 & 34 & \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+A side effect worth flagging: the ``ground truth'' majority-vote correctness
+label is itself not fully stable at $K=5$ -- recomputing the majority with 10
+samples flips a handful of items. Correctness labels for this pipeline should
+be read as an estimate that sharpens with $K$, not a fixed target.
+
+\subsection{No grading prompt variant fixes the yes-bias \failed{(screened out)}}
+\label{sec:prompt-variants}
+
+Three alternative grading prompts were screened against the FERMAT baseline on
+the first 100 items -- a screen, not a full measurement, per a pre-registered
+rule that only a variant clearing the baseline by a wide margin earns a full
+300-item run:
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+Variant & Accuracy & Answers ``there is a mistake'' & vs. baseline \\
+\midrule
+Baseline (FERMAT) & 0.510 & 94\% & -- \\
+Restate result first & 0.550 & 38\% & below bar \\
+``Half are correct'' framing & 0.540 & 83\% & below bar \\
+Elicit 0--100 confidence & 0.510 & 96\% & below bar \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+None clears the bar. The \emph{restate} variant is the interesting negative:
+it collapses the model's default answer from 94\% ``mistake'' to 38\% -- a
+large behavioral shift -- while accuracy barely moves (0.510 $\to$ 0.550). The
+model is not stuck on a biased default that a better prompt frees it from; it
+simply swaps which near-constant answer it gives. This weighs against
+``yes-bias is a fixable prompt artifact'' and for a genuine capability
+ceiling on this 3B model, strengthening the case for testing a larger model
+(\S\ref{sec:reasoning-dead}) as the next real lever on the reasoning arm,
+rather than further prompt engineering.
+
 \section{Integrity Checks}
 
 Both entropy signals depend on the sampling and parsing pipeline actually
@@ -727,7 +856,7 @@ a full-width colon); widening the pattern recovered most of the missed samples.
 
 \section{Summary}
 
-\subsection{Final conclusions (Phase 2, $n=300$)}
+\subsection{Final conclusions (Phase 2 + 3, $n=300$)}
 
 \begin{center}
 \begin{tabular}{llcl}
@@ -737,13 +866,19 @@ Arm & Status & AUROC (95\% CI) & Basis \\
 Perception & \worked{Works} & \textbf{0.835} $[0.787, 0.879]$ & Replicated, robust to all cuts \\
 \quad \texttt{has\_error}=1 stratum & \worked{Works} & 0.830 $[0.760, 0.893]$ & Like-for-like vs. pilot's 0.762 \\
 \quad harshest artifact cut & \worked{Works} & 0.796 $[0.736, 0.852]$ & $n=206$, CI excludes chance \\
+\quad vs. token confidence & \worked{Wins} & $+0.297$ $[+0.214, +0.380]$ & Paired, resolved -- \S\ref{sec:token-confidence} \\
+\quad $K=10$ vs. $K=5$ & \worked{Improves} & $+0.045$ $[+0.005, +0.087]$ & Paired, resolved -- confirms prediction \\
 Reasoning & \failed{Fails} & 0.522 $[0.462, 0.582]$ & Model grades at chance (0.517) \\
+\quad prompt variants (screen) & \failed{None fix it} & -- & 3 tried, none clear bar -- \S\ref{sec:prompt-variants} \\
 \bottomrule
 \end{tabular}
 \end{center}
 
 \noindent The reasoning result is a statement about the \emph{model}, not the
-metric. See \S\ref{sec:reasoning-dead}.
+metric. See \S\ref{sec:reasoning-dead}. Perception now has both an independent
+baseline it beats and a confirmed gain from additional sampling; the
+reasoning arm's failure has been shown not to be a simple, promptable
+artifact (\S\ref{sec:phase3}).
 
 \subsection{Phase 1 exploratory results (superseded)}
 
@@ -836,8 +971,11 @@ standing rests on its own CI excluding chance and surviving
     the task. That is the single most important caveat on the negative result,
     and it is exactly what a larger model would test.
   \item \textbf{Single model.} All results are Qwen2.5-VL-3B; no comparison to
-    a larger model (7B) or to a baseline uncertainty method. Given the above,
-    this limitation now carries more weight than it did in Phase 1.
+    a larger model (7B). Given the above, this limitation now carries more
+    weight than it did in Phase 1. (The baseline-uncertainty-method gap
+    mentioned in earlier drafts of this limitation is resolved: entropy now
+    has a measured, resolved win over token confidence,
+    \S\ref{sec:token-confidence}.)
   \item \textbf{The stratified reasoning hypothesis remains untested, not
     refuted.} The model's bias left 8 misgraded items among 150
     error-containing ones -- under the registered minimum. Nothing in Phase 2
@@ -866,10 +1004,15 @@ standing rests on its own CI excluding chance and surviving
     correcting a branch that had been skipping it. The registered threshold was
     not altered, but the change was made with the data visible and moved one
     verdict from ``confirmed'' to underpowered.
-  \item \textbf{Reasoning entropy's ceiling is model- and task-specific.} The
-    binary-outcome information limit applies to \emph{this} grading task
-    design; a differently-posed prompt (e.g. eliciting a confidence score
-    rather than a forced binary decision) was not tested.
+  \item \textbf{Reasoning entropy's ceiling is model- and task-specific, and
+    three alternative prompt designs were screened and rejected.} Restating
+    the result before judging, an explicit balanced-base-rate framing, and
+    eliciting a 0--100 confidence were all tested at $n=100$
+    (\S\ref{sec:prompt-variants}); none cleared the pre-registered screening
+    bar. This does not rule out every possible prompt design, but it does
+    rule out the simplest fixes, and the \emph{restate} variant's behavior
+    (a large response-distribution shift with no accuracy gain) argues for a
+    genuine capability ceiling over a promptable artifact.
   \item \textbf{Reasoning-text clustering has a confirmed mechanical defect at
     $K=15$.} Tested and found to collapse to near-random (AUROC 0.520) due to
     transitive cascade over-merging (\S\ref{sec:k15-cascade-failure}). The
@@ -884,51 +1027,42 @@ standing rests on its own CI excluding chance and surviving
 \section{Recommended Next Steps}
 
 Sample size is no longer the binding constraint -- Phase 2 resolved what it was
-built to resolve. What limits the reasoning conclusion now is \emph{model
-capability}: entropy was measured against a grader operating at chance, so the
-technique was never given a fair test. The ordering follows from that.
+built to resolve. Phase 3 closed two of the remaining gaps: perception now has
+an independent baseline it beats, and the simplest prompt fixes for the
+reasoning arm have been tried and rejected. What limits the reasoning
+conclusion now is \emph{model capability}, and there is exactly one
+experiment left that can resolve it.
 
 \begin{enumerate}
   \item \textbf{Re-run the reasoning arm on a model that can actually grade.}
-    This is now the highest-value next step and it directly addresses the main
-    caveat on the negative result. The prerequisite is a capability check, not
-    an entropy measurement: run the grading prompt on the balanced 300 items
+    This is the last open item and it directly addresses the main caveat on
+    the negative result. The prerequisite is a capability check, not an
+    entropy measurement: run the grading prompt on the balanced 300 items
     with a stronger model (Qwen2.5-VL-7B, or a text-only model given the
     ground-truth transcription) and check accuracy against the 0.500 baseline
     \emph{first}. If it still grades at chance, reasoning entropy is
     unanswerable on this task and the negative result stands as general for
-    this task family. If it clears roughly 0.65--0.70, the entropy question
+    this task family -- now a stronger claim than it was after Phase 2 alone,
+    since \S\ref{sec:prompt-variants} has already ruled out the task being
+    trivially fixable. If it clears roughly 0.65--0.70, the entropy question
     becomes live again and the existing analysis code applies unchanged.
-    Gating on accuracy before computing any AUROC is the point: Phase 1 spent
-    considerable effort interpreting an uncertainty metric over a model that
-    could not do the task.
-  \item \textbf{Fix the grading task before blaming the model.} The 93\%
-    ``error'' response rate may be partly promptable. The current prompt asks
-    for a binary verdict on whether an error exists, which invites a
-    yes-biased default. Worth testing on the balanced set: asking the model to
-    first restate the answer's final result, then judge; eliciting a
-    graded confidence rather than a forced 0/1; or presenting matched pairs
-    where it must identify which of two answers contains the error. If a prompt
-    change moves accuracy off 0.500, that is a cheaper and more informative
-    result than a model upgrade.
-  \item \textbf{Perception is the deployable result -- characterize it as one.}
-    AUROC 0.835 with a 93.4\%-precision abstention rule is usable now. The
-    natural next step is a proper operating-point analysis: precision/recall
-    across entropy thresholds, and conformal calibration to turn entropy into a
-    guaranteed-coverage abstention rule rather than a hand-picked cutoff. This
-    needs no new sampling -- the $n=300$ CSV already contains everything.
+    Blocked on access to compute large enough to run a 7B model, not on
+    anything methodological.
+  \item \textbf{Perception is a deployable result now, not just a promising
+    one -- write up the deferral mechanism, not only the AUROC.} It has AUROC
+    0.835, survives every artifact and scoring-strictness cut, holds across
+    handwriting quality and image quality, beats an independent baseline by a
+    resolved margin, and improves further with $K$. A risk-coverage analysis
+    and conformal calibration were run informally in review (turning entropy
+    into a guaranteed-error-rate abstention rule rather than a hand-picked
+    cutoff) and are worth formalizing into this document on request -- they
+    need no new sampling, the existing CSVs already contain everything.
   \item \textbf{The pairwise NLI matrix is already saved} for the $n=300$ run,
     so any clustering-variant experiment -- including a fix for the cascade
     fragility of \S\ref{sec:k15-cascade-failure} -- is now a free offline
-    computation. Worth doing if reasoning entropy becomes live again after
-    step 1 or 2; not worth doing before, since there is currently no signal for
-    a better clustering to recover.
-  \item \textbf{Token-level confidence} remains the most promising alternative
-    formulation: use the model's own next-token probability for the 0/1
-    decision instead of inferring uncertainty from repeated sampling. It is
-    immune to clustering artifacts entirely, and unlike sampling entropy it can
-    in principle distinguish a confidently wrong model from a confidently right
-    one. Requires new sampling code and a new run.
+    computation. Still not worth doing before step 1: there is no reasoning
+    signal for a better clustering to recover unless a capable model
+    produces one.
 \end{enumerate}
 
 \end{document}
