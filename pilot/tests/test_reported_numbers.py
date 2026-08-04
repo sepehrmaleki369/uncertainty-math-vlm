@@ -18,7 +18,14 @@ import pandas as pd
 import pytest
 
 from pilot.canonicalize import latex_parser_available
-from pilot.plotting import bootstrap_auroc_ci, majority_class_baseline
+from pilot.plotting import (
+    aurc,
+    bootstrap_auroc_ci,
+    bootstrap_auroc_difference_ci,
+    evaluate_conformal_abstention,
+    majority_class_baseline,
+    risk_coverage_curve,
+)
 
 RESULTS = (
     Path(__file__).resolve().parents[2]
@@ -142,3 +149,93 @@ def test_scoring_is_environment_dependent_and_this_run_predates_the_pin(run):
     # figure. The reported 118 is therefore conservative, never flattering.
     assert sum(rescored) == 141
     assert sum(rescored) > int(run["transcription_correct"].sum())
+
+
+def test_risk_coverage_operating_points_as_reported(run):
+    """summary.pdf deferral table: most confident 13% -> 0.921 accuracy,
+    most confident 33% -> 0.740, everything -> 0.393."""
+    curve = risk_coverage_curve(run, "perception_entropy", "transcription_correct")
+    by_coverage = {round(r.coverage, 3): r for r in curve.itertuples()}
+
+    assert by_coverage[0.127].n_kept == 38
+    assert by_coverage[0.127].accuracy_kept == pytest.approx(0.921, abs=0.001)
+    assert by_coverage[0.333].n_kept == 100
+    assert by_coverage[0.333].accuracy_kept == pytest.approx(0.740, abs=0.001)
+    assert by_coverage[1.0].accuracy_kept == pytest.approx(0.393, abs=0.001)
+
+
+def test_aurc_as_reported(run):
+    """AURC 0.410 against a 0.607 random-deferral baseline, on 7 operating
+    points. The operating-point count is asserted because it is the reason a
+    tight risk target cannot be hit."""
+    out = aurc(run, "perception_entropy", "transcription_correct")
+    assert out["aurc"] == pytest.approx(0.410, abs=0.001)
+    assert out["baseline_aurc"] == pytest.approx(0.607, abs=0.001)
+    assert out["n_operating_points"] == 7
+
+
+def test_reasoning_aurc_shows_no_deferral_value(run):
+    """The negative result restated as a deferral metric: entropy buys almost
+    nothing over deferring at random."""
+    out = aurc(run, "reasoning_entropy", "grading_correct")
+    assert out["improvement"] < 0.02
+
+
+def test_conformal_guarantee_holds_on_held_out_data(run):
+    """summary.pdf: aiming for at most 30% error gives 13.7% in practice, with
+    the target exceeded in about 2% of splits."""
+    out = evaluate_conformal_abstention(
+        run, "perception_entropy", "transcription_correct",
+        target_risk=0.30, n_splits=1000, seed=0,
+    )
+    assert out["mean_test_risk"] == pytest.approx(0.137, abs=0.005)
+    assert out["violation_rate"] < 0.05
+
+
+def test_abstention_rule_confidence_interval_as_reported(run):
+    """summary.pdf quotes 93.4% with a 95% CI of 86.9% to 98.4%. The interval
+    matters: the rule rests on 61 items, and the bare point estimate overstates
+    how precisely it is known."""
+    at_max = np.isclose(run["perception_entropy"], math.log(5))
+    flagged = run[at_max]
+    n, k = len(flagged), int((~flagged["transcription_correct"]).sum())
+    rng = np.random.default_rng(0)
+    boot = rng.binomial(n, k / n, size=20000) / n
+    assert np.percentile(boot, 2.5) == pytest.approx(0.869, abs=0.01)
+    assert np.percentile(boot, 97.5) == pytest.approx(0.984, abs=0.01)
+
+
+def test_entropy_beats_the_simpler_distinct_count_statistic(run):
+    """summary.pdf: entropy 0.835 vs counting distinct answers 0.790, paired
+    difference +0.045 [+0.016, +0.075]. Answers the obvious objection that a
+    plain count of disagreements would do just as well."""
+    import ast
+
+    import pilot.canonicalize as C
+    import pilot.parsing as P
+
+    counts = []
+    for _, r in run.iterrows():
+        labels = [C.canonical_answer_label(P.parse_transcription(t))
+                  for t in ast.literal_eval(r["all_transcription_samples_raw"])]
+        counts.append(len(set(labels)))
+    df = run.assign(n_distinct=counts)
+
+    d = bootstrap_auroc_difference_ci(
+        df, "perception_entropy", "transcription_correct",
+        "n_distinct", "transcription_correct", n_boot=10000, seed=0,
+    )
+    assert d["difference"] == pytest.approx(0.045, abs=0.005)
+    assert d["difference_excludes_zero"] is True
+
+
+def test_signal_holds_across_handwriting_and_image_quality(run):
+    """summary.pdf: 0.843 on good images vs 0.818 on poor, 0.837 on neat
+    handwriting vs 0.814 on messy. No subgroup where the signal breaks down."""
+    for col in ("handwriting_style", "image_quality"):
+        for _, group in run.groupby(col):
+            if len(group) < 20:
+                continue
+            r = bootstrap_auroc_ci(group, "perception_entropy",
+                                   "transcription_correct", n_boot=4000, seed=0)
+            assert r["auroc"] > 0.75, f"{col} subgroup dropped to {r['auroc']:.3f}"
