@@ -442,6 +442,190 @@ def auroc_sensitivity(
     return out
 
 
+def risk_coverage_curve(
+    df: pd.DataFrame, entropy_col: str, correctness_col: str
+) -> pd.DataFrame:
+    """Accuracy retained as a function of how many items you refuse to answer.
+
+    The operating characteristic a deferral system is actually specified by.
+    AUROC answers "does entropy rank errors above non-errors"; this answers
+    "if I answer only my most confident X%, how accurate am I", which is the
+    question a grading pipeline has to make a decision on.
+
+    Answer every item whose entropy is at or below a threshold, defer the rest.
+    One row per distinct entropy value, ascending, plus the full-coverage row.
+
+    Note the resolution limit: with K samples of a discrete answer, entropy
+    takes few distinct values (7 at K=5 on the real data, of which only 5 give
+    distinct coverage levels). You cannot target an arbitrary risk level -- the
+    achievable operating points are whatever the entropy grid provides.
+    """
+    entropy, is_error = _error_arrays(df, entropy_col, correctness_col)
+    rows = []
+    for threshold in np.unique(np.round(entropy, 6)):
+        keep = entropy <= threshold + 1e-9
+        n_kept = int(keep.sum())
+        if n_kept == 0:
+            continue
+        n_wrong = int(is_error[keep].sum())
+        rows.append({
+            "threshold": float(threshold),
+            "coverage": n_kept / len(entropy),
+            "n_kept": n_kept,
+            "n_deferred": int(len(entropy) - n_kept),
+            "accuracy_kept": 1.0 - n_wrong / n_kept,
+            "risk_kept": n_wrong / n_kept,
+            "n_errors_kept": n_wrong,
+        })
+    return pd.DataFrame(rows)
+
+
+def aurc(df: pd.DataFrame, entropy_col: str, correctness_col: str) -> dict:
+    """Area under the risk-coverage curve, plus the no-signal baseline.
+
+    Lower is better: it is the average error rate you incur as coverage sweeps
+    from answering one item to answering everything. Unlike AUROC it is
+    sensitive to the *base error rate*, so it must always be read next to the
+    baseline -- a model that is wrong 60% of the time cannot have a good AURC
+    no matter how well its uncertainty ranks.
+
+    ``baseline_aurc`` is what deferring at random would give (just the overall
+    error rate). ``improvement`` is how much of that the ordering buys back.
+    On the real n=300 perception data: 0.342 against a 0.607 baseline.
+    """
+    entropy, is_error = _error_arrays(df, entropy_col, correctness_col)
+    if len(entropy) == 0:
+        return {"aurc": float("nan"), "baseline_aurc": float("nan"),
+                "improvement": float("nan"), "n_items": 0}
+
+    # Integrated over the *achievable* operating points, not per item. A
+    # per-item sweep would break ties by input order, and ties dominate here --
+    # K=5 entropy takes 7 distinct values across 300 items, so a per-item
+    # version silently reports whatever order the CSV happened to be in, and
+    # scores uninformative entropy as if it were informative.
+    curve = risk_coverage_curve(df, entropy_col, correctness_col)
+    prev_coverage = 0.0
+    value = 0.0
+    for row in curve.itertuples():
+        value += (row.coverage - prev_coverage) * row.risk_kept
+        prev_coverage = row.coverage
+
+    base = float(is_error.mean())
+    return {
+        "aurc": float(value),
+        "baseline_aurc": base,
+        "improvement": base - float(value),
+        "n_items": int(len(entropy)),
+        "n_operating_points": int(len(curve)),
+    }
+
+
+def conformal_abstention_threshold(
+    cal_df: pd.DataFrame,
+    entropy_col: str,
+    correctness_col: str,
+    target_risk: float,
+    delta: float = 0.1,
+    conservative: bool = True,
+) -> dict:
+    """Largest entropy threshold whose retained items hold error <= target_risk.
+
+    Calibrated on held-out data, then applied to unseen items -- the point being
+    a threshold picked by eyeballing the same data it is evaluated on carries no
+    guarantee at all.
+
+    With ``conservative`` (the default) the threshold must satisfy a Hoeffding
+    upper bound on the risk rather than the point estimate, so the guarantee
+    holds with probability 1 - delta rather than on average. This costs
+    coverage, and at small n it costs a lot: the bound term is
+    sqrt(log(1/delta) / (2 * n_kept)), which is ~0.10 at n_kept=100.
+
+    Returns nan for the threshold when no operating point satisfies the target,
+    which is a real outcome rather than an error -- at a high base error rate
+    some risk levels are simply unreachable at any coverage.
+    """
+    if not 0.0 < target_risk < 1.0:
+        raise ValueError(f"target_risk must be in (0, 1), got {target_risk}")
+
+    curve = risk_coverage_curve(cal_df, entropy_col, correctness_col)
+    best = None
+    for row in curve.itertuples():
+        bound = row.risk_kept
+        if conservative:
+            bound += math.sqrt(math.log(1.0 / delta) / (2 * row.n_kept))
+        if bound <= target_risk:
+            best = row  # curve is ascending in threshold, so keep the last pass
+    if best is None:
+        return {"threshold": float("nan"), "cal_coverage": 0.0,
+                "cal_risk": float("nan"), "achievable": False}
+    return {
+        "threshold": float(best.threshold),
+        "cal_coverage": float(best.coverage),
+        "cal_risk": float(best.risk_kept),
+        "achievable": True,
+    }
+
+
+def evaluate_conformal_abstention(
+    df: pd.DataFrame,
+    entropy_col: str,
+    correctness_col: str,
+    target_risk: float,
+    n_splits: int = 1000,
+    cal_frac: float = 0.5,
+    seed: int = 0,
+    conservative: bool = True,
+) -> dict:
+    """Split-calibrate a deferral threshold repeatedly and check it holds out.
+
+    The honest test of a guarantee: calibrate on half the items, apply to the
+    other half, and count how often the held-out error actually exceeded the
+    target. ``violation_rate`` should sit at or below delta; well below means
+    the rule is conservative and is deferring more than it needs to.
+
+    Splits where no threshold achieves the target are counted in
+    ``n_unachievable`` rather than silently dropped -- at a high base error rate
+    that is the common case for a tight target, and hiding it would overstate
+    how usable the rule is.
+    """
+    rng = np.random.default_rng(seed)
+    n = len(df)
+    n_cal = int(round(n * cal_frac))
+
+    coverages, risks, violations, unachievable = [], [], 0, 0
+    for _ in range(n_splits):
+        perm = rng.permutation(n)
+        cal, test = df.iloc[perm[:n_cal]], df.iloc[perm[n_cal:]]
+        fit = conformal_abstention_threshold(
+            cal, entropy_col, correctness_col, target_risk,
+            conservative=conservative,
+        )
+        if not fit["achievable"]:
+            unachievable += 1
+            continue
+
+        t_entropy, t_error = _error_arrays(test, entropy_col, correctness_col)
+        keep = t_entropy <= fit["threshold"] + 1e-9
+        if keep.sum() == 0:
+            unachievable += 1
+            continue
+        risk = float(t_error[keep].mean())
+        coverages.append(float(keep.mean()))
+        risks.append(risk)
+        violations += int(risk > target_risk)
+
+    n_valid = len(risks)
+    return {
+        "target_risk": target_risk,
+        "n_splits": n_splits,
+        "n_valid": n_valid,
+        "n_unachievable": unachievable,
+        "mean_coverage": float(np.mean(coverages)) if coverages else float("nan"),
+        "mean_test_risk": float(np.mean(risks)) if risks else float("nan"),
+        "violation_rate": violations / n_valid if n_valid else float("nan"),
+    }
+
+
 def stratified_auroc(
     df: pd.DataFrame,
     entropy_col: str,

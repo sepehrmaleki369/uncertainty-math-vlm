@@ -1,5 +1,6 @@
 import math
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -7,6 +8,7 @@ from pilot.plotting import (
     REQUIRED_COLUMNS,
     SCALEUP_PREREGISTRATION,
     classify_scaleup_result,
+    aurc,
     auroc_sensitivity,
     bootstrap_auroc_ci,
     bootstrap_auroc_difference_ci,
@@ -14,9 +16,12 @@ from pilot.plotting import (
     check_temperature_zero_anchor,
     classify_k_resample_result,
     compute_auroc,
+    conformal_abstention_threshold,
+    evaluate_conformal_abstention,
     join_k_resample,
     load_results,
     majority_class_baseline,
+    risk_coverage_curve,
     stratified_auroc,
     summarize_k_comparison,
     summarize_results,
@@ -713,3 +718,118 @@ def test_classify_scaleup_inversion_confirms_when_adequately_powered():
         "reasoning_clean_stratum": _ci(0.24, 0.13, n_error=120, n_correct=60),
     })
     assert out["clean_stratum_inversion"] == "confirmed"
+
+
+# --- risk-coverage / AURC / conformal abstention ---
+
+
+def _selective_frame():
+    """Entropy ranks errors well but imperfectly: 20 confident-correct,
+    20 uncertain-mostly-wrong, plus one confident error to keep it honest."""
+    return pd.DataFrame({
+        "entropy": [0.0] * 20 + [0.0] + [1.0] * 20,
+        "correct": [True] * 20 + [False] + [False] * 16 + [True] * 4,
+    })
+
+
+def test_risk_coverage_curve_shape():
+    curve = risk_coverage_curve(_selective_frame(), "entropy", "correct")
+    assert list(curve["threshold"]) == [0.0, 1.0]
+    # Most-confident bucket: 21 items, 1 wrong.
+    assert curve.iloc[0]["n_kept"] == 21
+    assert curve.iloc[0]["risk_kept"] == pytest.approx(1 / 21)
+    # Full coverage is the last row and must match the overall error rate.
+    assert curve.iloc[-1]["coverage"] == pytest.approx(1.0)
+    assert curve.iloc[-1]["risk_kept"] == pytest.approx(17 / 41)
+
+
+def test_risk_coverage_accuracy_and_risk_are_complementary():
+    curve = risk_coverage_curve(_selective_frame(), "entropy", "correct")
+    assert np.allclose(curve["accuracy_kept"] + curve["risk_kept"], 1.0)
+
+
+def test_aurc_beats_baseline_when_entropy_ranks_errors():
+    out = aurc(_selective_frame(), "entropy", "correct")
+    assert out["aurc"] < out["baseline_aurc"]
+    assert out["improvement"] > 0
+
+
+def test_aurc_equals_baseline_when_entropy_is_uninformative():
+    """Flat entropy carries no ordering, so deferring by it is deferring at
+    random and AURC must collapse onto the base error rate."""
+    df = pd.DataFrame({"entropy": [0.5] * 40, "correct": [True] * 20 + [False] * 20})
+    out = aurc(df, "entropy", "correct")
+    assert out["aurc"] == pytest.approx(out["baseline_aurc"], abs=0.02)
+
+
+def test_conformal_threshold_picks_an_achievable_operating_point():
+    fit = conformal_abstention_threshold(
+        _selective_frame(), "entropy", "correct", target_risk=0.30,
+        conservative=False,
+    )
+    assert fit["achievable"] is True
+    assert fit["cal_risk"] <= 0.30
+
+
+def test_conformal_threshold_reports_unachievable_targets():
+    """A target below what any operating point can reach is a real outcome, not
+    an error -- at a high base error rate most tight targets are unreachable."""
+    df = pd.DataFrame({"entropy": [0.5] * 40, "correct": [False] * 40})
+    fit = conformal_abstention_threshold(df, "entropy", "correct", target_risk=0.05)
+    assert fit["achievable"] is False
+    assert math.isnan(fit["threshold"])
+
+
+def test_conformal_conservative_mode_costs_coverage():
+    """The Hoeffding bound must be strictly more cautious than the point
+    estimate, otherwise the 1-delta guarantee is not being bought."""
+    df = _selective_frame()
+    loose = conformal_abstention_threshold(df, "entropy", "correct", 0.42,
+                                           conservative=False)
+    tight = conformal_abstention_threshold(df, "entropy", "correct", 0.42,
+                                           conservative=True)
+    assert loose["cal_coverage"] >= tight["cal_coverage"]
+
+
+@pytest.mark.parametrize("bad", [0.0, 1.0, -0.1, 2.0])
+def test_conformal_threshold_rejects_invalid_target(bad):
+    with pytest.raises(ValueError, match="target_risk"):
+        conformal_abstention_threshold(_selective_frame(), "entropy", "correct", bad)
+
+
+def test_evaluate_conformal_holds_the_guarantee_on_held_out_data():
+    """The whole point: a threshold fitted on calibration data must control
+    risk on data it has never seen. Violations should be rare."""
+    rng = np.random.default_rng(0)
+    n = 400
+    entropy = rng.uniform(0, 1, n)
+    # Error probability rises with entropy, so the ordering is informative.
+    correct = rng.uniform(0, 1, n) > entropy * 0.8
+    df = pd.DataFrame({"entropy": entropy, "correct": correct})
+
+    out = evaluate_conformal_abstention(df, "entropy", "correct",
+                                        target_risk=0.20, n_splits=200, seed=1)
+    assert out["n_valid"] > 0
+    assert out["violation_rate"] <= 0.10
+    assert out["mean_test_risk"] <= 0.20
+
+
+def test_evaluate_conformal_counts_unachievable_splits():
+    df = pd.DataFrame({"entropy": [0.5] * 60, "correct": [False] * 60})
+    out = evaluate_conformal_abstention(df, "entropy", "correct",
+                                        target_risk=0.05, n_splits=50)
+    assert out["n_unachievable"] == 50
+    assert out["n_valid"] == 0
+
+
+def test_aurc_is_invariant_to_input_order_under_ties():
+    """Regression test for a real bug found while building this: the first
+    implementation swept per item, so within a group of tied entropy values the
+    result depended on the CSV's row order. Ties dominate this project -- K=5
+    entropy takes 7 distinct values across 300 items -- so the metric was
+    reporting row order as if it were signal."""
+    base = pd.DataFrame({"entropy": [0.5] * 20, "correct": [True] * 10 + [False] * 10})
+    shuffled = base.iloc[np.random.default_rng(3).permutation(20)].reset_index(drop=True)
+    assert aurc(base, "entropy", "correct")["aurc"] == pytest.approx(
+        aurc(shuffled, "entropy", "correct")["aurc"]
+    )
