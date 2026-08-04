@@ -1,6 +1,6 @@
 \documentclass[11pt]{article}
 
-\usepackage[margin=0.78in]{geometry}
+\usepackage[margin=0.72in]{geometry}
 \usepackage{booktabs}
 \usepackage{amsmath}
 \usepackage{xcolor}
@@ -10,7 +10,7 @@
 \newcommand{\worked}[1]{\textcolor{darkgreen}{\textbf{#1}}}
 \newcommand{\failed}[1]{\textcolor{darkred}{\textbf{#1}}}
 
-\setlength{\parskip}{0.18em}
+\setlength{\parskip}{0.14em}
 \linespread{0.99}\selectfont
 
 % Tighter section spacing without pulling in titlesec (not in this TeX install).
@@ -35,13 +35,12 @@
 \section*{The question}
 
 Can a model tell us when it is wrong, without seeing the answer key? We tested
-one idea. Ask the model the same question five times, then measure how much its
-five answers disagree with each other (Shannon entropy). If the model disagrees
-with itself more on the items it gets wrong, that gives us a free way to catch
-errors in real use, where nobody knows the right answer yet.
-
-We tested this on two tasks: reading a handwritten math solution, and judging
-whether that solution contains a mistake.
+one idea: ask the model the same question five times, then measure how much its
+five answers disagree with each other (Shannon entropy). If it disagrees with
+itself more on the items it gets wrong, that gives us a free way to catch errors
+in real use, where nobody knows the right answer yet. We tested this on two
+tasks, reading a handwritten math solution and judging whether that solution
+contains a mistake.
 
 \section*{Setup}
 
@@ -77,41 +76,62 @@ disagreement still leaves AUROC 0.796 $[0.736, 0.852]$ on the remaining 206
 items, and it matches an earlier 100 item pilot that gave 0.788.
 
 A simple rule comes out of this. \textbf{When all five readings differ, the model
-is wrong 57 times out of 61, or 93.4\%.} That catches 31\% of all reading
-errors, and you can apply it without knowing the right answer. Two real items:
+is wrong 57 times out of 61, or 93.4\%} (95\% CI 86.9\% to 98.4\%). That catches
+31\% of all reading errors, and you can apply it without knowing the right
+answer. Two real items:
 
-\begin{center}
-\footnotesize
-\begin{tabular}{@{}p{0.15\linewidth}p{0.80\linewidth}@{}}
-\toprule
-\multicolumn{2}{@{}l}{\textbf{Five identical readings, and correct}} \\
-\midrule
-correct answer & \texttt{option d} \\
-5 readings & \texttt{option d}, \texttt{option d}, \texttt{option d}, \texttt{option d}, \texttt{option d} \\
-\midrule
-\multicolumn{2}{@{}l}{\textbf{Five different readings, and wrong}} \\
-\midrule
-correct answer & $A - B \neq B - A$ \\
-5 readings & $A - B = \{1,3,5\}$ and $B - A = \{8\}$ \quad|\quad $A = B \neq B - A$ \quad|\quad
-             $A = B \neq B = A$ \quad|\quad $A \neq B$ \quad|\quad $A \neq B \neq B - A$ \\
-\bottomrule
-\end{tabular}
-\end{center}
+\smallskip
+\noindent\footnotesize\textbf{Item A, correct answer \texttt{option d}.} The five
+readings: \texttt{option d}, \texttt{option d}, \texttt{option d},
+\texttt{option d}, \texttt{option d}. All agree, and the model was right.
 
-\noindent The second is genuinely messy handwriting. The model cannot settle on
-a reading and every attempt is different. That instability is the signal.
+\noindent\textbf{Item B, correct answer $A - B \neq B - A$.} The five readings:
+$A - B = \{1,3,5\}$ and $B - A = \{8\}$; $A = B \neq B - A$; $A = B \neq B = A$;
+$A \neq B$; $A \neq B \neq B - A$. Genuinely messy handwriting, the model cannot
+settle on a reading, and it was wrong. That instability is the signal.
+\normalsize\smallskip
 
 Only 3 of the 300 items had all five readings agreeing and were still scored
 wrong, and all three are scoring quirks rather than real mistakes, for example
-the model answering \texttt{option a} where the correct answer was written
-\texttt{\textbackslash text\{A\}}. So the 0.393 accuracy is a strict lower
-bound, not our best estimate: ignoring formatting gives 0.527, and accepting the
-model's answer when it appears inside the correct line gives 0.640.
+answering \texttt{option a} where the correct answer was written
+\texttt{\textbackslash text\{A\}}. So 0.393 is a strict lower bound, not our
+best estimate: ignoring formatting gives 0.527, and accepting the answer when it
+appears inside the correct line gives 0.640.
 
 Importantly, \textbf{the AUROC barely moves across all of these}: 0.835 strict,
 0.785 ignoring formatting, 0.777 under the loosest rule, and 0.814 when the
 whole pipeline is re-run with a different \LaTeX{} parser. The signal does not
-depend on how strictly we score correctness.
+depend on how strictly we score correctness. It also holds across conditions:
+0.843 on good images against 0.818 on poor ones, and 0.837 on neat handwriting
+against 0.814 on messy. And it beats the cruder alternative of simply counting
+how many different answers came back (0.790), by a paired margin of 0.045 with
+a 95\% CI of 0.016 to 0.075.
+
+\subsection*{Turning this into a rule for when to defer to a human}
+
+The more useful way to state the result is: how accurate are we if we only
+answer the items we are most sure about, and hand the rest to a person?
+
+\begin{center}
+\small
+\begin{tabular}{ccc}
+\toprule
+We answer & Items kept & Accuracy on those \\
+\midrule
+the most confident 13\% & 38 & \textbf{0.921} \\
+the most confident 33\% & 100 & 0.740 \\
+everything & 300 & 0.393 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+A cutoff chosen on one half of the data still controls the error rate on the
+other half, over 1000 random splits: aiming for at most 30\% error gives 13.7\%
+in practice, with the target exceeded in 2\% of splits. The guarantee holds but
+is cautious, so we defer more than strictly necessary. Two limits: with five
+samples entropy takes only seven distinct values, so the rows above are the only
+choices available, and certifying a tighter target needs more data than we have.
+Both point at the same fix, more items and more samples each.
 
 \subsection*{Judging mistakes: no signal, because the model cannot do the task \failed{(fails)}}
 
@@ -141,35 +161,33 @@ run. There is nothing for entropy to measure.
 \section*{What this means}
 
 Entropy measures whether a model is consistent with itself. It never looks at
-whether the model is right. The method only works when those two things go
-together, meaning the model is steady when it is right and wavers when it is
-wrong. That holds for reading handwriting. It fails for judging mistakes,
-because a model that is confidently wrong looks exactly like one that is
-confidently right. Both look steady.
+whether the model is right. The method only works when those two go together,
+meaning the model is steady when right and wavers when wrong. That holds for
+reading handwriting. It fails for judging mistakes, because a confidently wrong
+model looks exactly like a confidently right one. Both look steady.
 
 The clearest evidence is a smaller result. On the solutions that were actually
-correct, AUROC is \textbf{0.239}, which is below 0.5. That means entropy ran
-backwards. The model was at its most consistent exactly when it was wrong,
-insisting on mistakes that were not there. Low disagreement there is actively
-misleading, not just uninformative.
+correct, AUROC is \textbf{0.239}, below 0.5, meaning entropy ran backwards. The
+model was most consistent exactly when it was wrong, insisting on mistakes that
+were not there. Low disagreement there is actively misleading.
 
 So the headline is not that entropy fails for reasoning. It is that
-\textbf{this kind of uncertainty inherits the model's ability}. It can flag
-errors for a model that knows something, and it tells you nothing about a model
-that is guessing. We only found this by rebalancing the test set. On the
-original imbalanced data the problem was invisible.
+\textbf{this kind of uncertainty inherits the model's ability}: it flags errors
+for a model that knows something and says nothing about one that is guessing. We
+only found this by rebalancing the test set; on the original imbalanced data the
+problem was invisible.
 
 \section*{Next step}
 
 The judging result is about this model, not the method. The obvious test is a
 stronger model (7B, or a text-only model given the correct transcription), with
 one condition: check its accuracy against the 0.500 baseline first, before
-computing any uncertainty numbers. If it still scores near chance, the negative
-result holds for this kind of task. If it reaches roughly 0.65 to 0.70, the
+computing any uncertainty numbers. If it still scores near chance the negative
+result holds for this kind of task; if it reaches roughly 0.65 to 0.70 the
 question becomes answerable again and our existing code applies unchanged.
 
-The handwriting result is usable as it stands and deserves a threshold analysis:
-how precision and recall trade off as the cutoff moves, and conformal
-calibration for a guaranteed error rate. That needs no new model runs.
+For the handwriting side the remaining gap is a comparison against a different
+kind of uncertainty signal, such as the model's own token probabilities, which
+we did not record during generation.
 
 \end{document}
