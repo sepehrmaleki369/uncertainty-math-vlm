@@ -115,6 +115,55 @@ result got overstated the first time.
   by flagging a mistake). That's a direct count, not an AUROC comparison, so
   the CI work doesn't touch it.
 
+### 2026-08-04 follow-up run — closes the token-confidence gap, tests prompt fixes
+
+`results/confidence_k10_qwen25-vl-3b-instruct_20260804T203938Z.csv` (300 rows)
+and `results/grading_variants_qwen25-vl-3b-instruct_20260804T203938Z.csv` (400
+rows), both Drive-only. Locked in `pilot/tests/test_confidence_and_variants.py`.
+Produced by `pilot/04_confidence_and_prompts.ipynb`, run on an A100 (the token-
+confidence capture needs ≥24 GiB VRAM — `output_scores=True` forces eager
+attention through the whole model including the vision tower, which OOMs a T4
+regardless of batch size; the notebook auto-detects VRAM and skips capture
+below the threshold).
+
+- **Entropy decisively beats token confidence as a baseline. AUROC 0.835 vs
+  -mean-logprob 0.537, paired +0.297 [+0.214, +0.380], resolved.** This closes
+  the biggest remaining gap in the perception story — entropy isn't just
+  redundant with the model's own next-token probabilities. `-min-logprob`
+  comes out *below* chance (0.460) but don't report that as "token confidence
+  is actively misleading" — 81% of items cluster in a narrow band that
+  plausibly reflects batched-generation padding rather than real content
+  uncertainty (checked: splitting on that band gives two wide, chance-
+  overlapping CIs, so it's not a clean artifact story either — the honest
+  conclusion is only that `-min-logprob` isn't usable, not confidently why).
+  `-mean-logprob` is the trustworthy half of this comparison.
+- **K=10 modestly sharpens perception, confirming the K=5 subsample
+  prediction.** Scored against the *K=10-recomputed* correctness label (the
+  fair comparison — scoring against the old K=5 label instead gives a
+  different, less meaningful number since it's asking whether more samples
+  predict a stale target): K=5 0.761 → K=10 0.806, paired +0.045
+  [+0.005, +0.087], resolved. 7 reachable entropy values at K=5 → 34 at K=10.
+  Side finding: the "ground truth" majority vote itself isn't fully stable at
+  K=5 — some items flip `transcription_correct` between K=5 and K=10.
+- **No grading prompt variant fixes the yes-bias. Screened at n=100, none
+  clear the pre-registered bar.** Tested restate-the-result-first, an
+  explicit "half are correct" framing, and eliciting a 0–100 confidence,
+  against the FERMAT baseline. All land within a few points of the baseline's
+  0.510 accuracy. The interesting negative: `restate` collapses the
+  says-error rate from 94% to 38% — a huge behavioral shift — while accuracy
+  barely moves (0.510 → 0.550). The model just picks a different near-constant
+  answer rather than discriminating, which argues *against* "yes-bias is a
+  fixable prompt artifact" and *for* a genuine capability ceiling on this
+  3B model. Strengthens the case for the 7B capability check as the next
+  real lever on the reasoning arm.
+- **Notebook engineering note, if reused:** checkpoint filenames are keyed by
+  `CAPTURE_LOGPROBS` and tag every `skipped_oom` entry with the mode it
+  happened under. A skip from the (expensive, OOM-prone) capturing path is
+  not evidence the (cheap, working) plain path would also fail — without the
+  mode tag, a resumed run silently trusts stale all-skipped checkpoints from
+  a different mode and never retries them. Found by reading a genuinely
+  confusing "resuming from 22 completed items" log line, not by inspection.
+
 ## Repo-specific conventions
 
 - **Don't touch `report/` unless explicitly asked.** As of 2026-08-02 the user
