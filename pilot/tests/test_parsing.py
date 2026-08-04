@@ -4,6 +4,7 @@ from pilot.parsing import (
     parse_grading,
     parse_grading_reasoning,
     parse_transcription,
+    parse_grading_confidence,
 )
 
 
@@ -169,3 +170,35 @@ def test_grading_cluster_matches_label_compares_majority_cluster_to_bool_label()
 
 def test_grading_cluster_matches_label_parse_failure_cluster_is_incorrect():
     assert not grading_cluster_matches_label("<PARSE_FAILURE>", True)
+
+
+# --- parse_grading_confidence ---
+
+
+def test_parse_grading_confidence_basic():
+    text = "**Reasoning:** Looks wrong.\n\n**Error:** 1\n\n**Confidence:** 85"
+    assert parse_grading_confidence(text) == 85
+
+
+def test_parse_grading_confidence_boundaries():
+    assert parse_grading_confidence("**Confidence:** 0") == 0
+    assert parse_grading_confidence("**Confidence:** 100") == 100
+
+
+def test_parse_grading_confidence_rejects_out_of_range():
+    """A model emitting 150 has not followed the instruction. Clamping it to 100
+    would manufacture a confidence it never expressed."""
+    assert parse_grading_confidence("**Confidence:** 150") is None
+
+
+def test_parse_grading_confidence_absent_returns_none():
+    assert parse_grading_confidence("**Reasoning:** ok\n\n**Error:** 0") is None
+    assert parse_grading_confidence(None) is None
+
+
+def test_parse_grading_confidence_coexists_with_the_error_digit():
+    """The confidence variant must still parse under the existing grading
+    parser, so the two prompts stay comparable on the same scoring path."""
+    text = "**Reasoning:** Fine.\n\n**Error:** 0\n\n**Confidence:** 70"
+    assert parse_grading(text) == 0
+    assert parse_grading_confidence(text) == 70

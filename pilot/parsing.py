@@ -96,3 +96,27 @@ def grading_cluster_matches_label(majority_cluster: str, has_error: bool | int) 
     if majority_cluster not in {"0", "1"}:
         return False
     return grading_matches_label(int(majority_cluster), has_error)
+
+
+_CONFIDENCE_RE = re.compile(r"\*\*Confidence:\*\*\s*(\d{1,3})")
+
+
+def parse_grading_confidence(response_text: Optional[str]) -> Optional[int]:
+    """Extract the 0-100 self-reported confidence from the confidence variant.
+
+    A second, independent uncertainty signal for the grading task: sampling
+    entropy asks whether the model agrees with itself across draws, this asks
+    what the model says about itself in one draw. Having both is what makes it
+    possible to say entropy beats (or does not beat) simply asking.
+
+    Values outside 0-100 return None rather than being clamped -- a model
+    emitting 150 has not understood the instruction, and silently turning that
+    into 100 would manufacture confidence that was never expressed.
+    """
+    if response_text is None:
+        return None
+    match = _CONFIDENCE_RE.search(response_text)
+    if match is None:
+        return None
+    value = int(match.group(1))
+    return value if 0 <= value <= 100 else None
