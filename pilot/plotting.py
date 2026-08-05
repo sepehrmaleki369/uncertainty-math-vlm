@@ -943,6 +943,65 @@ def classify_scaleup_result(
     return out
 
 
+def plot_risk_coverage(
+    df: pd.DataFrame,
+    entropy_col: str,
+    correctness_col: str,
+    ax: Optional[plt.Axes] = None,
+    baseline_risk: Optional[float] = None,
+) -> plt.Axes:
+    """Step plot of error rate among answered items as coverage increases.
+
+    Reads left to right as "if I answer my most confident X% and defer the
+    rest, what's my error rate on the X% I answered". Coverage 0 is the
+    single most confident item; coverage 1 is answering everything, where
+    risk equals the overall error rate by construction.
+
+    A step plot, not a smooth curve, because the underlying operating points
+    are genuinely discrete -- K=5 entropy only takes a handful of distinct
+    values (7 on the real n=300 perception data), so the curve is flat
+    between them and jumps at each one. Drawing a smooth interpolation would
+    imply operating points that do not exist.
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(5.6, 4.4))
+
+    curve = risk_coverage_curve(df, entropy_col, correctness_col)
+
+    ax.set_facecolor(SURFACE)
+    if ax.figure is not None:
+        ax.figure.patch.set_facecolor(SURFACE)
+
+    coverage = curve["coverage"].to_numpy()
+    risk = curve["risk_kept"].to_numpy()
+    ax.step(coverage, risk, where="post", color=COLOR_CORRECT, linewidth=2, zorder=3)
+    ax.scatter(coverage, risk, color=COLOR_CORRECT, s=28, zorder=4)
+
+    if baseline_risk is None:
+        baseline_risk = float((~_as_bool(df[correctness_col])).mean())
+    ax.axhline(baseline_risk, color=GRIDLINE, linestyle="--", linewidth=1, zorder=1)
+    ax.text(
+        0.02, baseline_risk, "answer everything", va="bottom", ha="left",
+        fontsize=8, color=INK_MUTED, transform=ax.get_yaxis_transform(),
+    )
+
+    ax.set_xlabel("coverage (fraction answered, most confident first)",
+                  fontsize=10, color=INK_SECONDARY)
+    ax.set_ylabel("risk (error rate among answered items)",
+                  fontsize=10, color=INK_SECONDARY)
+    ax.set_xlim(-0.02, 1.02)
+    ax.set_ylim(-0.03, max(risk.max(), baseline_risk) * 1.15)
+
+    ax.grid(axis="y", color=GRIDLINE, linewidth=1, zorder=0)
+    ax.set_axisbelow(True)
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    for side in ("left", "bottom"):
+        ax.spines[side].set_color(BASELINE)
+    ax.tick_params(colors=INK_MUTED, labelsize=9, length=0)
+    return ax
+
+
 def main(results_csv: str, output_dir: str = "figures") -> None:
     """Load results, run the integrity checks, save the two box plots."""
     df = load_results(results_csv)

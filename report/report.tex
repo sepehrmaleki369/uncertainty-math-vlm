@@ -80,8 +80,8 @@ Given a vision-language model transcribing and grading handwritten math answers,
 does the entropy of its own repeated outputs -- how much it disagrees with
 itself across independent samples -- predict when it is actually wrong?
 
-The work ran in two phases, and the distinction matters for how much weight any
-individual number carries:
+The work ran in three phases, and the distinction matters for how much weight
+any individual number carries:
 
 \begin{itemize}
   \item \textbf{Phase 1 ($n=100$, exploratory).} Whether either signal exists at
@@ -90,11 +90,16 @@ individual number carries:
   \item \textbf{Phase 2 ($n=300$, confirmatory).}
     Section~\ref{sec:scaleup}. A rebalanced sample with thresholds registered
     before the run (\texttt{pilot.plotting.SCALEUP\_PREREGISTRATION}). This is
-    the phase the headline claims rest on.
+    the phase the headline claims rest on. Includes a risk-coverage and
+    conformal deferral analysis of the $n=300$ result (\S\ref{sec:deferral}).
+  \item \textbf{Phase 3 (same $n=300$ items, follow-up).} Section~\ref{sec:phase3}.
+    Closes two gaps Phase 2 left open: an independent baseline for perception
+    entropy, and a screen of alternative grading prompts for the reasoning arm.
 \end{itemize}
 
-Still out of scope in both: no baseline suite, no conformal calibration, no
-human double grading, no full-dataset run, one model only.
+Still out of scope across all three: no human double grading, no full-dataset
+run, and no larger model -- the single most important remaining gap, discussed
+in \S\ref{sec:reasoning-dead} and the final recommendation.
 
 Every AUROC below is reported with a 95\% bootstrap confidence interval
 (10{,}000 item-level resamples, seed 0; \texttt{pilot.plotting.bootstrap\_auroc\_ci}).
@@ -710,6 +715,86 @@ direction for a small-sample extreme, and 93.4\% remains a usable operating
 point -- it flags 57 of the 182 transcription errors (31\% recall) with 4 false
 positives.
 
+\subsection{The deferral rule: risk-coverage, AURC, and a conformal guarantee}
+\label{sec:deferral}
+
+The abstention rule above is one hand-picked operating point. The general
+version of the same idea is a \emph{risk-coverage curve}: order items by
+entropy, most confident first, and ask what error rate results from
+answering only the most confident $X\%$ and deferring the rest.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.62\textwidth]{figures/risk_coverage_n300.png}
+  \caption{Risk-coverage curve for perception entropy, $n=300$. A step plot,
+  not a smooth curve, because $K=5$ entropy has only 7 achievable operating
+  points -- the curve is genuinely flat between them and jumps at each one.
+  Coverage 1.0 (answer everything) recovers the overall error rate, 0.607.}
+  \label{fig:risk-coverage}
+\end{figure}
+
+\begin{center}
+\begin{tabular}{cccc}
+\toprule
+Coverage & Items answered & Items deferred & Risk (error rate answered) \\
+\midrule
+12.7\% & 38 & 262 & \textbf{0.079} \\
+33.3\% & 100 & 200 & 0.260 \\
+52.0\% & 156 & 144 & 0.372 \\
+100\% (answer everything) & 300 & 0 & 0.607 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+A single number summarizes the whole curve: the \emph{area under the
+risk-coverage curve} (AURC), the average risk swept across all achievable
+coverage levels. Lower is better, and it must always be read against the
+random-deferral baseline (just the overall error rate) since a high base
+error rate caps how good any AURC can be regardless of how well entropy
+ranks errors.
+
+\begin{center}
+\begin{tabular}{lc}
+\toprule
+AURC (entropy-ordered deferral) & \textbf{0.410} \\
+Baseline AURC (random deferral order) & 0.607 \\
+Improvement & 0.197 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Does the guarantee hold on data it has not seen?} A hand-picked
+cutoff carries no guarantee -- it is only known to have worked on the data
+it was chosen from. A \emph{conformal} threshold is calibrated on one half
+of the items and evaluated on the other half, repeated over 1{,}000 random
+splits, to check whether it actually controls risk on held-out data. Targeting
+at most 30\% risk:
+
+\begin{center}
+\begin{tabular}{lc}
+\toprule
+Target risk & 30\% \\
+Mean coverage achieved & 12.6\% \\
+Mean risk on held-out data & \textbf{13.7\%} \\
+Splits where the target was violated & 2.4\% \\
+Splits where no threshold could reach the target at all & \textbf{66.7\%} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The guarantee holds -- observed risk (13.7\%) sits well under the 30\% target,
+and it is violated in only 2.4\% of splits, both consistent with a
+conservative, working conformal procedure. The honest caveat is the fourth
+row: two-thirds of splits could not even attempt the target, because $K=5$'s
+seven operating points do not include one fine enough. This is the same
+resolution limit noted in \S\ref{sec:token-confidence}'s $K=10$ result, stated
+here in the specific terms that matter for deployment -- more samples per
+item would not just raise the headline AUROC, it would unlock finer-grained,
+more reliable deferral thresholds. \texttt{pilot.plotting.risk\_coverage\_curve},
+\texttt{aurc}, and \texttt{evaluate\_conformal\_abstention} implement all of
+this and are unit tested against both synthetic cases and this exact $n=300$
+run.
+
 \section{Phase 3: Closing the Baseline Gap and Testing Prompt Fixes}
 \label{sec:phase3}
 
@@ -1048,15 +1133,17 @@ experiment left that can resolve it.
     becomes live again and the existing analysis code applies unchanged.
     Blocked on access to compute large enough to run a 7B model, not on
     anything methodological.
-  \item \textbf{Perception is a deployable result now, not just a promising
-    one -- write up the deferral mechanism, not only the AUROC.} It has AUROC
-    0.835, survives every artifact and scoring-strictness cut, holds across
-    handwriting quality and image quality, beats an independent baseline by a
-    resolved margin, and improves further with $K$. A risk-coverage analysis
-    and conformal calibration were run informally in review (turning entropy
-    into a guaranteed-error-rate abstention rule rather than a hand-picked
-    cutoff) and are worth formalizing into this document on request -- they
-    need no new sampling, the existing CSVs already contain everything.
+  \item \textbf{Perception is a deployable result, and the deferral mechanism
+    is now written up alongside the AUROC} (\S\ref{sec:deferral}). It has
+    AUROC 0.835, survives every artifact and scoring-strictness cut, holds
+    across handwriting quality and image quality, beats an independent
+    baseline by a resolved margin, and improves further with $K$. The
+    remaining open item on this side is narrower than a full write-up: about
+    two-thirds of conformal calibration splits could not reach a 30\% risk
+    target at all, because $K=5$ gives too few operating points. $K=10$
+    (\S\ref{sec:token-confidence}) is the direct, already-tested fix; drawing
+    it for the full $n=300$ sample rather than the smaller confidence-baseline
+    subset would let the deferral analysis use it too.
   \item \textbf{The pairwise NLI matrix is already saved} for the $n=300$ run,
     so any clustering-variant experiment -- including a fix for the cascade
     fragility of \S\ref{sec:k15-cascade-failure} -- is now a free offline

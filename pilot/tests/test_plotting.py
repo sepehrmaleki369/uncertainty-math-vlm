@@ -21,6 +21,7 @@ from pilot.plotting import (
     join_k_resample,
     load_results,
     majority_class_baseline,
+    plot_risk_coverage,
     risk_coverage_curve,
     stratified_auroc,
     summarize_k_comparison,
@@ -833,3 +834,34 @@ def test_aurc_is_invariant_to_input_order_under_ties():
     assert aurc(base, "entropy", "correct")["aurc"] == pytest.approx(
         aurc(shuffled, "entropy", "correct")["aurc"]
     )
+
+
+# --- plot_risk_coverage ---
+
+
+def test_plot_risk_coverage_returns_axes_with_correct_step_count():
+    df = pd.DataFrame({
+        "entropy": [0.0] * 10 + [1.0] * 10,
+        "correct": [True] * 9 + [False] * 11,
+    })
+    ax = plot_risk_coverage(df, "entropy", "correct")
+    assert ax is not None
+    # Exactly one solid step line (the curve) plus the dashed baseline
+    # reference line drawn separately -- filter to the solid one.
+    solid_lines = [ln for ln in ax.get_lines() if ln.get_linestyle() not in ("--", "dashed")]
+    assert len(solid_lines) == 1
+    xdata = solid_lines[0].get_xdata()
+    assert xdata[0] == pytest.approx(0.5)  # coverage of the first (lowest-entropy) group
+    assert xdata[-1] == pytest.approx(1.0)
+
+
+def test_plot_risk_coverage_baseline_defaults_to_overall_error_rate():
+    df = pd.DataFrame({
+        "entropy": [0.0, 0.5, 1.0, 1.0],
+        "correct": [True, True, False, True],
+    })
+    ax = plot_risk_coverage(df, "entropy", "correct")
+    # The dashed reference line should sit at the overall error rate (1/4).
+    hlines = [ln for ln in ax.get_lines() if ln.get_linestyle() == "--"]
+    assert len(hlines) == 1
+    assert hlines[0].get_ydata()[0] == pytest.approx(0.25)
