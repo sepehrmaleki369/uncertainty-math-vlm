@@ -16,7 +16,7 @@
 \newcommand{\unresolved}[1]{\textcolor{darkamber}{\textbf{#1}}}
 
 \title{Uncertainty Signal Pilot: Perception and Reasoning Entropy\\
-\large FERMAT Handwritten Math, Qwen2.5-VL-3B}
+\large FERMAT Handwritten Math, Qwen2.5-VL-3B and 7B}
 \author{}
 \date{\today}
 
@@ -27,11 +27,13 @@
 This study tests whether two entropy-based uncertainty signals -- \emph{perception
 entropy} (instability in transcribing a handwritten math answer) and
 \emph{reasoning entropy} (instability in grading whether an answer contains an
-error) -- predict model correctness, using Qwen2.5-VL-3B on the FERMAT dataset.
-It ran in three phases: an exploratory $n=100$ pilot, a confirmatory $n=300$
-run with a pre-registered analysis and a deliberately rebalanced label
-distribution, and a follow-up closing the two gaps that run left open. The
-two arms end in opposite places, and both results are firm.
+error) -- predict model correctness, using Qwen2.5-VL on the FERMAT dataset.
+It ran in four phases: an exploratory $n=100$ pilot on the 3B model, a
+confirmatory $n=300$ run with a pre-registered analysis and a deliberately
+rebalanced label distribution, a follow-up closing the two gaps that run left
+open, and a fourth phase testing a 7B model on the reasoning arm specifically.
+Perception is unambiguous; reasoning is more specific than either a clean
+positive or a clean negative, and resolving that took the whole fourth phase.
 
 \textbf{Perception entropy works.} At $n=300$ it reaches AUROC~$=0.835$,
 95\% CI $[0.787, 0.879]$, replicating the pilot's 0.788 and tightening the
@@ -67,11 +69,29 @@ from 94\% ``error'' to 38\% while leaving accuracy essentially unchanged,
 evidence that the ceiling is a capability limit rather than a promptable
 default.
 
-The methodological lesson is separable from either result. Adding bootstrap
-confidence intervals late overturned several conclusions the pilot had already
-formalized into code and prose, and the single most consequential design
-decision was not the metric or the model but the \emph{label balance of the
-evaluation set}.
+\textbf{A larger model refines, rather than overturns, the reasoning result.}
+Qwen2.5-VL-7B's grading accuracy (59.0\% vs.\ a 50.0\% baseline) clears a
+pre-registered capability gate only marginally, and its pooled AUROC (0.520)
+is statistically identical to 3B's. But stratifying by whether the graded
+answer actually contains an error -- the design Phase 2 could not test,
+because the model's bias left only 8 misgraded error items -- and then
+drawing 200 more error items specifically to power that stratum, produces a
+\textbf{confirmed AUROC of 0.834} $[0.768, 0.891]$ on 38 misgraded items. The
+clean stratum, powered for the first time because 7B is simply more accurate
+on clean items, confirms the predicted inversion at 0.280 $[0.200, 0.366]$.
+For the first time in this project, both grading strata are simultaneously
+powered and resolved, in opposite directions (\S\ref{sec:phase4}) --
+Phase 2's ``the model grades at chance so entropy measures nothing'' is
+correct about pooling an error-biased model's output, not about reasoning
+entropy in general.
+
+The methodological lesson is separable from any single result. Adding
+bootstrap confidence intervals late overturned several conclusions the pilot
+had already formalized into code and prose; the single most consequential
+design decision was not the metric or the model but the \emph{label balance
+of the evaluation set} -- and Phase 4 shows the same lesson applies a second
+time, one level up: a real effect survived being pooled away only once the
+pooling itself was diagnosed and undone.
 \end{abstract}
 
 \section{Goal}
@@ -80,26 +100,33 @@ Given a vision-language model transcribing and grading handwritten math answers,
 does the entropy of its own repeated outputs -- how much it disagrees with
 itself across independent samples -- predict when it is actually wrong?
 
-The work ran in three phases, and the distinction matters for how much weight
+The work ran in four phases, and the distinction matters for how much weight
 any individual number carries:
 
 \begin{itemize}
-  \item \textbf{Phase 1 ($n=100$, exploratory).} Whether either signal exists at
-    all. Sections~\ref{sec:perception}--\ref{sec:reasoning-pilot}. Several
-    analyses here were chosen after seeing data, and are labelled as such.
-  \item \textbf{Phase 2 ($n=300$, confirmatory).}
+  \item \textbf{Phase 1 ($n=100$, exploratory, 3B).} Whether either signal
+    exists at all. Sections~\ref{sec:perception}--\ref{sec:reasoning-pilot}.
+    Several analyses here were chosen after seeing data, and are labelled as
+    such.
+  \item \textbf{Phase 2 ($n=300$, confirmatory, 3B).}
     Section~\ref{sec:scaleup}. A rebalanced sample with thresholds registered
     before the run (\texttt{pilot.plotting.SCALEUP\_PREREGISTRATION}). This is
-    the phase the headline claims rest on. Includes a risk-coverage and
-    conformal deferral analysis of the $n=300$ result (\S\ref{sec:deferral}).
-  \item \textbf{Phase 3 (same $n=300$ items, follow-up).} Section~\ref{sec:phase3}.
+    the phase the headline perception claim rests on. Includes a
+    risk-coverage and conformal deferral analysis of the $n=300$ result
+    (\S\ref{sec:deferral}).
+  \item \textbf{Phase 3 (same $n=300$ items, follow-up, 3B).} Section~\ref{sec:phase3}.
     Closes two gaps Phase 2 left open: an independent baseline for perception
     entropy, and a screen of alternative grading prompts for the reasoning arm.
+  \item \textbf{Phase 4 ($n=300$ then $n=500$, 7B).} Section~\ref{sec:phase4}.
+    Tests whether a larger model changes the reasoning-arm conclusion: a
+    pre-registered capability gate, a stratified re-analysis, and a targeted
+    200-item extension that resolves the stratum Phase 2 could not test.
 \end{itemize}
 
-Still out of scope across all three: no human double grading, no full-dataset
-run, and no larger model -- the single most important remaining gap, discussed
-in \S\ref{sec:reasoning-dead} and the final recommendation.
+Still out of scope: no human double grading, no full-dataset run, and no
+model larger than 7B. What Phase 4 removed from this list is the single
+biggest one -- whether reasoning entropy could work at all on a model with
+some real grading competence is no longer open (\S\ref{sec:phase4}).
 
 Every AUROC below is reported with a 95\% bootstrap confidence interval
 (10{,}000 item-level resamples, seed 0; \texttt{pilot.plotting.bootstrap\_auroc\_ci}).
@@ -120,8 +147,14 @@ test.
     Phase 2 drew 300 items \emph{stratified} to 150/150 on \verb|has_error|
     (\texttt{pilot.data.load\_fermat\_balanced}) -- for reasons developed in
     \S\ref{sec:reasoning-diagnosis}, this turned out to be the single most
-    consequential design choice in the study.
-  \item \textbf{Model}: Qwen2.5-VL-3B-Instruct.
+    consequential design choice in the study. Phase 4 reuses that same
+    300-item sample for its capability gate, then extends it with 200 more
+    \verb|has_error|=1 items only, disjoint by construction
+    (\texttt{pilot.data.load\_fermat\_extra\_error\_items}), to power a
+    stratum the 300-item sample could not measure.
+  \item \textbf{Model}: Qwen2.5-VL-3B-Instruct (Phases 1--3);
+    Qwen2.5-VL-7B-Instruct, full bf16, reasoning arm only (Phase 4,
+    \S\ref{sec:phase4}).
   \item \textbf{Perception}: the model transcribes a handwritten Question--Answer
     pair; $K=5$ samples at temperature 0.7, plus 2 samples at temperature 0 as a
     determinism sanity anchor.
@@ -654,7 +687,15 @@ entropy sees the stability and infers reliability. This is a property of the
 technique, not a bug in this implementation, and it applies to any
 sampling-based uncertainty method.
 
+Phase 4 (\S\ref{sec:phase4}) revisits this claim with a larger model. The
+pooled failure described here turns out to be specific to pooling an
+error-biased model's predictions, not a general statement that reasoning
+entropy has nothing to measure: within the \texttt{has\_error}=1 stratum,
+a 7B model's entropy becomes a confirmed, sizable predictor once given
+enough misgraded items to measure against.
+
 \subsection{The pre-registered stratified hypothesis was untestable}
+\label{sec:phase1-stratified-untestable}
 
 Phase 1's most promising reasoning claim was that entropy scores 0.756 within
 the \texttt{has\_error}=1 stratum and is only cancelled by pooling. Phase 2
@@ -912,6 +953,170 @@ ceiling on this 3B model, strengthening the case for testing a larger model
 (\S\ref{sec:reasoning-dead}) as the next real lever on the reasoning arm,
 rather than further prompt engineering.
 
+\section{Phase 4: A Larger Model, and the Reasoning Arm's Stratified Resolution}
+\label{sec:phase4}
+
+Phase 3 left model capability as the one remaining lever on the reasoning arm
+(\S\ref{sec:prompt-variants}). This phase runs that check on Qwen2.5-VL-7B,
+finds it ambiguous rather than clearly positive or negative, follows the
+stratified pattern Phase 2 flagged but could not test, and then closes the
+power gap that made that pattern untestable.
+
+\subsection{The capability gate: marginal, not resolved either way}
+\label{sec:phase4-gate}
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+Metric & 3B ($n=300$, \S\ref{sec:reasoning-dead}) & 7B ($n=300$) \\
+\midrule
+Grading accuracy & 0.517 & \textbf{0.590} \\
+vs.\ baseline & 0.500 & 0.500 \\
+Gate verdict (0.55 / 0.65 bars) & \failed{at chance} & \unresolved{marginal} \\
+Answers ``there is an error'' & 93\% & 80\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The gate exists precisely so a middling result is not silently read as a
+resolution. 7B improves 9 points over baseline -- a real gain over 3B's
+0.517 -- but does not clear the pre-registered 0.65 bar that would treat the
+entropy numbers below as validated rather than diagnostic
+(\texttt{entropy\_result\_meaningful} is \texttt{False} for this run).
+Consistent with that, the pooled AUROC is 0.520 $[0.458, 0.582]$ --
+statistically indistinguishable from 3B's 0.522 -- and is reported here for
+completeness, not as evidence on its own.
+
+\subsection{The stratified pattern replicates, initially still underpowered}
+\label{sec:phase4-stratified}
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+Stratum & AUROC (95\% CI) & $n_{\text{wrong}}$ & Verdict \\
+\midrule
+Pooled & 0.520 $[0.458, 0.582]$ & 123 & \failed{no signal} \\
+\texttt{has\_error}=1 & 0.761 $[0.646, 0.860]$ & 17 & \unresolved{underpowered} \\
+Clean & 0.280 $[0.200, 0.366]$ & 44 & \worked{confirmed inversion} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Both \texttt{sign\_reversal} and \texttt{pooled\_understates} hold, same as
+3B. Two comparisons are worth making against 3B's own $n=300$ result
+(\S\ref{sec:phase1-stratified-untestable}), not the earlier $n=100$ pilot
+number, since only the $n=300$ runs share a design:
+
+\begin{itemize}
+  \item \textbf{\texttt{has\_error}=1}: 3B scored 0.836 $[0.626, 0.946]$ on
+    just \textbf{8} misgraded items -- too few to trust on its own. 7B's
+    0.761 here is still underpowered too (17 misgraded), but sits inside
+    3B's wide interval. The two independent point estimates agreeing this
+    closely is a hint the underlying effect size is real and roughly this
+    large, even though neither alone clears the power bar.
+  \item \textbf{Clean stratum}: 3B's clean stratum was underpowered for a
+    \emph{different} reason -- not too few items, but too few \emph{correct}
+    ones (13 of 150, because 3B is wrong on clean items 91\% of the time).
+    7B's clean-item accuracy is far better (106 of 150 correct), which is
+    what makes 44 misgraded items available to measure against -- the first
+    clean stratum in this project to clear the power bar. The confirmed
+    result, 0.280 $[0.200, 0.366]$, is close to 3B's own point estimate of
+    0.239 $[0.128, 0.374]$: the direction and rough magnitude were right at
+    3B, just unmeasurable there.
+\end{itemize}
+
+\subsection{Manual inspection: two mechanisms, and two cases with no findable error}
+\label{sec:phase4-inspection}
+
+Before spending more compute, the 17 misgraded \texttt{has\_error}=1 items
+were read directly. This required a pipeline change: the per-item checkpoint
+always retained the model's full raw text, but the final scoring step had
+been discarding it down to digit, entropy, and correctness -- adequate for
+computing AUROC, not for explaining a wrong answer. Carrying the raw text
+through to the final CSV made the following possible.
+
+Two concrete failure mechanisms account for most of the 17:
+
+\begin{itemize}
+  \item \textbf{Digit/reasoning self-contradiction}, elevated relative to 3B.
+    Roughly 35--40\% of digit-0 samples among the wrong items have reasoning
+    text that itself raises a concern, after correcting a naive keyword
+    check's false positives (23\% of raw keyword matches were phrases like
+    ``no error'', which trips a literal string match on ``error'' without
+    asserting one). This is \emph{not} a controlled comparison against 3B's
+    previously reported 11\% (\S\ref{sec:reasoning-dead}), since 3B's samples
+    were not re-measured with the same correction -- reported as a
+    directional observation, not a resolved gap.
+  \item \textbf{Pattern-matching a solution's structure instead of
+    independently recomputing a step.} For example, one item's worked
+    solution states $19 \times (-18) \times 23 = -7966$; the model's
+    reasoning restates this product as confirmation without recomputing it.
+    The correct value is $-7866$.
+\end{itemize}
+
+Of the 17, only \textbf{2 are unanimous across all $K=5$ samples} (reasoning
+entropy exactly 0, so there is no disagreement for entropy to detect even in
+principle) -- the other 15 had at least one dissenting or unparseable sample,
+so entropy had \emph{some} signal available, it simply was not enough to flip
+the majority vote. Both unanimous cases were re-derived by hand and neither
+shows a mathematical error anywhere in the text shown to the model, raising
+the possibility of dataset label noise rather than a model failure on those
+two specific items. This is checked directly against the source handwritten
+images, not just the text, in a dedicated follow-up
+(\texttt{pilot/07\_manual\_case\_inspection.ipynb}).
+
+\subsection{Closing the power gap: \texttt{has\_error}=1 confirmed}
+\label{sec:phase4-confirmed}
+
+200 additional \texttt{has\_error}=1 items were drawn -- disjoint from the
+reference run by construction, since both draws index the same seeded
+shuffle of error items and take non-overlapping slices
+(\texttt{pilot.data.load\_fermat\_extra\_error\_items}) -- and merged with
+the 300-item reference run, giving 350 \texttt{has\_error}=1 items against
+150 clean ones (500 total, deliberately no longer balanced: the extension
+targets only the stratum that needed power).
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+Stratum & AUROC (95\% CI) & $n_{\text{wrong}}$ & Verdict \\
+\midrule
+\texttt{has\_error}=1 (before, $n=150$) & 0.761 $[0.646, 0.860]$ & 17 & \unresolved{underpowered} \\
+\texttt{has\_error}=1 (after, $n=350$) & \textbf{0.834} $[0.768, 0.891]$ & \textbf{38} & \worked{confirmed} \\
+Clean (unchanged, $n=150$) & 0.280 $[0.200, 0.366]$ & 44 & \worked{confirmed inversion} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+$n_{\text{wrong}}$ clears the registered minimum of 30 for the first time in
+this stratum, and the AUROC itself rose from 0.761 to 0.834, clearing the
+pre-registered 0.70 threshold (\S\ref{sec:phase1-stratified-untestable}) with
+a CI that excludes chance outright. This is the first point in the project
+where \emph{both} grading strata are simultaneously powered and resolved, in
+opposite directions -- not a hypothesis about pooling hiding a real effect,
+but a fully measured, symmetric result.
+
+One trap in this specific sample is worth flagging explicitly. Its pooled
+AUROC reads 0.612 $[0.560, 0.663]$ -- above chance, which invites the reading
+that the sign-reversal problem has resolved itself. It has not: the sample is
+no longer 50/50 on \texttt{has\_error} (350 vs.\ 150), which mechanically
+pulls the pooled statistic toward the larger, stronger \texttt{has\_error}=1
+stratum. \texttt{stratified\_auroc} remains the only correct read of this
+data, exactly as it was when pooling produced the opposite distortion in
+\S\ref{sec:reasoning-dead}.
+
+\textbf{Net revision to the reasoning-arm conclusion:} \S\ref{sec:reasoning-dead}'s
+finding stands as stated -- pooled entropy on an error-biased 3B model
+measures nothing. But that is now known to be a statement about pooling an
+error-biased model's output, not about reasoning entropy in general. Within
+the \texttt{has\_error}=1 stratum, at 7B, entropy is a confirmed AUROC-0.834
+predictor of grading correctness, and its close agreement with 3B's own
+(underpowered) 0.836 point estimate for the same stratum suggests this was
+close to the true effect size at 3B too -- just never measurable there. The
+practical implication is not ``bigger model, better entropy'' so much as
+``stratify by the model's own response bias before pooling, or a real signal
+disappears into it.''
+
 \section{Integrity Checks}
 
 Both entropy signals depend on the sampling and parsing pipeline actually
@@ -941,7 +1146,7 @@ a full-width colon); widening the pattern recovered most of the missed samples.
 
 \section{Summary}
 
-\subsection{Final conclusions (Phase 2 + 3, $n=300$)}
+\subsection{Final conclusions (Phase 2--4)}
 
 \begin{center}
 \begin{tabular}{llcl}
@@ -953,17 +1158,24 @@ Perception & \worked{Works} & \textbf{0.835} $[0.787, 0.879]$ & Replicated, robu
 \quad harshest artifact cut & \worked{Works} & 0.796 $[0.736, 0.852]$ & $n=206$, CI excludes chance \\
 \quad vs. token confidence & \worked{Wins} & $+0.297$ $[+0.214, +0.380]$ & Paired, resolved -- \S\ref{sec:token-confidence} \\
 \quad $K=10$ vs. $K=5$ & \worked{Improves} & $+0.045$ $[+0.005, +0.087]$ & Paired, resolved -- confirms prediction \\
-Reasoning & \failed{Fails} & 0.522 $[0.462, 0.582]$ & Model grades at chance (0.517) \\
+Reasoning, pooled (3B) & \failed{Fails} & 0.522 $[0.462, 0.582]$ & Model grades at chance (0.517) \\
 \quad prompt variants (screen) & \failed{None fix it} & -- & 3 tried, none clear bar -- \S\ref{sec:prompt-variants} \\
+Reasoning, pooled (7B) & \failed{Fails} & 0.520 $[0.458, 0.582]$ & Capability gate marginal -- \S\ref{sec:phase4-gate} \\
+\quad \texttt{has\_error}=1 stratum (7B) & \worked{Works} & \textbf{0.834} $[0.768, 0.891]$ & Confirmed, $n_{\text{wrong}}=38$ -- \S\ref{sec:phase4-confirmed} \\
+\quad Clean stratum (7B) & \worked{Inverted} & 0.280 $[0.200, 0.366]$ & Confirmed, $n_{\text{wrong}}=44$ -- \S\ref{sec:phase4-stratified} \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\noindent The reasoning result is a statement about the \emph{model}, not the
-metric. See \S\ref{sec:reasoning-dead}. Perception now has both an independent
-baseline it beats and a confirmed gain from additional sampling; the
-reasoning arm's failure has been shown not to be a simple, promptable
-artifact (\S\ref{sec:phase3}).
+\noindent The 3B pooled reasoning result is a statement about \emph{that
+model}, not the metric. See \S\ref{sec:reasoning-dead}. Perception now has
+both an independent baseline it beats and a confirmed gain from additional
+sampling; the reasoning arm's pooled failure has been shown not to be a
+simple, promptable artifact (\S\ref{sec:phase3}), and -- once stratified and
+adequately powered at 7B -- not a statement that the technique has nothing
+to measure, either (\S\ref{sec:phase4}). The pooled/stratified split is now
+the central caveat on reading \emph{any} AUROC in this report: pooling can
+hide as much as it reveals when a model's own response bias is asymmetric.
 
 \subsection{Phase 1 exploratory results (superseded)}
 
@@ -1049,22 +1261,35 @@ standing rests on its own CI excluding chance and surviving
 \section{Limitations}
 
 \begin{itemize}
-  \item \textbf{The reasoning result is about this model, not about entropy in
-    general.} Qwen2.5-VL-3B cannot grade handwritten math above chance, so this
-    study establishes that entropy fails \emph{in that regime}. It is not
-    evidence that reasoning entropy would fail for a model that can actually do
-    the task. That is the single most important caveat on the negative result,
-    and it is exactly what a larger model would test.
-  \item \textbf{Single model.} All results are Qwen2.5-VL-3B; no comparison to
-    a larger model (7B). Given the above, this limitation now carries more
-    weight than it did in Phase 1. (The baseline-uncertainty-method gap
-    mentioned in earlier drafts of this limitation is resolved: entropy now
-    has a measured, resolved win over token confidence,
+  \item \textbf{The 3B reasoning result is about that model, not about
+    entropy in general -- and Phase 4 confirms the caveat mattered.}
+    Qwen2.5-VL-3B cannot grade handwritten math above chance, so Phase 2
+    establishes that pooled entropy fails \emph{in that regime}, not that
+    the technique fails outright. A 7B model's pooled result is statistically
+    identical (0.520 vs.\ 0.522), but its \texttt{has\_error}=1 stratum,
+    once adequately powered, is a confirmed 0.834 -- so the caveat this
+    bullet used to raise as untested is now resolved, and resolved in the
+    direction it hoped for (\S\ref{sec:phase4}).
+  \item \textbf{Still only two model sizes.} 3B and 7B are both tested now
+    (\S\ref{sec:phase4-gate}); a still-larger model, or a text-only model
+    given the ground-truth transcription, remains untested. Given Phase 4,
+    this limitation is now about the ceiling of the stratified effect size,
+    not about whether reasoning entropy works at all. (The baseline-
+    uncertainty-method gap mentioned in earlier drafts of this limitation is
+    resolved: entropy has a measured, resolved win over token confidence,
     \S\ref{sec:token-confidence}.)
-  \item \textbf{The stratified reasoning hypothesis remains untested, not
-    refuted.} The model's bias left 8 misgraded items among 150
-    error-containing ones -- under the registered minimum. Nothing in Phase 2
-    licenses a conclusion about it either way.
+  \item \textbf{The stratified reasoning hypothesis is now confirmed at 7B,
+    not merely untested.} 3B's version remains untestable (8 misgraded items
+    among 150 error-containing ones, under the registered minimum); nothing
+    in Phase 2 licenses a conclusion about 3B specifically. But 7B's version
+    of the same stratum, after drawing 200 more error items, clears the
+    power bar and confirms the hypothesis (\S\ref{sec:phase4-confirmed}).
+  \item \textbf{Two of the 7B reasoning arm's misgraded items show no
+    findable error in the text shown to the model.} Manual re-derivation of
+    both found the worked solution mathematically sound
+    (\S\ref{sec:phase4-inspection}), raising an open question about FERMAT
+    label noise on those two items specifically, pending a check against the
+    source images.
   \item \textbf{Phase 1 numbers are exploratory.} With a minority class of
     18--58 items, its CIs span roughly $\pm 0.12$, and four of five comparisons
     were unresolvable. Several of its analyses were also chosen after seeing
@@ -1111,28 +1336,26 @@ standing rests on its own CI excluding chance and surviving
 
 \section{Recommended Next Steps}
 
-Sample size is no longer the binding constraint -- Phase 2 resolved what it was
-built to resolve. Phase 3 closed two of the remaining gaps: perception now has
-an independent baseline it beats, and the simplest prompt fixes for the
-reasoning arm have been tried and rejected. What limits the reasoning
-conclusion now is \emph{model capability}, and there is exactly one
-experiment left that can resolve it.
+Phase 4 resolved the item that used to head this list: the reasoning arm has
+a confirmed, sizable stratified signal at 7B, not just an unresolved caveat.
+What remains is narrower.
 
 \begin{enumerate}
-  \item \textbf{Re-run the reasoning arm on a model that can actually grade.}
-    This is the last open item and it directly addresses the main caveat on
-    the negative result. The prerequisite is a capability check, not an
-    entropy measurement: run the grading prompt on the balanced 300 items
-    with a stronger model (Qwen2.5-VL-7B, or a text-only model given the
-    ground-truth transcription) and check accuracy against the 0.500 baseline
-    \emph{first}. If it still grades at chance, reasoning entropy is
-    unanswerable on this task and the negative result stands as general for
-    this task family -- now a stronger claim than it was after Phase 2 alone,
-    since \S\ref{sec:prompt-variants} has already ruled out the task being
-    trivially fixable. If it clears roughly 0.65--0.70, the entropy question
-    becomes live again and the existing analysis code applies unchanged.
-    Blocked on access to compute large enough to run a 7B model, not on
-    anything methodological.
+  \item \textbf{Check the two label-noise candidates against the source
+    images.} \S\ref{sec:phase4-inspection} found two misgraded items with no
+    findable error in the text shown to the model. Cheap to resolve
+    (\texttt{pilot/07\_manual\_case\_inspection.ipynb}, no GPU required) and
+    worth doing before treating every misgraded \texttt{has\_error}=1 item as
+    a model failure -- if either turns out to be a labeling error, that
+    revises (slightly) which items the 0.834 result is measuring against,
+    though not the headline number itself.
+  \item \textbf{Decide whether the reasoning arm's stratified result is the
+    headline finding or a secondary one.} It is now positive and confirmed,
+    which changes the shape of this report's contribution: not ``perception
+    works, reasoning doesn't,'' but ``entropy works on both arms once a
+    model's own response bias is accounted for.'' Whether that reframing
+    belongs in the abstract's emphasis or stays a Phase 4 result is an
+    editorial choice, not a methodological one.
   \item \textbf{Perception is a deployable result, and the deferral mechanism
     is now written up alongside the AUROC} (\S\ref{sec:deferral}). It has
     AUROC 0.835, survives every artifact and scoring-strictness cut, holds
@@ -1144,12 +1367,18 @@ experiment left that can resolve it.
     (\S\ref{sec:token-confidence}) is the direct, already-tested fix; drawing
     it for the full $n=300$ sample rather than the smaller confidence-baseline
     subset would let the deferral analysis use it too.
+  \item \textbf{A similarly powered \texttt{has\_error}=1 extension at 3B
+    is the direct way to test whether 3B's own 0.836 point estimate
+    (\S\ref{sec:phase1-stratified-untestable}) would also resolve to
+    something close to 0.834.} Not started. Would directly answer whether
+    the stratified effect is model-size-independent or specific to 7B's
+    better-calibrated behavior, rather than inferring it from two point
+    estimates landing close together.
   \item \textbf{The pairwise NLI matrix is already saved} for the $n=300$ run,
     so any clustering-variant experiment -- including a fix for the cascade
     fragility of \S\ref{sec:k15-cascade-failure} -- is now a free offline
-    computation. Still not worth doing before step 1: there is no reasoning
-    signal for a better clustering to recover unless a capable model
-    produces one.
+    computation, and now has a stratified positive result to try to sharpen
+    rather than a null result to abandon.
 \end{enumerate}
 
 \end{document}
