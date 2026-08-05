@@ -216,6 +216,63 @@ the push failed). Locked in `pilot/tests/test_7b_capability_check.py`.
   deciding whether the reasoning arm is being written up as a closed
   negative or pursued further.
 
+### Manual case inspection (2026-08-05) + has_error=1 stratum powered (2026-08-05/06)
+
+The user asked, before running more GPU: *why* can't the 7B model find more
+mistakes — not just the aggregate rate. `pilot/06_7b_error_stratum_power.ipynb`
+was rewritten to carry raw grading text through to the final CSV (checkpoints
+always had it; only the final scoring step used to strip it down to
+digit+entropy+correctness). Manual inspection of the 17 wrong has_error=1
+cases from the reference run found two real mechanisms — digit/reasoning
+self-contradiction, and pattern-matching a solution's procedural structure
+instead of independently recomputing an arithmetic step (e.g. accepting
+`19 × -18 × 23 = -7966` at face value; the correct value is -7866) — but also
+turned up **two cases (items 40 and 161) with no findable error anywhere in
+the text**, raising a real question about label noise vs. model failure.
+`pilot/07_manual_case_inspection.ipynb` pulls the actual handwritten images
+for every wrong has_error=1 case (recomputed from the checkpoints, not
+hardcoded) so this can be checked visually, not just textually. It also
+corrected an overcount from the initial ad hoc chat inspection: of those 17,
+only **2 are truly unanimous / zero-entropy** (items 40, 161) — the other 15
+had at least one disagreeing or failed sample but the majority vote was still
+wrong, so entropy did have signal available there, it just wasn't enough to
+flip the vote.
+
+**Then the stratum-powering run itself completed and fully resolved the
+has_error=1 stratum.** 200 more has_error=1 items (disjoint by construction,
+`pilot.data.load_fermat_extra_error_items`) merged with the 300-item
+reference run: `results/grading_7b_stratum_powered_n500_qwen2.5-vl-7b-instruct_20260805T135021Z.csv`
+(500 rows, Drive-only as always). Locked in `pilot/tests/test_7b_stratum_powered.py`.
+
+- **has_error=1: CONFIRMED, not just a point estimate anymore.** n_wrong grew
+  17 → **38** (clears the registered minimum of 30 for the first time), and
+  the AUROC itself rose 0.761 → **0.834 [0.768, 0.891]** — clears the
+  pre-registered 0.70 threshold with a CI that excludes chance outright.
+- **has_error=0 (clean) stratum is unchanged, as expected** (no new clean
+  items were drawn): still 150 items / 44 wrong, AUROC 0.280 [0.200, 0.366].
+- **This is the first point in the entire project where both grading strata
+  are simultaneously adequately powered, each fully resolved, in opposite
+  directions.** `sign_reversal=True`, `pooled_understates=True`, and both
+  hold with real power now, not suggestively.
+- **Don't be misled by the pooled AUROC on this specific CSV: it now reads
+  0.612, above chance** — but that is an artifact of the sample no longer
+  being 50/50 (350 has_error=1 vs 150 clean), which mechanically favors the
+  larger, stronger has_error=1 stratum in the pooled mix. It is not evidence
+  the sign-reversal problem resolved itself; `stratified_auroc` is still the
+  only correct read, per the project's standing rule on this.
+- Side note: says-error rate rose to 83.6% (vs the reference-only run's
+  79.7%) simply because the 200 new items are all has_error=1 and the
+  model's existing bias scores well on them — not a new behavioral finding.
+- **Net effect on the reasoning-arm story:** within the has_error=1 stratum,
+  entropy is now a confirmed, sizable (0.834) predictor of grading
+  correctness at 7B. The arm is not a clean negative anymore at this
+  stratum — the earlier "reasoning is dead" framing (from the pooled/3B
+  numbers) was correct about *pooled* entropy on an error-biased model, not
+  about entropy's usefulness in general. The honest updated framing: entropy
+  works within-stratum at 7B, in both directions, but the model's own
+  response bias makes the *pooled* statistic actively misleading — a
+  measurement-methodology finding as much as a capability one.
+
 ## Repo-specific conventions
 
 - **Don't touch `report/` unless explicitly asked.** As of 2026-08-02 the user
