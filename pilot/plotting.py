@@ -845,6 +845,64 @@ SCALEUP_PREREGISTRATION = {
 }
 
 
+def classify_capability_check(
+    accuracy: float,
+    baseline_accuracy: float,
+    n_items: int,
+    threshold_capable: float = 0.65,
+    threshold_chance: float = 0.55,
+) -> dict:
+    """Gate for the 7B (or any larger-model) reasoning capability check.
+
+    The Phase 2/3 finding was that reasoning entropy measures nothing because
+    Qwen2.5-VL-3B cannot grade above chance (51.7% on a 0.500 baseline). The
+    report's recommended next step is explicit that a stronger model must be
+    gated on \\emph{accuracy} before any entropy/AUROC number is computed --
+    interpreting an uncertainty metric over an incompetent grader is the
+    mistake this whole project spent its middle third correcting. This
+    function is that gate, made a pure, testable decision rather than an
+    eyeballed call at the top of a notebook.
+
+    Three bands, matching the report's own stated criterion ("roughly
+    0.65-0.70" to call the question live again):
+      - below ``threshold_chance``: "at_chance" -- the negative reasoning-arm
+        result generalizes to this model too; do not proceed to an AUROC.
+      - between the two thresholds: "marginal" -- some signal above the
+        baseline, but not clearly enough to trust an uncertainty analysis
+        built on top of it. Report both numbers, proceed with a caveat.
+      - at or above ``threshold_capable``: "capable" -- the entropy question
+        is live again; the existing AUROC/CI code applies unchanged.
+
+    ``baseline_accuracy`` is passed in (from majority_class_baseline) rather
+    than assumed to be 0.5, since a differently-balanced sample -- unlikely
+    here, since this check is designed to reuse the same n=300 balanced
+    sample, but not guaranteed -- would make a hardcoded 0.5 wrong.
+    """
+    margin = accuracy - baseline_accuracy
+    if accuracy >= threshold_capable:
+        verdict = "capable"
+    elif accuracy < threshold_chance:
+        verdict = "at_chance"
+    else:
+        verdict = "marginal"
+    return {
+        "verdict": verdict,
+        "accuracy": accuracy,
+        "baseline_accuracy": baseline_accuracy,
+        "margin_over_baseline": margin,
+        "n_items": n_items,
+        "threshold_capable": threshold_capable,
+        "threshold_chance": threshold_chance,
+        # Whether a resulting entropy AUROC would be a meaningful test of the
+        # technique. False for "marginal" too, not just "at_chance": an AUROC
+        # is worth *computing* diagnostically at any accuracy level, but only
+        # "capable" grading makes it a trustworthy answer to the reasoning-arm
+        # question -- exactly the distinction the pooled-vs-stratified n=300
+        # result depended on getting right.
+        "entropy_result_meaningful": verdict == "capable",
+    }
+
+
 def classify_scaleup_result(
     summary: dict, prereg: Optional[dict] = None
 ) -> dict:

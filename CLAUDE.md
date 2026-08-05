@@ -164,6 +164,37 @@ below the threshold).
   a different mode and never retries them. Found by reading a genuinely
   confusing "resuming from 22 completed items" log line, not by inspection.
 
+### Deferral write-up + 7B capability check notebook (2026-08-05)
+
+- **`report/report.tex` §5.4 formalizes the risk-coverage/AURC/conformal
+  analysis** with a real figure (`pilot.plotting.plot_risk_coverage`,
+  `report/figures/risk_coverage_n300.png`). Correct current numbers: AURC
+  **0.410** against a 0.607 random-deferral baseline. **A stale 0.3417 figure
+  circulated earlier in chat from an ad hoc, order-dependent computation
+  before `aurc()` was fixed for ties — never use that number, it does not
+  appear in the report or any test.** Conformal at a 30% risk target: 13.7%
+  observed risk, 2.4% violation rate, but two-thirds of 1000 calibration
+  splits couldn't reach the target at all (K=5 gives too few operating
+  points — ties directly to the K=10 result).
+- **`pilot/05_7b_capability_check.ipynb` is built and dry-run tested, not yet
+  run.** Reuses the same n=300 balanced sample (same seed) as every other
+  notebook. Gates on grading accuracy *before* computing any entropy/AUROC,
+  via the new `pilot.plotting.classify_capability_check` (pure, tested
+  decision function, thresholds 0.55/0.65 per the report's own stated
+  criterion: `at_chance` / `marginal` / `capable`, plus
+  `entropy_result_meaningful` which is only `True` for `capable` — a
+  `marginal` AUROC is computed for the record but must not be read as
+  validating reasoning entropy). Falls back to a 4-bit quantized load if
+  bf16 doesn't fit, and records `QUANTIZED` in the output so that's never
+  silently glossed over. No transcription in this notebook — perception is
+  settled; only grading is in question. **Blocked on GPU access to actually
+  run it.**
+- Dry-run gotcha worth remembering: `load_fermat_balanced` **shuffles its
+  final selection** (`pilot/data.py`), so a stub/fixture must never assume
+  sample order correlates with `has_error` (e.g. "first half are error
+  items") — read ground truth from the real sample object instead. Caught
+  by the dry run disagreeing with itself, not by inspection.
+
 ## Repo-specific conventions
 
 - **Don't touch `report/` unless explicitly asked.** As of 2026-08-02 the user

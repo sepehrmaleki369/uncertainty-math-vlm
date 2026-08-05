@@ -13,6 +13,7 @@ from pilot.plotting import (
     bootstrap_auroc_ci,
     bootstrap_auroc_difference_ci,
     check_parse_failure_rate,
+    classify_capability_check,
     check_temperature_zero_anchor,
     classify_k_resample_result,
     compute_auroc,
@@ -865,3 +866,52 @@ def test_plot_risk_coverage_baseline_defaults_to_overall_error_rate():
     hlines = [ln for ln in ax.get_lines() if ln.get_linestyle() == "--"]
     assert len(hlines) == 1
     assert hlines[0].get_ydata()[0] == pytest.approx(0.25)
+
+
+# --- classify_capability_check ---
+
+
+def test_capability_check_at_chance():
+    out = classify_capability_check(accuracy=0.517, baseline_accuracy=0.500, n_items=300)
+    assert out["verdict"] == "at_chance"
+    assert out["entropy_result_meaningful"] is False
+
+
+def test_capability_check_real_3b_result_is_at_chance():
+    """Regression: the actual 3B n=300 grading accuracy (0.517) must classify
+    as at_chance, not marginal -- this is the number the whole gate exists to
+    catch, so the boundary must not accidentally let it through."""
+    out = classify_capability_check(accuracy=0.517, baseline_accuracy=0.500, n_items=300)
+    assert out["verdict"] == "at_chance"
+
+
+def test_capability_check_capable():
+    out = classify_capability_check(accuracy=0.70, baseline_accuracy=0.500, n_items=300)
+    assert out["verdict"] == "capable"
+    assert out["entropy_result_meaningful"] is True
+
+
+def test_capability_check_marginal_is_not_meaningful():
+    """The middle band exists precisely so a so-so accuracy cannot be quietly
+    read as validating reasoning entropy -- only 'capable' does that."""
+    out = classify_capability_check(accuracy=0.60, baseline_accuracy=0.500, n_items=300)
+    assert out["verdict"] == "marginal"
+    assert out["entropy_result_meaningful"] is False
+
+
+def test_capability_check_boundary_values():
+    at_capable = classify_capability_check(accuracy=0.65, baseline_accuracy=0.5, n_items=300)
+    assert at_capable["verdict"] == "capable"
+    just_below = classify_capability_check(accuracy=0.649, baseline_accuracy=0.5, n_items=300)
+    assert just_below["verdict"] == "marginal"
+    at_chance_edge = classify_capability_check(accuracy=0.55, baseline_accuracy=0.5, n_items=300)
+    assert at_chance_edge["verdict"] == "marginal"
+    just_below_chance = classify_capability_check(accuracy=0.549, baseline_accuracy=0.5, n_items=300)
+    assert just_below_chance["verdict"] == "at_chance"
+
+
+def test_capability_check_uses_the_passed_baseline_not_a_hardcoded_half():
+    """If a future run is not perfectly 50/50, the baseline must come from
+    majority_class_baseline, not an assumed 0.5."""
+    out = classify_capability_check(accuracy=0.60, baseline_accuracy=0.55, n_items=300)
+    assert out["margin_over_baseline"] == pytest.approx(0.05)
