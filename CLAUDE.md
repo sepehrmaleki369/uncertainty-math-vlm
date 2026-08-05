@@ -176,24 +176,45 @@ below the threshold).
   observed risk, 2.4% violation rate, but two-thirds of 1000 calibration
   splits couldn't reach the target at all (K=5 gives too few operating
   points — ties directly to the K=10 result).
-- **`pilot/05_7b_capability_check.ipynb` is built and dry-run tested, not yet
-  run.** Reuses the same n=300 balanced sample (same seed) as every other
-  notebook. Gates on grading accuracy *before* computing any entropy/AUROC,
-  via the new `pilot.plotting.classify_capability_check` (pure, tested
-  decision function, thresholds 0.55/0.65 per the report's own stated
-  criterion: `at_chance` / `marginal` / `capable`, plus
-  `entropy_result_meaningful` which is only `True` for `capable` — a
-  `marginal` AUROC is computed for the record but must not be read as
-  validating reasoning entropy). Falls back to a 4-bit quantized load if
-  bf16 doesn't fit, and records `QUANTIZED` in the output so that's never
-  silently glossed over. No transcription in this notebook — perception is
-  settled; only grading is in question. **Blocked on GPU access to actually
-  run it.**
 - Dry-run gotcha worth remembering: `load_fermat_balanced` **shuffles its
   final selection** (`pilot/data.py`), so a stub/fixture must never assume
   sample order correlates with `has_error` (e.g. "first half are error
   items") — read ground truth from the real sample object instead. Caught
   by the dry run disagreeing with itself, not by inspection.
+
+### 7B capability check — RUN 2026-08-05, result is MARGINAL
+
+`pilot/05_7b_capability_check.ipynb` ran clean on an A100, full bf16 (not
+quantized). `results/grading_7b_n300_qwen2.5-vl-7b-instruct_20260805T115859Z.csv`
+(300 rows, Drive-only — push 403'd as always, downloaded via Drive API since
+the push failed). Locked in `pilot/tests/test_7b_capability_check.py`.
+
+- **Gate verdict: `marginal`.** Grading accuracy 59.0% vs a 50.0% baseline —
+  better than 3B's 51.7%, but under the report's 0.65 bar. Doesn't cleanly
+  resolve "bigger model fixes it" or "task is unanswerable"; `entropy_result_meaningful`
+  is `False`, so the pooled AUROC (0.520, no signal) is diagnostic only.
+- **The stratified pattern replicates 3B almost exactly, same sign_reversal,
+  same pooled_understates.** has_error=1 stratum AUROC 0.761 [0.646, 0.860]
+  (3B: 0.756) — but **still underpowered** (17 wrong vs the registered
+  minimum of 30, same standard applied, not a new one). Point estimates
+  matching across model size is suggestive of a stable mechanism, not a
+  confirmed magnitude at either size.
+- **New: the clean stratum is adequately powered at 7B for the first time.**
+  3B's clean stratum was hopeless (13 items total). 7B's balanced sample
+  gives it 150 items / 44 wrong — clears the n=30 minimum. Result: AUROC
+  **0.280 [0.200, 0.366]**, resolvably below chance. **The inversion
+  (entropy runs backwards on clean items) is now a genuinely confirmed
+  finding, not just a suggestive direction** — the first stratum in this
+  whole project to both invert *and* clear the power bar.
+- Side improvements at 7B, real but partial: parse failures 0.1% (vs 3B's
+  0.9%), says-error rate 80% (vs 3B's 93%) — same bias, less extreme, not
+  gone. Consistent with the sign-reversal pattern still holding.
+- **Next open question, if pursued further:** a rebalanced *grading* sample
+  specifically for 7B (skewed toward has_error=1, the underpowered stratum)
+  would be the direct fix, mirroring the 3B→n=300 rebalancing move. Not
+  started — no GPU session run for this yet, and not clearly worth it before
+  deciding whether the reasoning arm is being written up as a closed
+  negative or pursued further.
 
 ## Repo-specific conventions
 
