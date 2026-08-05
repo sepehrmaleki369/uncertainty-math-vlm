@@ -5,6 +5,7 @@ from pilot.data import (
     FERMAT_FIELDS,
     fermat_census,
     load_fermat_balanced,
+    load_fermat_extra_error_items,
     load_fermat_sample,
 )
 
@@ -165,3 +166,63 @@ def test_load_fermat_balanced_reproducible_for_a_seed():
 def test_load_fermat_balanced_rejects_invalid_target(bad):
     with pytest.raises(ValueError, match="target_error_frac"):
         load_fermat_balanced(n=10, target_error_frac=bad, _loader=_imbalanced_loader(50, 50))
+
+
+# --- load_fermat_extra_error_items ---
+
+
+def test_load_fermat_extra_error_items_disjoint_from_prior_balanced_run():
+    """The whole point: items drawn here must never overlap the has_error=1
+    items a prior load_fermat_balanced call already used with the same seed."""
+    loader = _imbalanced_loader(500, 500)
+    prior = load_fermat_balanced(n=300, seed=7, target_error_frac=0.5, _loader=loader)
+    prior_error_qs = {q for q, e in zip(prior["orig_q"], prior["has_error"]) if e}
+    assert len(prior_error_qs) == 150
+
+    extra = load_fermat_extra_error_items(n_extra=100, seed=7, skip=150, _loader=loader)
+    extra_qs = set(extra["orig_q"])
+
+    assert len(extra) == 100
+    assert all(bool(x) for x in extra["has_error"])
+    assert extra_qs.isdisjoint(prior_error_qs)
+
+
+def test_load_fermat_extra_error_items_is_the_immediate_next_slice():
+    """Not just disjoint from the prior run -- specifically the NEXT items in
+    the same seeded ordering, so a second extension call (skip=350) would
+    continue seamlessly with no gap."""
+    loader = _imbalanced_loader(500, 500)
+    first = load_fermat_extra_error_items(n_extra=50, seed=7, skip=150, _loader=loader)
+    second = load_fermat_extra_error_items(n_extra=50, seed=7, skip=200, _loader=loader)
+    assert set(first["orig_q"]).isdisjoint(set(second["orig_q"]))
+    combined_via_one_call = load_fermat_extra_error_items(
+        n_extra=100, seed=7, skip=150, _loader=loader
+    )
+    assert set(first["orig_q"]) | set(second["orig_q"]) == set(combined_via_one_call["orig_q"])
+
+
+def test_load_fermat_extra_error_items_reproducible_for_a_seed():
+    loader = _imbalanced_loader(500, 500)
+    a = load_fermat_extra_error_items(n_extra=40, seed=3, skip=100, _loader=loader)
+    b = load_fermat_extra_error_items(n_extra=40, seed=3, skip=100, _loader=loader)
+    assert a["orig_q"] == b["orig_q"]
+
+
+def test_load_fermat_extra_error_items_shrinks_and_warns_when_pool_runs_short(caplog):
+    loader = _imbalanced_loader(180, 500)  # only 180 error items exist total
+    with caplog.at_level("WARNING"):
+        result = load_fermat_extra_error_items(n_extra=100, seed=7, skip=150, _loader=loader)
+    assert len(result) == 30  # 180 - 150 remaining
+    assert "Returning 30" in caplog.text
+
+
+def test_load_fermat_extra_error_items_all_positive_class():
+    loader = _imbalanced_loader(500, 500)
+    result = load_fermat_extra_error_items(n_extra=60, seed=7, skip=150, _loader=loader)
+    assert all(bool(x) for x in result["has_error"])
+
+
+def test_load_fermat_extra_error_items_drops_extra_columns():
+    loader = _imbalanced_loader(500, 500)
+    result = load_fermat_extra_error_items(n_extra=20, seed=7, skip=150, _loader=loader)
+    assert set(result.column_names) == set(FERMAT_FIELDS)

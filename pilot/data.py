@@ -138,3 +138,58 @@ def load_fermat_balanced(
         sample = sample.remove_columns(columns_to_drop)
 
     return sample
+
+
+def load_fermat_extra_error_items(
+    n_extra: int,
+    seed: int = 42,
+    skip: int = 150,
+    split: str = "train",
+    _loader: Callable[..., datasets.Dataset] = datasets.load_dataset,
+) -> datasets.Dataset:
+    """Load n_extra MORE has_error=1 items, disjoint from a prior balanced run.
+
+    Exists for exactly one situation: a stratified analysis (see
+    pilot.plotting.stratified_auroc) found one stratum underpowered and the
+    other already adequate, so the fix is more items in ONE stratum only --
+    drawing a fresh balanced sample would waste calls re-covering the
+    stratum that already has enough. Concretely: the 2026-08-05 7B grading
+    run had 150 has_error=1 items / 17 misgraded (below the registered
+    minimum of 30), while has_error=0 had 150 items / 44 misgraded (already
+    adequate). This draws more has_error=1 items to fix only the deficient
+    side.
+
+    Disjointness is structural, not probabilistic: with the same seed,
+    ``dataset.shuffle(seed=seed)`` reproduces the exact ordering
+    load_fermat_balanced used to build error_idx, so
+    ``error_idx[:skip]`` is precisely what a prior
+    ``load_fermat_balanced(n=..., seed=seed, target_error_frac=...)`` call
+    already took (for skip = round(n * target_error_frac)), and
+    ``error_idx[skip:skip+n_extra]`` is guaranteed to be the very next
+    items in that same ordering, never overlapping. The caller is
+    responsible for passing the ``skip`` that actually matches the prior
+    run's error-item count -- this function has no way to verify that from
+    here, since it does not see the prior run.
+    """
+    dataset = _loader("ai4bharat/FERMAT", split=split)
+    dataset = dataset.shuffle(seed=seed)
+
+    error_idx = [i for i, has_error in enumerate(dataset["has_error"]) if has_error]
+
+    available = max(0, len(error_idx) - skip)
+    actual_n = min(n_extra, available)
+    if actual_n < n_extra:
+        logger.warning(
+            "Requested %d extra has_error=1 items beyond the first %d, but only "
+            "%d are available after skipping. Returning %d instead.",
+            n_extra, skip, available, actual_n,
+        )
+
+    selected = error_idx[skip: skip + actual_n]
+    sample = dataset.select(selected)
+
+    columns_to_drop = [c for c in sample.column_names if c not in FERMAT_FIELDS]
+    if columns_to_drop:
+        sample = sample.remove_columns(columns_to_drop)
+
+    return sample
