@@ -302,6 +302,42 @@ reference run: `results/grading_7b_stratum_powered_n500_qwen2.5-vl-7b-instruct_2
   response bias makes the *pooled* statistic actively misleading — a
   measurement-methodology finding as much as a capability one.
 
+### RUN 2026-08-06: the 7B result is model-size-independent — 3B confirms too
+
+Open question after the 7B stratum-powering run: is 0.834 a 7B-specific
+behavior, or does the same effect show up at 3B once it's given enough
+misgraded items? `pilot/08_3b_error_stratum_power.ipynb` mirrors notebook 06
+for 3B — **N_EXTRA=500, not 200**, because 3B's has_error=1 error rate
+(8/150=5.3%) is roughly half 7B's (17/150=11.3%): 3B says "error" even more
+often (93% vs 80%), so it needed more than double the extra items to reach
+the same power. `results/grading_3b_stratum_powered_n800_qwen2.5-vl-3b-instruct_20260806T150044Z.csv`
+(800 rows, Drive-only). Locked in `pilot/tests/test_3b_stratum_powered.py`.
+
+- **CONFIRMED, and close to 7B's number.** n_wrong grew 8 → **42** (clears
+  the registered minimum of 30). AUROC: 0.836 (unconfirmed point estimate)
+  → **0.854 [0.796, 0.902]** — clears the pre-registered 0.70 threshold,
+  CI excludes chance. **7B: 0.834 [0.768, 0.891]. 3B: 0.854 [0.796, 0.902].**
+  Two independent model sizes, both confirmed, landing within 0.02 of each
+  other.
+- **This answers the open question decisively: the has_error=1 stratified
+  effect is model-size-independent, not a 7B-specific behavior.** It isn't
+  "bigger model unlocks the signal" — both model sizes had the signal all
+  along; they just needed enough misgraded items to measure it.
+- Clean stratum unchanged and still underpowered at 3B (13 correct items,
+  same as the original n=300 run — no new clean items were drawn; unlike
+  7B, 3B's clean stratum has never cleared the power bar).
+- Same pooled-AUROC trap as the 7B n=500 CSV: pooled reads 0.610 here
+  (above chance) purely because the sample is no longer 50/50 (650 vs
+  150) — not evidence the sign-reversal problem resolved, `stratified_auroc`
+  is still the only correct read.
+- Minor infra note, not yet acted on: the save cell's git commit failed on
+  this run with "Author identity unknown" (git user.name/email never
+  configured on this fresh Colab runtime) — a different failure mode than
+  the usual 403, caught one step earlier. Practically the same outcome
+  either way (CSV safe on Drive, not pushed), but worth a `git config
+  --global user.email/user.name` in the auth cell if this notebook pattern
+  gets reused again.
+
 ## Repo-specific conventions
 
 - **Don't touch `report/` unless explicitly asked.** As of 2026-08-02 the user
