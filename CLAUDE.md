@@ -228,15 +228,44 @@ self-contradiction, and pattern-matching a solution's procedural structure
 instead of independently recomputing an arithmetic step (e.g. accepting
 `19 × -18 × 23 = -7966` at face value; the correct value is -7866) — but also
 turned up **two cases (items 40 and 161) with no findable error anywhere in
-the text**, raising a real question about label noise vs. model failure.
-`pilot/07_manual_case_inspection.ipynb` pulls the actual handwritten images
-for every wrong has_error=1 case (recomputed from the checkpoints, not
-hardcoded) so this can be checked visually, not just textually. It also
-corrected an overcount from the initial ad hoc chat inspection: of those 17,
-only **2 are truly unanimous / zero-entropy** (items 40, 161) — the other 15
-had at least one disagreeing or failed sample but the majority vote was still
-wrong, so entropy did have signal available there, it just wasn't enough to
-flip the vote.
+the text** — initially read as possible label noise. `pilot/07_manual_case_inspection.ipynb`
+pulls the actual handwritten images for every wrong has_error=1 case
+(recomputed from the checkpoints, not hardcoded) so this could be checked
+visually, not just textually. It also corrected an overcount from the
+initial ad hoc chat inspection: of the reference run's 17, only **2 are
+truly unanimous / zero-entropy** (items 40, 161) — the other 15 had at least
+one disagreeing or failed sample but the majority vote was still wrong, so
+entropy did have signal available there, it just wasn't enough to flip the
+vote.
+
+**RUN 2026-08-06: notebook 07 executed, and the "label noise" reading was
+wrong — both have real errors, just not visible in the text excerpt used to
+screen them.** Downloaded the actual PNGs from Drive and viewed them
+directly (not re-reading the text more carefully — the text truly doesn't
+show it, e.g. item 40's `pert_a` field literally ends "The required number
+is $y$" and that IS the answer line, not a truncation artifact). Findings:
+- **Item 40**: algebra is correct (y=7), but the final line is verbatim "The
+  required number is y" — the computed value is never substituted into the
+  answer statement.
+- **Item 161**: defines R×R×R as `{(x,y,z) : x,y,x ∈ R}` — the tuple
+  introduces z, but the membership condition repeats x instead of z. An
+  internal inconsistency in the reference solution itself.
+- **A third unanimous case appeared** after the 200-item extension merged in
+  (extra_idx185, not in the original 17 — total wrong has_error=1 is now 38,
+  3 unanimous): correct arithmetic (√45 = 3√5 for a 3D distance calc)
+  followed by labeling the answer "meters" — a unit the problem never gave
+  for two bare coordinate points.
+
+**Net correction: zero label noise found across all 3 unanimous cases —
+all real, findable errors, just not arithmetic ones.** This sharpens the
+two known mechanisms (self-contradiction, pattern-matching without
+recomputing) into four: the model appears to verify a solution's *core
+computation* and stop there, without checking whether the final answer
+statement is complete (unsubstituted variable), internally consistent
+(mismatched notation), or licensed by the problem (fabricated unit). Fixed
+in `report/report.tex` §7.3 and CLAUDE.md — the report briefly stated the
+label-noise reading as an open question before this was checked; that
+version is wrong and has been corrected, not just appended to.
 
 **Then the stratum-powering run itself completed and fully resolved the
 has_error=1 stratum.** 200 more has_error=1 items (disjoint by construction,
