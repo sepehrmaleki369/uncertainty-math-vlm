@@ -4,6 +4,7 @@
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{hyperref}
 \usepackage{xcolor}
 \usepackage{caption}
@@ -1025,17 +1026,18 @@ number, since only the $n=300$ runs share a design:
     3B, just unmeasurable there.
 \end{itemize}
 
-\subsection{Manual inspection: two mechanisms, and two cases with no findable error}
+\subsection{Manual inspection: four mechanisms, no label noise}
 \label{sec:phase4-inspection}
 
 Before spending more compute, the 17 misgraded \texttt{has\_error}=1 items
-were read directly. This required a pipeline change: the per-item checkpoint
-always retained the model's full raw text, but the final scoring step had
-been discarding it down to digit, entropy, and correctness -- adequate for
-computing AUROC, not for explaining a wrong answer. Carrying the raw text
-through to the final CSV made the following possible.
+from the reference run were read directly. This required a pipeline change:
+the per-item checkpoint always retained the model's full raw text, but the
+final scoring step had been discarding it down to digit, entropy, and
+correctness -- adequate for computing AUROC, not for explaining a wrong
+answer. Carrying the raw text through to the final CSV made the following
+possible.
 
-Two concrete failure mechanisms account for most of the 17:
+Two mechanisms account for most of the 17:
 
 \begin{itemize}
   \item \textbf{Digit/reasoning self-contradiction}, elevated relative to 3B.
@@ -1054,16 +1056,33 @@ Two concrete failure mechanisms account for most of the 17:
     The correct value is $-7866$.
 \end{itemize}
 
-Of the 17, only \textbf{2 are unanimous across all $K=5$ samples} (reasoning
-entropy exactly 0, so there is no disagreement for entropy to detect even in
-principle) -- the other 15 had at least one dissenting or unparseable sample,
-so entropy had \emph{some} signal available, it simply was not enough to flip
-the majority vote. Both unanimous cases were re-derived by hand and neither
-shows a mathematical error anywhere in the text shown to the model, raising
-the possibility of dataset label noise rather than a model failure on those
-two specific items. This is checked directly against the source handwritten
-images, not just the text, in a dedicated follow-up
-(\texttt{pilot/07\_manual\_case\_inspection.ipynb}).
+Of the 17, \textbf{2 were unanimous across all $K=5$ samples} (reasoning
+entropy exactly 0) and showed no error anywhere in the pert\_a \emph{text} --
+initially read as possible dataset label noise. Checking both directly
+against the source handwritten images
+(\texttt{pilot/07\_manual\_case\_inspection.ipynb}) instead overturned that
+reading: both have real errors that the text excerpt had simply failed to
+surface. One item's final line reads, verbatim, ``The required number is
+$y$'' -- the algebra is correct ($y=7$) but the answer is never actually
+substituted in. The other defines $\mathbb{R}\times\mathbb{R}\times\mathbb{R}$
+as $\{(x,y,z) : x, y, x \in \mathbb{R}\}$ -- the tuple introduces $z$ but the
+membership condition repeats $x$ instead, an internal inconsistency in the
+model's own reference solution. Re-running the same check after
+\S\ref{sec:phase4-confirmed}'s 200-item extension found a third unanimous
+case among the new items, with the same pattern: correct arithmetic
+($\sqrt{45}=3\sqrt{5}$ for a 3D distance calculation) followed by an
+unwarranted final claim -- the answer is labeled ``meters,'' a unit the
+problem never specified for two bare coordinate points.
+
+\textbf{All three unanimous cases have real, findable errors -- none are
+label noise --} and together they sharpen the two mechanisms above into
+four. The common thread across the new two: the model appears to verify the
+\emph{core computation} of a solution and stop there, without checking
+whether the final answer statement is actually complete (an unsubstituted
+variable), internally consistent (mismatched notation), or licensed by the
+problem (a unit that was never given). This is a more specific description
+of the capability ceiling than ``cannot do arithmetic'' -- the arithmetic
+itself is not what these three items get wrong.
 
 \subsection{Closing the power gap: \texttt{has\_error}=1 confirmed}
 \label{sec:phase4-confirmed}
@@ -1284,12 +1303,17 @@ standing rests on its own CI excluding chance and surviving
     in Phase 2 licenses a conclusion about 3B specifically. But 7B's version
     of the same stratum, after drawing 200 more error items, clears the
     power bar and confirms the hypothesis (\S\ref{sec:phase4-confirmed}).
-  \item \textbf{Two of the 7B reasoning arm's misgraded items show no
-    findable error in the text shown to the model.} Manual re-derivation of
-    both found the worked solution mathematically sound
-    (\S\ref{sec:phase4-inspection}), raising an open question about FERMAT
-    label noise on those two items specifically, pending a check against the
-    source images.
+  \item \textbf{The three unanimous (zero-entropy) misgraded items all have
+    real errors invisible to arithmetic-checking, not label noise.} Two were
+    initially misread as errorless from the pert\_a text alone; checking the
+    source images instead (\S\ref{sec:phase4-inspection}) found an
+    unsubstituted variable and a notation inconsistency, plus a third case
+    (an unwarranted unit) in the 200-item extension. Read together, they
+    suggest the model checks a solution's core computation and does not
+    check whether its final answer statement is complete, consistent, or
+    licensed by the problem -- a narrower description of the ceiling than
+    ``cannot do arithmetic,'' but based on only three items and not
+    independently verified against a larger sample.
   \item \textbf{Phase 1 numbers are exploratory.} With a minority class of
     18--58 items, its CIs span roughly $\pm 0.12$, and four of five comparisons
     were unresolvable. Several of its analyses were also chosen after seeing
@@ -1341,14 +1365,14 @@ a confirmed, sizable stratified signal at 7B, not just an unresolved caveat.
 What remains is narrower.
 
 \begin{enumerate}
-  \item \textbf{Check the two label-noise candidates against the source
-    images.} \S\ref{sec:phase4-inspection} found two misgraded items with no
-    findable error in the text shown to the model. Cheap to resolve
-    (\texttt{pilot/07\_manual\_case\_inspection.ipynb}, no GPU required) and
-    worth doing before treating every misgraded \texttt{has\_error}=1 item as
-    a model failure -- if either turns out to be a labeling error, that
-    revises (slightly) which items the 0.834 result is measuring against,
-    though not the headline number itself.
+  \item \textbf{The label-noise question is resolved: there isn't any, in the
+    three cases checked.} \S\ref{sec:phase4-inspection} initially raised it
+    for two misgraded items with no findable error in the pert\_a text; a
+    check against the source images (\texttt{pilot/07\_manual\_case\_inspection.ipynb})
+    found real errors in both, plus a third case in the 200-item extension.
+    A natural follow-up, not yet done: check whether the ``core computation
+    only'' characterization holds on a larger sample than three items, since
+    it was formed from exactly the cases this check happened to cover.
   \item \textbf{Decide whether the reasoning arm's stratified result is the
     headline finding or a secondary one.} It is now positive and confirmed,
     which changes the shape of this report's contribution: not ``perception
