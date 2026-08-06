@@ -84,10 +84,15 @@ on clean items, confirms the predicted inversion at 0.280 $[0.200, 0.366]$.
 Repeating the same 500-item extension on 3B (its own error rate on this
 stratum is about half 7B's, so it needed more items to reach the same power)
 confirms the effect there too: \textbf{0.854 $[0.796, 0.902]$ on 42
-misgraded items} -- within 0.02 of 7B's number. The
+misgraded items} -- close to 7B's number at first (\S\ref{sec:phase4-3b}),
+and, once 7B was extended to the identical 650-item set for a direct
+matched-$n$ comparison, confirmed again at 0.801 $[0.751, 0.846]$
+(\S\ref{sec:phase4-matched}) -- overlapping CIs, not resolvably different,
+though not as numerically close as the first comparison suggested. The
 \texttt{has\_error}=1 stratified effect is not a property of the larger
 model; both sizes had it, they simply needed enough misgraded items to
-measure it (\S\ref{sec:phase4-3b}). For the first time in this project, both
+measure it (\S\ref{sec:phase4-3b}, \S\ref{sec:phase4-matched}). For the
+first time in this project, both
 grading strata are simultaneously powered and resolved, in opposite
 directions (\S\ref{sec:phase4}) -- Phase 2's ``the model grades at chance so
 entropy measures nothing'' is correct about pooling an error-biased model's
@@ -1196,6 +1201,47 @@ close agreement.} What differs by model size is not whether the signal
 exists but how error-biased the model is, which determines how many items
 it takes to measure the signal, not whether the signal is there to measure.
 
+\subsection{Matching 7B to the same 650 items: still confirmed, a somewhat
+wider gap}
+\label{sec:phase4-matched}
+
+The comparison above used 7B at $n=350$ against 3B at $n=650$ -- different
+totals, because 7B reached the power bar with fewer items. As a check that
+the different totals were not themselves doing any work, 7B's stratum was
+extended a second time (300 more \texttt{has\_error}=1 items, \texttt{skip=350})
+to reach the same 650-item total 3B was tested on, drawn from the identical
+seed=42 ordering. (2 of the freshly drawn items turned out to duplicate
+items already in the first extension -- FERMAT's Hub copy appears to have
+shifted slightly between the two draws -- and were dropped after inspection
+confirmed they were ordinary items, not a sampling bug; the matched total is
+648, not 650.)
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+& AUROC (95\% CI) & $n_{\text{wrong}}$ & Verdict \\
+\midrule
+7B, $n=350$ (\S\ref{sec:phase4-confirmed}) & 0.834 $[0.768, 0.891]$ & 38 & \worked{confirmed} \\
+7B, $n=648$ (matched to 3B) & \textbf{0.801} $[0.751, 0.846]$ & \textbf{73} & \worked{confirmed} \\
+3B, $n=650$ (\S\ref{sec:phase4-3b}) & 0.854 $[0.796, 0.902]$ & 42 & \worked{confirmed} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The matched-$n$ result is still confirmed -- comfortably above the 0.70
+threshold, CI excluding chance -- and 0.801 sits inside the original
+$n=350$ result's own interval, so this is a refinement from more data, not
+a contradiction. It is a somewhat less striking match to 3B's 0.854 than
+the earlier $n=350$-vs-$n=650$ comparison's 0.834 suggested: the two CIs
+still overlap ($0.846 > 0.796$), so the two model sizes remain statistically
+indistinguishable, but the point estimates are 0.05 apart rather than 0.02.
+\textbf{The conclusion is unchanged -- both model sizes confirm the
+\texttt{has\_error}=1 effect, and it is not resolvably different between
+them -- but ``within 0.02'' overstated how tight that agreement is once
+both are measured on the same items.} Reported here rather than quietly
+revised in place, since the closer-looking number was the one already
+circulated before this check ran.
+
 \section{Integrity Checks}
 
 Both entropy signals depend on the sampling and parsing pipeline actually
@@ -1240,9 +1286,10 @@ Perception & \worked{Works} & \textbf{0.835} $[0.787, 0.879]$ & Replicated, robu
 Reasoning, pooled (3B) & \failed{Fails} & 0.522 $[0.462, 0.582]$ & Model grades at chance (0.517) \\
 \quad prompt variants (screen) & \failed{None fix it} & -- & 3 tried, none clear bar -- \S\ref{sec:prompt-variants} \\
 Reasoning, pooled (7B) & \failed{Fails} & 0.520 $[0.458, 0.582]$ & Capability gate marginal -- \S\ref{sec:phase4-gate} \\
-\quad \texttt{has\_error}=1 stratum (7B) & \worked{Works} & 0.834 $[0.768, 0.891]$ & Confirmed, $n_{\text{wrong}}=38$ -- \S\ref{sec:phase4-confirmed} \\
+\quad \texttt{has\_error}=1 stratum (7B, $n=350$) & \worked{Works} & 0.834 $[0.768, 0.891]$ & Confirmed, $n_{\text{wrong}}=38$ -- \S\ref{sec:phase4-confirmed} \\
 \quad Clean stratum (7B) & \worked{Inverted} & 0.280 $[0.200, 0.366]$ & Confirmed, $n_{\text{wrong}}=44$ -- \S\ref{sec:phase4-stratified} \\
-\quad \texttt{has\_error}=1 stratum (3B) & \worked{Works} & \textbf{0.854} $[0.796, 0.902]$ & Confirmed, $n_{\text{wrong}}=42$ -- \S\ref{sec:phase4-3b} \\
+\quad \texttt{has\_error}=1 stratum (3B, $n=650$) & \worked{Works} & \textbf{0.854} $[0.796, 0.902]$ & Confirmed, $n_{\text{wrong}}=42$ -- \S\ref{sec:phase4-3b} \\
+\quad \texttt{has\_error}=1 stratum (7B, $n=648$) & \worked{Works} & 0.801 $[0.751, 0.846]$ & Confirmed, matched to 3B -- \S\ref{sec:phase4-matched} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1253,13 +1300,15 @@ both an independent baseline it beats and a confirmed gain from additional
 sampling; the reasoning arm's pooled failure has been shown not to be a
 simple, promptable artifact (\S\ref{sec:phase3}), and -- once stratified and
 adequately powered at \emph{both} model sizes -- not a statement that the
-technique has nothing to measure, either (\S\ref{sec:phase4}). 7B's 0.834
-and 3B's 0.854 landing within 0.02 of each other is the strongest evidence
-in this report that the \texttt{has\_error}=1 stratified effect is a
-property of the task and pipeline, not of one particular model. The
-pooled/stratified split is now the central caveat on reading \emph{any}
-AUROC in this report: pooling can hide as much as it reveals when a model's
-own response bias is asymmetric.
+technique has nothing to measure, either (\S\ref{sec:phase4}). 7B's
+matched-$n$ result (0.801) and 3B's (0.854) have overlapping CIs -- not
+resolvably different -- which is the strongest evidence in this report that
+the \texttt{has\_error}=1 stratified effect is a property of the task and
+pipeline, not of one particular model, even though the point estimates are
+not as numerically close as an earlier, differently-sized comparison
+suggested. The pooled/stratified split is now the central caveat on
+reading \emph{any} AUROC in this report: pooling can hide as much as it
+reveals when a model's own response bias is asymmetric.
 
 \subsection{Phase 1 exploratory results (superseded)}
 
@@ -1354,17 +1403,18 @@ standing rests on its own CI excluding chance and surviving
     once adequately powered, is a confirmed 0.834 -- so the caveat this
     bullet used to raise as untested is now resolved, and resolved in the
     direction it hoped for (\S\ref{sec:phase4}).
-  \item \textbf{Still only two model sizes, but they now agree.} 3B and 7B
-    are both tested (\S\ref{sec:phase4-gate}), and their confirmed
-    \texttt{has\_error}=1 AUROCs land within 0.02 of each other
-    (\S\ref{sec:phase4-3b}) -- evidence the stratified effect is not
-    specific to one model size, though a still-larger model or a text-only
-    model given the ground-truth transcription remains untested. Given
-    Phase 4, this limitation is now about the ceiling of the stratified
-    effect size, not about whether reasoning entropy works at all. (The
-    baseline-uncertainty-method gap mentioned in earlier drafts of this
-    limitation is resolved: entropy has a measured, resolved win over token
-    confidence, \S\ref{sec:token-confidence}.)
+  \item \textbf{Still only two model sizes, but they now agree, on a
+    matched sample.} 3B and 7B are both tested (\S\ref{sec:phase4-gate}),
+    and their confirmed \texttt{has\_error}=1 AUROCs (0.801 and 0.854 on
+    the same 648/650 items, \S\ref{sec:phase4-matched}) have overlapping
+    CIs -- not resolvably different -- evidence the stratified effect is
+    not specific to one model size, though a still-larger model or a
+    text-only model given the ground-truth transcription remains untested.
+    Given Phase 4, this limitation is now about the ceiling of the
+    stratified effect size, not about whether reasoning entropy works at
+    all. (The baseline-uncertainty-method gap mentioned in earlier drafts
+    of this limitation is resolved: entropy has a measured, resolved win
+    over token confidence, \S\ref{sec:token-confidence}.)
   \item \textbf{The stratified reasoning hypothesis is now confirmed at both
     model sizes, not merely at 7B.} 3B's version was originally untestable
     (8 misgraded items among 150 error-containing ones, under the

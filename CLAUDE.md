@@ -313,12 +313,15 @@ often (93% vs 80%), so it needed more than double the extra items to reach
 the same power. `results/grading_3b_stratum_powered_n800_qwen2.5-vl-3b-instruct_20260806T150044Z.csv`
 (800 rows, Drive-only). Locked in `pilot/tests/test_3b_stratum_powered.py`.
 
-- **CONFIRMED, and close to 7B's number.** n_wrong grew 8 → **42** (clears
-  the registered minimum of 30). AUROC: 0.836 (unconfirmed point estimate)
-  → **0.854 [0.796, 0.902]** — clears the pre-registered 0.70 threshold,
-  CI excludes chance. **7B: 0.834 [0.768, 0.891]. 3B: 0.854 [0.796, 0.902].**
-  Two independent model sizes, both confirmed, landing within 0.02 of each
-  other.
+- **CONFIRMED, and close to 7B's number (n=350).** n_wrong grew 8 → **42**
+  (clears the registered minimum of 30). AUROC: 0.836 (unconfirmed point
+  estimate) → **0.854 [0.796, 0.902]** — clears the pre-registered 0.70
+  threshold, CI excludes chance. **7B (n=350): 0.834 [0.768, 0.891]. 3B
+  (n=650): 0.854 [0.796, 0.902].** Two independent model sizes, both
+  confirmed. (This "within 0.02" comparison used different total n per
+  model — see the 2026-08-06 matched-n650 follow-up below for the
+  apples-to-apples version, which tells the same story with a bit more
+  daylight between the numbers.)
 - **This answers the open question decisively: the has_error=1 stratified
   effect is model-size-independent, not a 7B-specific behavior.** It isn't
   "bigger model unlocks the signal" — both model sizes had the signal all
@@ -330,13 +333,54 @@ the same power. `results/grading_3b_stratum_powered_n800_qwen2.5-vl-3b-instruct_
   (above chance) purely because the sample is no longer 50/50 (650 vs
   150) — not evidence the sign-reversal problem resolved, `stratified_auroc`
   is still the only correct read.
-- Minor infra note, not yet acted on: the save cell's git commit failed on
-  this run with "Author identity unknown" (git user.name/email never
-  configured on this fresh Colab runtime) — a different failure mode than
-  the usual 403, caught one step earlier. Practically the same outcome
-  either way (CSV safe on Drive, not pushed), but worth a `git config
-  --global user.email/user.name` in the auth cell if this notebook pattern
-  gets reused again.
+- Infra note: the save cell's git commit failed on this run with "Author
+  identity unknown" (git user.name/email never configured on this fresh
+  Colab runtime) — a different failure mode than the usual 403, caught one
+  step earlier. **Fixed** in the same commit as the matched-n650 notebook
+  below (`git config user.email/user.name` added to notebook 08's save
+  cell, matching what notebook 06's already had).
+
+### RUN 2026-08-06 follow-up: matching 7B to 3B's exact n=650 — still confirmed, gap wider than it looked
+
+User's own push-back on the comparison above: 7B was confirmed at n=350,
+3B needed n=650 to confirm — is that mismatch itself hiding something?
+Checked for free first (no GPU): scoring 3B's own combined CSV restricted
+to just the 350 items 7B had already seen gave 0.858 [0.768, 0.924],
+consistent with both 3B's full-650 result and 7B's 0.834 — so the
+different totals weren't distorting anything. User asked to extend 7B to
+n=650 anyway for a cleaner paper table. `pilot/09_7b_match_3b_n650.ipynb`
+draws 300 more has_error=1 items at `skip=350` (past 7B's existing 150+200)
+and merges THREE checkpoints. `results/grading_7b_matched_n650_qwen2.5-vl-7b-instruct_20260806T172004Z.csv`
+(798 rows — see below). Locked in `pilot/tests/test_7b_matched_n650.py`.
+
+- **Real bug caught by the dry run before this ever ran on GPU:** the
+  merge cell's precision check only compared `entries[0]` of the
+  reference and round-1 checkpoints against the session's `QUANTIZED` —
+  it never actually checked the round-2 data being merged in. A
+  deliberately-corrupted test entry slipped through silently. Fixed: now
+  checks every entry across all three checkpoints, not just the first
+  entry of two of them.
+- **Real overlap hit on the actual run, diagnosed and handled correctly:**
+  2 items overlapped between round-1 (drawn under notebook 06, weeks
+  earlier) and round-2 (drawn fresh this session) despite both using
+  seed=42 with disjoint `skip` values — FERMAT's Hub copy appears to have
+  drifted slightly in the interim, shifting `shuffle(seed=42)`'s exact
+  ordering near the boundary. Diagnosed by printing the 2 overlapping
+  questions (ordinary items, nothing anomalous) before dropping them from
+  the round-2 side. Final n is 648, not 650.
+- **Result: AUROC 0.801 [0.751, 0.846], n_wrong=73, still CONFIRMED** —
+  clears the threshold and power bar. Sits inside the original n=350
+  result's own CI [0.768, 0.891], so this is a refinement, not a
+  contradiction.
+- **Corrected framing vs. the earlier comparison:** 7B (n=648) 0.801 vs 3B
+  (n=650) 0.854 — CIs still overlap (0.846 > 0.796), so the two remain
+  statistically indistinguishable, but the point estimates are 0.05 apart,
+  not 0.02. The "within 0.02" framing from the first comparison overstated
+  how tight the agreement is once both are actually measured on
+  (essentially) the same items. Conclusion unchanged either way: both
+  model sizes confirm the has_error=1 effect.
+- Verified independently against the real downloaded CSV before writing
+  the test, same as every other result this project reports.
 
 ## Repo-specific conventions
 
