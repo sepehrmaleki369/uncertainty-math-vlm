@@ -382,6 +382,59 @@ and merges THREE checkpoints. `results/grading_7b_matched_n650_qwen2.5-vl-7b-ins
 - Verified independently against the real downloaded CSV before writing
   the test, same as every other result this project reports.
 
+### RUN 2026-08-06: second model family (LLaVA-NeXT) — perception gated, reasoning promising
+
+WACV push started (target: Round 2, enrollment Aug 21, submission Aug 28
+2026 — see the plan at `.claude/plans/pilot-kickoff-instructions-glittery-eclipse.md`
+for the full roadmap). Biggest reviewer-facing gap identified: every result
+so far is one model family (Qwen2.5-VL, 3B/7B). `pilot/10_llava_next_fermat.ipynb`
+re-ran both headline measurements on **LLaVA-NeXT** (`llava-hf/llava-v1.6-mistral-7b-hf`)
+at the identical n=300 sample. The adapter (no system role — folded into
+one user turn; LLaVA-NeXT's chat templates vary by base LLM and never
+demonstrate system-role support in the public docs — plus the combined
+`apply_chat_template(tokenize=True, return_dict=True, ...)` call, verified
+against current `transformers` docs before writing any code) worked on the
+first real run, no fallback needed.
+`results/scaleup_n300_bal50_llava-v16-mistral-7b-hf_20260806T231143Z.csv`
+(300 rows, Drive-only). Locked in `pilot/tests/test_llava_next_fermat.py`.
+
+- **Perception: gated by a real capability gap, not usable.** Transcription
+  accuracy is 3.0% (9/300) vs Qwen's ~42%. Diagnosed properly before
+  concluding anything (the user specifically pushed back asking for a full
+  diagnosis, not a guess): independently recomputing `transcription_correct`
+  from raw text matches the stored CSV on all 300/300 rows (not a scoring
+  bug); parse failures are only 9.6% (144/1500), so it's not a
+  format-following failure either. **The real cause: LLaVA can read a
+  multiple-choice letter but essentially cannot transcribe free-response
+  handwritten derivations** — MCQ accuracy 12.3% (7/57) vs free-response
+  0.8% (2/243), a ~15x gap that accounts for the entire effect. This is
+  the same "capability gate" concept as the 7B reasoning check, just
+  applied to the perception arm for the first time: **perception_entropy's
+  AUROC (0.710, only 9 correct items) is not reportable** — an order of
+  magnitude below the registered minimum of 30 used everywhere else, CI
+  barely excludes chance.
+- **Reasoning: promising, replicates Qwen-7B's exact pattern, underpowered.**
+  Grading accuracy 50.0% (chance, same story as Qwen). Clean-stratum point
+  estimate **0.283 [0.178, 0.398] — within 0.01 of Qwen-7B's CONFIRMED
+  0.280.** Same bias mechanism (says "error" ~91% of the time here). Not
+  confirmed: only 14 misgraded per stratum (has_error=1: 0.766
+  [0.652, 0.883]; clean: 0.283), same starting point Qwen-7B was in before
+  notebook 06 extended it.
+- **Decision (with the user): pursue the reasoning-arm extension on LLaVA
+  now (cheap, promising); hold off on perception until a different
+  second-model choice is made** (LLaVA-NeXT-7B specifically doesn't clear
+  the bar for that arm — needs a model with real dense-OCR competence,
+  not yet chosen).
+- `pilot/11_llava_error_stratum_power.ipynb` mirrors notebooks 06/09
+  exactly: draws 250 more `has_error=1` items (sized off the observed
+  9.3% error rate on this stratum, Wilson CI [6.1%, 14.0%], same
+  point-estimate-based planning that worked for both prior extensions),
+  merges with the notebook 10 reference checkpoint. Dry-run verified
+  against REAL reference data (reconstructed from the already-downloaded,
+  already-verified n=300 CSV — not synthetic stubs) — reproduces the
+  verified 14/150 figure exactly before any GPU time is spent on the
+  extension itself.
+
 ## Repo-specific conventions
 
 - **Don't touch `report/` unless explicitly asked.** As of 2026-08-02 the user
