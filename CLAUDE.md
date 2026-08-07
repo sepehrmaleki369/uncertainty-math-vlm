@@ -435,6 +435,106 @@ first real run, no fallback needed.
   verified 14/150 figure exactly before any GPU time is spent on the
   extension itself.
 
+**RUN 2026-08-07: notebook 11 completed — LLaVA-NeXT's has_error=1 stratum
+CONFIRMED, first cross-model-family replication in this project.**
+`results/grading_llava_stratum_powered_n550_llava-v1.6-mistral-7b-hf_20260807T181623Z.csv`
+(550 rows: 300 reference + 250 extra). Locked in
+`pilot/tests/test_llava_stratum_powered.py`.
+
+- n_wrong grew 14 → **34** (clears the registered minimum of 30). AUROC:
+  0.766 (unconfirmed) → **0.775 [0.694, 0.848]** — clears the 0.70
+  threshold, CI excludes chance. Overlaps Qwen-7B's confirmed
+  [0.751, 0.846] almost entirely — the two model families are not
+  resolvably different on this measurement.
+- Clean stratum unchanged (14 correct, still underpowered — the
+  extension targeted only has_error=1) but its point estimate (0.283) is
+  itself close to Qwen-7B's confirmed 0.280. Response bias replicates
+  too: says-error 91.1% (vs Qwen-3B 93%, Qwen-7B 80%).
+- **This is the first confirmed replication across model families in the
+  whole project.** Every prior confirmation (7B vs 3B) compared model
+  *sizes* within Qwen2.5-VL; this compares architecturally distinct
+  families. Locked into `report/report.tex` §Phase 5.
+
+### RUN 2026-08-07/08: third model family (InternVL3-8B) — perception result is real but fails its own sensitivity cut
+
+`pilot/12_internvl3_fermat.ipynb`, same n=300 balanced sample. **Built
+twice.** v1 used the `trust_remote_code` recipe from InternVL3's own model
+card (`OpenGVLab/InternVL3-8B`, custom `.chat()` interface, custom
+image-tiling code) and crashed on the user's real run:
+`AttributeError: 'InternVLChatModel' object has no attribute
+'all_tied_weights_keys'` — root-caused via search (not guessed) as a
+`transformers` v4-vs-v5 breaking change: v5 requires custom
+`trust_remote_code` model classes to initialize `all_tied_weights_keys` via
+`post_init()`, which pre-v5 custom code (InternVL3's included, also hits
+Molmo/moondream/InternVisionModel per search results) never does. **Fixed
+by switching to the checkpoint transformers itself now ships natively**
+(`OpenGVLab/InternVL3-8B-hf`, `AutoModelForImageTextToText` +
+`AutoProcessor`) rather than pinning an old transformers version — verified
+against current docs (WebFetch) before rewriting, confirming the same
+message-format and combined `apply_chat_template(...)` call as the LLaVA
+adapter, and critically restoring standard batched `generate()` sampling
+the old `.chat()` interface never had. All ~230 lines of custom tiling code
+deleted. Committed as `34d5534`.
+
+`results/scaleup_n300_bal50_internvl3-8b-hf_20260807T205407Z.csv` (300
+rows, Drive-only). Locked in `pilot/tests/test_internvl3_fermat.py`
+(12 tests, including a full raw-sample recompute with 0 mismatches).
+
+- **Transcription accuracy 21.0% (63/300)** — about half Qwen's ~42%, but
+  unlike LLaVA-NeXT's 0.8%, well above the 30-item power minimum, so this
+  is NOT a capability gate.
+- **Perception AUROC printed as 0.915 [0.880, 0.944] — higher than Qwen's
+  confirmed 0.835 despite half the base accuracy.** That mismatch doesn't
+  happen with a genuine graded signal, so it got the project's standard
+  surprising-result verification before being reported as a finding.
+  Every derived column (`perception_entropy`, `reasoning_entropy`,
+  `transcription_correct`, `grading_correct`, both parse-failure counts)
+  recomputes from raw samples with **0/300 mismatches** — real model
+  behavior, not a scoring bug.
+- **But it does NOT survive this project's standard sensitivity cut.**
+  `auroc_sensitivity` (excluding max-entropy items): 0.915 → **0.556
+  [0.495, 0.614], chance** — versus Qwen's 0.835 → 0.796 under the
+  identical cut, which survives. **Do not report 0.915 as "InternVL3 beats
+  Qwen on perception."**
+- **Mechanism (found by categorizing all 300 items, not eyeballing a
+  sample): 202/300 (67%) pin at exact max entropy ln(5); accuracy within
+  that group is a 0.99% floor (2/202) vs 62.2% (61/98) in the rest** — a
+  bimodal coherent-vs-incoherent split driving the whole headline number,
+  not a graded relationship. **Correction to an initial chat claim:** 1-2
+  examples showing degenerate repeated-phrase generation ("where the word
+  ROSE" ×40) were read as *the* mechanism; a full-population check found
+  that pattern in only ~30% of the max-entropy-wrong group (61/200). The
+  dominant mechanism (~70%, 139/200, confirmed by reading concrete
+  examples) is different: the model's 5 retries each land on a different
+  *incomplete slice* of a multi-step derivation (one restates a garbled
+  question, another jumps into a mid-derivation step, another states an
+  unfinished fragment as its "Answer") rather than converging on a stated
+  final result the way Qwen typically does even when wrong. Every field is
+  non-empty and canonicalizes to a real label — the parser is behaving
+  correctly on genuinely incomparable content, not failing.
+- **Reasoning: has_error=1 stratum is a new verdict type for this
+  project** — powered (n_wrong=45, clears the 30 minimum) and CI excludes
+  chance (0.548 lower bound), but AUROC **0.628 [0.548, 0.706] does not
+  clear the 0.70 confirmation threshold**. Weaker than every other
+  model/family measured (0.775–0.854). Clean stratum unaffected by any of
+  this: 0.369 [0.290, 0.454], n_wrong=97, powered, inverted as expected.
+  One wrong has_error=1 case's own grading text defaults to "no error"
+  explicitly because it judges the image unreadable — plausibly the same
+  generation instability from the perception arm leaking into reasoning's
+  inputs, not a separate mechanism.
+- **Decision (with the user, after explicitly rejecting "iterate until a
+  fix clears 0.70" as a p-hacking risk — same failure class as the K=15
+  cascade episode): run one small, pre-registered, single-shot screen of 3
+  evidence-grounded ideas** (illegible→don't-default-to-no-error prompt,
+  retest the 3B restate-first variant, K=10 grading resample), capped at
+  n=100-150, report all three results honestly even if none pass. No
+  further InternVL3 GPU work planned beyond that screen. See
+  `.claude/plans/pilot-kickoff-instructions-glittery-eclipse.md` for the
+  full spec (`pilot/13_internvl3_grading_screen.ipynb`, not yet run).
+- Locked into `report/report.tex` §Phase 6 (new section, plus Summary
+  table, Limitations, and Recommended Next Steps updates) — compiled
+  clean, zero new warnings.
+
 ## Repo-specific conventions
 
 - **Don't touch `report/` unless explicitly asked.** As of 2026-08-02 the user

@@ -142,6 +142,32 @@ GRADING_USER_PROMPT_BALANCED = (
     "**Error:** <0 or 1>"
 )
 
+GRADING_USER_PROMPT_COMMIT = (
+    "The image provided contains a handwritten math problem consisting of both a "
+    "Question and an Answer at a middle or high school level. Your task is to "
+    "analyze the Answer to determine whether there is any error.\n"
+    "\n"
+    "Some images may be partly hard to read. If so, do not default to reporting "
+    "no error just because part of the image is unclear -- base your judgement on "
+    "whatever content you can make out, and commit to your best assessment rather "
+    "than treating illegibility itself as evidence the Answer is correct.\n"
+    "\n"
+    "Begin by providing a brief reasoning for your analysis, explaining where and "
+    "why you believe an error is present or absent in the Answer. If the problem "
+    "is multiple-choice (MCQ), judge the presence or absence of error based only "
+    "on the explanation given in the Answer, not the option selected by the "
+    "student.\n"
+    "\n"
+    "After the reasoning, provide a binary output indicating whether an error "
+    "exists (1 for error, 0 for no error).\n"
+    "\n"
+    "Please follow the exact format below without adding any extra information:\n"
+    "\n"
+    "**Reasoning:** <Brief Explanation of Error Presence or Absence>\n"
+    "\n"
+    "**Error:** <0 or 1>"
+)
+
 GRADING_USER_PROMPT_CONFIDENCE = (
     "The image provided contains a handwritten math problem consisting of both a "
     "Question and an Answer at a middle or high school level. Your task is to "
@@ -170,6 +196,7 @@ GRADING_VARIANTS = {
     "restate": GRADING_USER_PROMPT_RESTATE,
     "balanced": GRADING_USER_PROMPT_BALANCED,
     "confidence": GRADING_USER_PROMPT_CONFIDENCE,
+    "commit": GRADING_USER_PROMPT_COMMIT,
 }
 
 

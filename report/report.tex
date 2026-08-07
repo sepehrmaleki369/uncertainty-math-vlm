@@ -17,7 +17,7 @@
 \newcommand{\unresolved}[1]{\textcolor{darkamber}{\textbf{#1}}}
 
 \title{Uncertainty Signal Pilot: Perception and Reasoning Entropy\\
-\large FERMAT Handwritten Math, Qwen2.5-VL-3B/7B and LLaVA-NeXT}
+\large FERMAT Handwritten Math, Qwen2.5-VL-3B/7B, LLaVA-NeXT, and InternVL3}
 \author{}
 \date{\today}
 
@@ -28,16 +28,20 @@
 This study tests whether two entropy-based uncertainty signals -- \emph{perception
 entropy} (instability in transcribing a handwritten math answer) and
 \emph{reasoning entropy} (instability in grading whether an answer contains an
-error) -- predict model correctness, on the FERMAT dataset. It ran in five
+error) -- predict model correctness, on the FERMAT dataset. It ran in six
 phases: an exploratory $n=100$ pilot on Qwen2.5-VL-3B, a confirmatory
 $n=300$ run with a pre-registered analysis and a deliberately rebalanced
 label distribution, a follow-up closing the two gaps that run left open, a
-fourth phase testing Qwen2.5-VL-7B on the reasoning arm specifically, and a
-fifth phase testing a second model family, LLaVA-NeXT. Perception is
-unambiguous on Qwen; reasoning is more specific than either a clean
-positive or a clean negative, and resolving that took Phase 4. Phase 5
-confirms the reasoning result generalizes across model families and finds
-a real limit on how far the perception result can currently be tested.
+fourth phase testing Qwen2.5-VL-7B on the reasoning arm specifically, a
+fifth phase testing a second model family (LLaVA-NeXT), and a sixth phase
+testing a third model family (InternVL3). Perception is unambiguous on
+Qwen; reasoning is more specific than either a clean positive or a clean
+negative, and resolving that took Phase 4. Phase 5 confirms the reasoning
+result generalizes across model families and finds a real limit on how far
+the perception result can currently be tested. Phase 6 adds a cautionary
+methodological finding: a third model's perception AUROC can look like the
+best result in the study and not survive the same robustness check every
+other perception number here is held to.
 
 \textbf{Perception entropy works.} At $n=300$ it reaches AUROC~$=0.835$,
 95\% CI $[0.787, 0.879]$, replicating the pilot's 0.788 and tightening the
@@ -121,6 +125,26 @@ the same way as Phase 4, confirms: \textbf{AUROC 0.775 $[0.694, 0.848]$ on
 $[0.751, 0.846]$ almost entirely. This is the first confirmed replication
 across model families in this project -- every earlier confirmation
 compared model sizes within Qwen2.5-VL.
+
+\textbf{A third model family (Phase 6, InternVL3-8B) produces this
+project's clearest case yet for why every perception result here is
+checked against a sensitivity cut.} Its raw perception AUROC, 0.915
+$[0.880, 0.944]$, is higher than Qwen's confirmed 0.835 despite InternVL3's
+base transcription accuracy (21.0\%) being about half Qwen's ($\sim$42\%).
+Independently recomputing every derived column from the raw samples finds
+zero mismatches -- this is real model behavior, not a scoring bug -- but
+the same artifact cut every other perception number in this report
+survives (excluding maximum-entropy items) collapses InternVL3's AUROC to
+\textbf{0.556 $[0.495, 0.614]$, indistinguishable from chance}. The
+mechanism: 67\% of items (202/300) pin at exact maximum entropy, and
+within that group accuracy is a 0.99\% floor, versus 62.2\% among the
+rest -- a bimodal coherent-vs-incoherent split, not a graded uncertainty
+signal. \textbf{The 0.915 headline must not be read as InternVL3 beating
+Qwen on perception.} Its reasoning arm is a smaller, first-of-its-kind
+result: the \texttt{has\_error}=1 stratum (0.628 $[0.548, 0.706]$, 45
+misgraded items) is adequately powered and its CI excludes chance, but
+does not clear this report's 0.70 confirmation threshold -- a new,
+in-between verdict this report has not needed before.
 \end{abstract}
 
 \section{Goal}
@@ -129,7 +153,7 @@ Given a vision-language model transcribing and grading handwritten math answers,
 does the entropy of its own repeated outputs -- how much it disagrees with
 itself across independent samples -- predict when it is actually wrong?
 
-The work ran in five phases, and the distinction matters for how much weight
+The work ran in six phases, and the distinction matters for how much weight
 any individual number carries:
 
 \begin{itemize}
@@ -156,15 +180,23 @@ any individual number carries:
     size, changes either conclusion: a capability gate for perception (it
     does not clear it) and a powered stratified re-analysis for reasoning
     (it confirms, and replicates Qwen-7B's magnitude).
+  \item \textbf{Phase 6 ($n=300$, InternVL3-8B).} Section~\ref{sec:phase6}.
+    A third model family, trained independently of both prior families.
+    Perception clears the accuracy bar this time (unlike LLaVA-NeXT) but
+    its raw AUROC does not survive this report's standard sensitivity cut;
+    reasoning's \texttt{has\_error}=1 stratum is powered and resolved
+    above chance but does not clear the confirmation threshold.
 \end{itemize}
 
 Still out of scope: no human double grading, no full-dataset run, no model
-larger than 7B, and no second dataset/task. What Phase 4 removed from this
-list was whether reasoning entropy could work at all on a model with some
-real grading competence; what Phase 5 removed was whether either result is
-specific to the Qwen2.5-VL family (reasoning: no, confirmed; perception:
-untested, gated by a capability gap in the one alternative model tried so
-far).
+larger than 7B/8B, and no second dataset/task. What Phase 4 removed from
+this list was whether reasoning entropy could work at all on a model with
+some real grading competence; what Phase 5 removed was whether either
+result is specific to the Qwen2.5-VL family (reasoning: no, confirmed;
+perception: untested, gated by a capability gap in the one alternative
+model tried so far); Phase 6 adds a model where perception could be
+measured but the headline number turned out not to be trustworthy without
+the sensitivity cut this report already applies everywhere else.
 
 Every AUROC below is reported with a 95\% bootstrap confidence interval
 (10{,}000 item-level resamples, seed 0; \texttt{pilot.plotting.bootstrap\_auroc\_ci}).
@@ -194,7 +226,9 @@ test.
     Qwen2.5-VL-7B-Instruct, full bf16, reasoning arm only (Phase 4,
     \S\ref{sec:phase4}); LLaVA-NeXT (\texttt{llava-v1.6-mistral-7b-hf}),
     full bf16, both arms attempted but perception gated (Phase 5,
-    \S\ref{sec:phase5}).
+    \S\ref{sec:phase5}); InternVL3-8B (\texttt{OpenGVLab/InternVL3-8B-hf}),
+    full bf16, both arms attempted, perception measurable but not
+    trustworthy at face value (Phase 6, \S\ref{sec:phase6}).
   \item \textbf{Perception}: the model transcribes a handwritten Question--Answer
     pair; $K=5$ samples at temperature 0.7, plus 2 samples at temperature 0 as a
     determinism sanity anchor.
@@ -1357,6 +1391,117 @@ is evidence the effect is a property of this task and pipeline, not of
 Qwen specifically -- directly addressing the single largest gap identified
 for this line of work.
 
+\section{Phase 6: A Third Model Family (InternVL3), and a Sensitivity-Cut
+Failure}
+\label{sec:phase6}
+
+Phase 5 answered ``is either result Qwen-specific'' for the reasoning arm
+but left perception open, gated by LLaVA-NeXT's near-zero free-response
+OCR. This phase repeats both headline measurements on \textbf{InternVL3-8B}
+(\texttt{OpenGVLab/InternVL3-8B-hf}, trained independently of both Qwen2.5-VL
+and LLaVA-NeXT's base LLM), at the identical $n=300$ balanced sample. The
+first integration attempt used InternVL3's own \texttt{trust\_remote\_code}
+model card recipe and crashed on a real run (\texttt{transformers} v5
+requires custom model classes to initialize \texttt{all\_tied\_weights\_keys}
+via \texttt{post\_init()}, which that recipe's code predates); the
+checkpoint used here is \texttt{transformers}' native integration instead,
+which restores standard batched \texttt{generate()} sampling the
+\texttt{trust\_remote\_code} \texttt{.chat()} interface never had.
+
+\subsection{Perception: clears the accuracy bar, fails the sensitivity cut}
+\label{sec:phase6-perception}
+
+Transcription accuracy is 21.0\% (63/300) -- about half Qwen's
+$\sim$42\%, but, unlike LLaVA-NeXT's 0.8\%, well above the registered
+30-item power minimum, so this is not a capability gate the way
+\S\ref{sec:phase5-perception-gate} was. The raw perception AUROC is
+\textbf{0.915 $[0.880, 0.944]$} -- higher than Qwen's confirmed 0.835,
+despite the lower base accuracy. That mismatch does not happen with a
+genuine graded uncertainty signal, so it was checked the way every
+surprising result in this report is checked before being reported.
+
+Every derived column recomputes from the raw per-item samples (the same
+\texttt{parse\_transcription} $\to$ \texttt{canonical\_answer\_label} $\to$
+\texttt{cluster\_entropy} sequence the scoring cell uses) with \textbf{zero
+mismatches against the stored CSV} -- this is real model behavior, not a
+pipeline bug. But it does not survive the standard robustness check
+(\texttt{auroc\_sensitivity}, \S\ref{sec:reasoning-diagnosis}) every other
+perception number in this report is held to:
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+& AUROC (95\% CI) & Verdict \\
+\midrule
+Full ($n=300$) & 0.915 $[0.880, 0.944]$ & -- \\
+Excluding max-entropy items ($n=98$) & \textbf{0.556} $[0.495, 0.614]$ & \failed{chance} \\
+Qwen-3B, same cut (for comparison) & 0.796 $[0.736, 0.852]$ & \worked{survives} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The mechanism, found by categorizing every one of the 300 items rather
+than eyeballing a handful: 202/300 items (67\%) pin at exact maximum
+entropy $\ln(5)$, and within that group accuracy is a \textbf{0.99\% floor
+(2/202)}; among the other 98 items accuracy is \textbf{62.2\% (61/98)}.
+This is a bimodal coherent-vs-incoherent split driving the whole headline
+number, not a graded relationship between disagreement level and
+correctness. An initial reading (based on 1--2 examples showing a
+degenerate repeated-phrase failure, e.g.\ the same clause repeated dozens
+of times) attributed this to generation loops specifically; a
+full-population check found that pattern in only $\sim$30\% of the
+max-entropy-wrong group (61/200). The dominant mechanism ($\sim$70\%,
+139/200, confirmed by reading concrete examples) is different: InternVL3's
+five retries each land on a different \emph{incomplete slice} of a
+multi-step derivation -- one restates a garbled version of the question,
+another jumps into an intermediate algebra step, another states an
+unfinished fragment as its ``Answer'' -- rather than reliably converging
+on a stated final result the way Qwen typically does even when wrong.
+Every one of these fields is non-empty and canonicalizes to a real (if
+messy) label, so the parser is behaving correctly on genuinely
+incomparable content, not failing.
+
+\textbf{This result must not be reported as ``InternVL3 beats Qwen on
+perception.''} It is the clearest illustration in this report of why the
+sensitivity cut exists: a headline AUROC can be manufactured by an
+extreme bimodal failure mode that has nothing to do with a model being
+usefully, gradedly uncertain.
+
+\subsection{Reasoning: powered, resolved above chance, still short of
+confirmation}
+\label{sec:phase6-reasoning}
+
+The reasoning-entropy distribution shows no equivalent pinning problem (4
+reachable values, no single value above 54\% of items), so this stratum's
+result is not an artifact of the same kind. Stratifying by
+\texttt{has\_error}:
+
+\begin{center}
+\begin{tabular}{lccl}
+\toprule
+& AUROC (95\% CI) & $n_{\text{wrong}}$ & Verdict \\
+\midrule
+\texttt{has\_error}=1 & 0.628 $[0.548, 0.706]$ & 45 & \unresolved{resolved, below threshold} \\
+\texttt{has\_error}=0 (clean) & 0.369 $[0.290, 0.454]$ & 97 & \worked{inverted, as predicted} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Both strata clear the registered $n=30$ power minimum. The clean stratum
+replicates every other model/family's inversion. The \texttt{has\_error}=1
+stratum is a genuinely new outcome for this report: its CI excludes chance
+(lower bound 0.548) but its upper bound (0.706) sits just under the 0.70
+confirmation threshold used for Qwen-3B/7B and LLaVA-NeXT -- powered and
+resolved above chance, but not \worked{confirmed} and not
+\unresolved{inconclusive\_underpowered} either. Reading the model's own
+grading text on wrong-vote items surfaces a plausible reason this stratum
+is weaker here than elsewhere: on at least one case the model's own stated
+reasoning defaults to ``no error'' explicitly because it judges the image
+unreadable (\emph{``the image contains repetitive text\ldots no clear
+answer given, and therefore no error can be evaluated''}) -- the same
+generation instability documented in \S\ref{sec:phase6-perception} leaking
+into the reasoning arm's inputs, not a separate mechanism.
+
 \section{Integrity Checks}
 
 Both entropy signals depend on the sampling and parsing pipeline actually
@@ -1408,6 +1553,9 @@ Reasoning, pooled (7B) & \failed{Fails} & 0.520 $[0.458, 0.582]$ & Capability ga
 Perception (LLaVA-NeXT) & \unresolved{Gated} & 0.710 $[0.525, 0.886]$ & Not reportable, $n_{\text{correct}}=9$ -- \S\ref{sec:phase5-perception-gate} \\
 \quad \texttt{has\_error}=1 stratum (LLaVA) & \worked{Works} & 0.775 $[0.694, 0.848]$ & Confirmed, $n_{\text{wrong}}=34$ -- \S\ref{sec:phase5-reasoning} \\
 \quad Clean stratum (LLaVA) & \unresolved{Inverted} & 0.283 $[0.178, 0.398]$ & Underpowered, $n_{\text{correct}}=14$ -- \S\ref{sec:phase5-reasoning} \\
+Perception (InternVL3) & \failed{Not real} & 0.915 $\to$ 0.556 & Fails sensitivity cut -- \S\ref{sec:phase6-perception} \\
+\quad \texttt{has\_error}=1 stratum (InternVL3) & \unresolved{Below bar} & 0.628 $[0.548, 0.706]$ & Powered, resolved, not confirmed -- \S\ref{sec:phase6-reasoning} \\
+\quad Clean stratum (InternVL3) & \worked{Inverted} & 0.369 $[0.290, 0.454]$ & Powered, $n_{\text{wrong}}=97$ -- \S\ref{sec:phase6-reasoning} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1438,6 +1586,19 @@ transcription accuracy is a capability gate, the same concept
 perception too. The reasoning result generalizes across the two
 model families tested; whether the perception result does remains open,
 gated on finding a second model with real OCR competence.
+
+Phase 6 (InternVL3) is the first model where perception clears the
+accuracy bar but the AUROC itself does not survive this report's own
+robustness standard -- 0.915 collapses to 0.556 under the identical cut
+that leaves Qwen's 0.835 at 0.796. Read together with Phase 5, the
+perception result now has one clean replication candidate blocked by a
+capability gate and one blocked by a sensitivity-cut failure; it remains
+unconfirmed outside Qwen. Its reasoning \texttt{has\_error}=1 stratum
+(0.628) is real (CI excludes chance) but weaker than every other
+model/family measured (0.775--0.854) and does not clear the confirmation
+threshold -- introducing this report's first ``resolved but not
+confirmed'' verdict, distinct from both ends of the scale used everywhere
+else.
 
 \subsection{Phase 1 exploratory results (superseded)}
 
@@ -1532,19 +1693,22 @@ standing rests on its own CI excluding chance and surviving
     once adequately powered, is a confirmed 0.834 -- so the caveat this
     bullet used to raise as untested is now resolved, and resolved in the
     direction it hoped for (\S\ref{sec:phase4}).
-  \item \textbf{Two model sizes and now two model families agree on
-    reasoning; perception has only been tested on one family.} 3B and 7B
-    (\S\ref{sec:phase4-gate}) and now LLaVA-NeXT (\S\ref{sec:phase5})
-    all confirm the \texttt{has\_error}=1 stratified effect with
-    overlapping CIs -- evidence it is not specific to Qwen2.5-VL. The
-    perception result has no such evidence yet: LLaVA-NeXT could not test
-    it (a capability gate, not a null result), so ``does perception entropy
-    generalize across model families'' is still open, pending a second
-    model with real free-response OCR competence. A still-larger model, or
-    a text-only model given the ground-truth transcription, also remain
-    untested for either arm. (The baseline-uncertainty-method gap mentioned
-    in earlier drafts of this limitation is resolved: entropy has a
-    measured, resolved win over token confidence, \S\ref{sec:token-confidence}.)
+  \item \textbf{Two model sizes and now three model families agree on
+    reasoning's \texttt{has\_error}=1 direction; perception has not been
+    confirmed on any family besides Qwen.} 3B and 7B (\S\ref{sec:phase4-gate}),
+    LLaVA-NeXT (\S\ref{sec:phase5}), and InternVL3 (\S\ref{sec:phase6},
+    weaker but still resolved above chance) all point the same direction on
+    \texttt{has\_error}=1 -- evidence the effect is not specific to
+    Qwen2.5-VL, though InternVL3's magnitude (0.628) is the first to fall
+    short of this report's confirmation bar. Perception has no cross-family
+    confirmation yet: LLaVA-NeXT could not test it (a capability gate) and
+    InternVL3 could measure it but the result did not survive the
+    sensitivity cut (\S\ref{sec:phase6-perception}) -- two different
+    failure modes, same open status. A still-larger model, or a text-only
+    model given the ground-truth transcription, also remain untested for
+    either arm. (The baseline-uncertainty-method gap mentioned in earlier
+    drafts of this limitation is resolved: entropy has a measured, resolved
+    win over token confidence, \S\ref{sec:token-confidence}.)
   \item \textbf{The perception capability gate is diagnosed on one model,
     not systematically characterized.} LLaVA-NeXT's MCQ-vs-free-response
     accuracy split (12.3\% vs.\ 0.8\%) is a clean, specific finding, but it
@@ -1553,6 +1717,18 @@ standing rests on its own CI excluding chance and surviving
     models. It explains why this specific model cannot be used to test
     perception entropy; it is not a general theory of when a VLM will or
     will not clear the gate.
+  \item \textbf{A high perception AUROC is not sufficient evidence of a
+    genuine signal, even when every derived column recomputes correctly
+    from raw data.} InternVL3's 0.915 (\S\ref{sec:phase6-perception}) is
+    the clearest case in this report of a metric driven by an extreme
+    bimodal failure mode (total generation incoherence vs.\ not) rather
+    than graded uncertainty -- and it would have been reported as this
+    project's best perception result without the sensitivity cut applied
+    to every number here. The mechanism itself (five retries landing on
+    different incomplete derivation fragments) is characterized on one
+    model only, from one full-population automated pass plus a handful of
+    manually read examples, not independently verified against a larger
+    sample the way the Phase 4 manual-inspection findings were.
   \item \textbf{The stratified reasoning hypothesis is now confirmed at both
     model sizes, not merely at 7B.} 3B's version was originally untestable
     (8 misgraded items among 150 error-containing ones, under the
@@ -1620,17 +1796,31 @@ standing rests on its own CI excluding chance and surviving
 
 Phases 4 and 5 resolved the items that used to head this list: the
 reasoning arm has a confirmed, sizable stratified signal, and it holds
-across both model sizes and, now, both model families tested. What
-remains is narrower, and is being pursued toward a paper submission (see
-the working roadmap for scope, priority order, and the current external
-deadline).
+across both model sizes and, now, three model families tested (with
+InternVL3's magnitude weaker and unconfirmed, \S\ref{sec:phase6-reasoning}).
+What remains is narrower, and is being pursued toward a paper submission
+(see the working roadmap for scope, priority order, and the current
+external deadline).
 
 \begin{enumerate}
-  \item \textbf{Find a second model with real free-response OCR competence
-    to test perception entropy.} LLaVA-NeXT could not be used
-    (\S\ref{sec:phase5-perception-gate}) -- not a null result, a capability
-    gate. This is now the single largest open item: the reasoning result
-    has cross-family evidence, perception does not.
+  \item \textbf{Find a model that is both accurate enough and gradedly
+    uncertain enough to confirm perception entropy outside Qwen.}
+    LLaVA-NeXT failed on accuracy (\S\ref{sec:phase5-perception-gate});
+    InternVL3 cleared the accuracy bar but failed the sensitivity cut
+    (\S\ref{sec:phase6-perception}) -- two distinct disqualifications, not
+    one recurring problem. This is still the single largest open item: the
+    reasoning result has cross-family evidence, perception does not.
+  \item \textbf{Run the pre-registered screen for InternVL3's
+    \texttt{has\_error}=1 stratum, one shot per idea, report honestly
+    either way.} Three candidates, each tied to a specific diagnosed
+    mechanism rather than a generic retry: an explicit
+    ``don't default to no-error on illegible input'' instruction
+    (\S\ref{sec:phase6-reasoning}), a retest of the restate-result-first
+    variant already screened on 3B (\S\ref{sec:prompt-variants}), and a
+    $K=10$ resample (mirroring the confirmed $K=5\to K=10$ perception gain,
+    \S\ref{sec:token-confidence}). If none clears 0.70 on a capped screen
+    sample, 0.628 stands as the reported result -- deliberately not an
+    open-ended search for a passing number.
   \item \textbf{Decide whether the reasoning arm's stratified result is the
     headline finding or a secondary one.} It is now positive, confirmed,
     and holds across two model sizes \emph{and} two model families, which
