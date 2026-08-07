@@ -1502,6 +1502,61 @@ answer given, and therefore no error can be evaluated''}) -- the same
 generation instability documented in \S\ref{sec:phase6-perception} leaking
 into the reasoning arm's inputs, not a separate mechanism.
 
+\subsection{A pre-registered screen of three fixes: none resolves}
+\label{sec:phase6-screen}
+
+Rather than iterating on fixes until one cleared 0.70 -- which, with
+enough attempts, happens by chance alone -- three ideas were screened
+once each on the same 150 \texttt{has\_error}=1 items, with the pass bar
+(AUROC $\geq 0.70$, CI excludes chance, minority class $\geq 30$) written
+before the run. This mirrors how the Phase 3 grading-prompt screen was
+run and reported (\S\ref{sec:prompt-variants}), where ``none clear the
+bar'' was itself the finding. The three: an explicit ``do not default to
+no-error on illegible input'' instruction (\texttt{commit}, motivated by
+the wrong-vote case quoted above); a retest of Phase 3's
+restate-result-first variant, unmodified; and a $K=10$ resample, motivated
+by the CI upper bound sitting just under the threshold.
+
+\begin{center}
+\begin{tabular}{lccl}
+\toprule
+& AUROC (95\% CI) & Paired diff vs.\ baseline & Resolved? \\
+\midrule
+Baseline ($K=5$) & 0.628 $[0.548, 0.706]$ & -- & -- \\
+\texttt{commit} & 0.698 $[0.618, 0.773]$ & $+0.069$ $[-0.028, +0.166]$ & \failed{no} \\
+\texttt{k10} & 0.702 $[0.616, 0.781]$ & $+0.074$ $[-0.024, +0.171]$ & \failed{no} \\
+\texttt{restate} & 0.621 $[0.541, 0.699]$ & $-0.008$ $[-0.112, +0.095]$ & \failed{no} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{No variant resolvably beat the baseline: all three paired
+intervals span zero.} Reported honestly, \texttt{k10} does meet the bar as
+written (0.7023, CI excludes chance, 34 misgraded items) -- but it clears
+the threshold by 0.0023 while its own interval runs $[0.616, 0.781]$, so
+the lower bound sits far below the bar it passed, and the 0.005 separating
+it from \texttt{commit} (which ``fails'') is noise. This exposes a real
+limitation in the pre-registered bar itself: 0.70 was borrowed from the
+confirmation runs of \S\ref{sec:phase4}--\S\ref{sec:phase5}, where CIs
+were tight and unambiguously above it; applied to an $n=150$ screen with a
+$\pm 0.08$ interval, ``the point estimate crossed 0.70'' is a much weaker
+statement. \texttt{k10} also changes the target as well as the predictor
+(21 items flip correctness label at $K=10$), a confound the paired
+interval cannot remove. \textbf{Decision: no confirmation run; 0.628
+stands as InternVL3's reported reasoning result.}
+
+Two secondary results are worth keeping. First, $K=10$'s effect on
+\emph{grading accuracy} does resolve where its AUROC does not: 0.700
+$\rightarrow$ 0.773, $+0.073$ $[+0.013, +0.133]$, with 16 items fixed
+against 5 broken -- more samples make the majority vote more accurate,
+the same direction as the confirmed $K=5 \rightarrow K=10$ perception
+result (\S\ref{sec:token-confidence}). Second, \texttt{restate}
+reproduces its Phase 3 failure signature on a different model family
+entirely: heavy churn (31 items fixed, 36 broken) with accuracy moving
+\emph{down}, 0.700 $\rightarrow$ 0.667 -- the model swapping which
+near-constant answer it gives rather than discriminating, exactly as on
+Qwen-3B.
+
 \section{Integrity Checks}
 
 Both entropy signals depend on the sampling and parsing pipeline actually
@@ -1555,6 +1610,7 @@ Perception (LLaVA-NeXT) & \unresolved{Gated} & 0.710 $[0.525, 0.886]$ & Not repo
 \quad Clean stratum (LLaVA) & \unresolved{Inverted} & 0.283 $[0.178, 0.398]$ & Underpowered, $n_{\text{correct}}=14$ -- \S\ref{sec:phase5-reasoning} \\
 Perception (InternVL3) & \failed{Not real} & 0.915 $\to$ 0.556 & Fails sensitivity cut -- \S\ref{sec:phase6-perception} \\
 \quad \texttt{has\_error}=1 stratum (InternVL3) & \unresolved{Below bar} & 0.628 $[0.548, 0.706]$ & Powered, resolved, not confirmed -- \S\ref{sec:phase6-reasoning} \\
+\quad prompt/$K$ screen (InternVL3) & \failed{None fix it} & -- & 3 tried, no paired diff resolves -- \S\ref{sec:phase6-screen} \\
 \quad Clean stratum (InternVL3) & \worked{Inverted} & 0.369 $[0.290, 0.454]$ & Powered, $n_{\text{wrong}}=97$ -- \S\ref{sec:phase6-reasoning} \\
 \bottomrule
 \end{tabular}
@@ -1717,6 +1773,19 @@ standing rests on its own CI excluding chance and surviving
     models. It explains why this specific model cannot be used to test
     perception entropy; it is not a general theory of when a VLM will or
     will not clear the gate.
+  \item \textbf{A pre-registered bar can be honoured exactly and still be
+    the wrong bar.} \S\ref{sec:phase6-screen}'s screen was registered
+    before the run and reported as written -- and one variant ``passed''
+    an absolute 0.70 threshold by 0.0023 with a CI of $[0.616, 0.781]$,
+    while no variant's paired difference against baseline excluded zero.
+    The threshold was inherited from confirmation runs with tight
+    intervals and is too blunt for a screen at $n=150$. The result is
+    reported as a pass on the letter of the registration \emph{and} as
+    unresolved on the evidence that matters; the honest conclusion is the
+    latter. This is a limitation of the screen's design, not a
+    post-hoc reinterpretation of its outcome -- but the distinction is
+    only visible because the paired test was run, which argues for
+    registering screens on paired differences in future.
   \item \textbf{A high perception AUROC is not sufficient evidence of a
     genuine signal, even when every derived column recomputes correctly
     from raw data.} InternVL3's 0.915 (\S\ref{sec:phase6-perception}) is
@@ -1810,17 +1879,18 @@ external deadline).
     (\S\ref{sec:phase6-perception}) -- two distinct disqualifications, not
     one recurring problem. This is still the single largest open item: the
     reasoning result has cross-family evidence, perception does not.
-  \item \textbf{Run the pre-registered screen for InternVL3's
-    \texttt{has\_error}=1 stratum, one shot per idea, report honestly
-    either way.} Three candidates, each tied to a specific diagnosed
-    mechanism rather than a generic retry: an explicit
-    ``don't default to no-error on illegible input'' instruction
-    (\S\ref{sec:phase6-reasoning}), a retest of the restate-result-first
-    variant already screened on 3B (\S\ref{sec:prompt-variants}), and a
-    $K=10$ resample (mirroring the confirmed $K=5\to K=10$ perception gain,
-    \S\ref{sec:token-confidence}). If none clears 0.70 on a capped screen
-    sample, 0.628 stands as the reported result -- deliberately not an
-    open-ended search for a passing number.
+  \item \textbf{Design screening bars around the interval, not the point
+    estimate.} \S\ref{sec:phase6-screen} ran its three-idea screen exactly
+    as pre-registered and still produced an awkward outcome: one variant
+    ``passed'' a 0.70 bar by 0.0023 with a CI running $[0.616, 0.781]$,
+    while the paired comparison against baseline did not resolve for any
+    of the three. The bar was sound for the confirmation runs it came
+    from and too blunt for a screen at $n=150$. A better-specified screen
+    would register on the paired difference (does the variant beat
+    baseline on the same items, CI excluding zero) rather than on an
+    absolute point-estimate threshold -- the same reasoning that makes
+    \texttt{bootstrap\_auroc\_difference\_ci} the right test everywhere
+    else in this report.
   \item \textbf{Decide whether the reasoning arm's stratified result is the
     headline finding or a secondary one.} It is now positive, confirmed,
     and holds across two model sizes \emph{and} two model families, which

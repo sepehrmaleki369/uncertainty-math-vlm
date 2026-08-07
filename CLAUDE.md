@@ -535,6 +535,55 @@ rows, Drive-only). Locked in `pilot/tests/test_internvl3_fermat.py`
   table, Limitations, and Recommended Next Steps updates) — compiled
   clean, zero new warnings.
 
+### RUN 2026-08-08: the InternVL3 screen — none of the 3 fixes resolves, and the pre-registered bar itself was too blunt
+
+`pilot/13_internvl3_grading_screen.ipynb` ran the full n=150 screen.
+`results/internvl3_grading_screen_n150_20260807T231004Z.csv` (450 rows =
+3 variants × 150 items, Drive-only). Locked in
+`pilot/tests/test_internvl3_grading_screen.py`. Verified independently:
+0/450 mismatches recomputing entropy/correctness/K from raw samples.
+
+- **Baseline on the same 150 items: 0.628 [0.548, 0.706], acc 0.700,
+  n_wrong=45.**
+- **No variant resolvably beats it — all three paired intervals span
+  zero:** commit +0.069 [−0.028, +0.166]; k10 +0.074 [−0.024, +0.171];
+  restate −0.008 [−0.112, +0.095].
+- **`k10` technically PASSES the pre-registered bar** (AUROC 0.7023 ≥
+  0.70, CI excludes chance, minority 34 ≥ 30) — reported as written, bar
+  not moved after the fact. **But it clears 0.70 by 0.0023 with a CI of
+  [0.616, 0.781]** (lower bound far below the bar it passed), and the
+  0.005 separating it from `commit` (which "fails" at 0.6976) is noise.
+  k10 also changes the *target* (21 items flip correctness label at
+  K=10), a confound the paired interval can't remove.
+- **Methodological lesson worth carrying forward: the 0.70 bar was
+  inherited from the confirmation runs (0.775–0.854), where CIs were
+  tight and unambiguously above it. Applied to an n=150 screen with a
+  ±0.08 interval it's a much weaker statement.** A better-specified
+  screen registers on the *paired difference* (variant beats baseline on
+  the same items, CI excluding zero), not an absolute point-estimate
+  threshold. Recorded in the report's Limitations and Next Steps.
+- **Decision (with the user): no confirmation run. 0.628 stands as
+  InternVL3's reported reasoning result.** Screen documented as a
+  good-faith attempt that found no resolvable fix.
+- **Two real side findings:** (1) k10's *grading accuracy* does resolve
+  where its AUROC doesn't — 0.700 → 0.773, +0.073 [+0.013, +0.133], 16
+  fixed / 5 broke; more samples sharpen the majority vote, same direction
+  as the confirmed K=5→K=10 perception result. (2) **`restate`
+  reproduces its Qwen-3B failure signature on a different model family**:
+  heavy churn (31 fixed / 36 broke) with accuracy moving *down* (0.700 →
+  0.667) — the model swapping which near-constant answer it gives rather
+  than discriminating. A clean cross-family replication of a prior
+  negative.
+- **Two real bugs caught on this run, both now guarded in notebook 13**
+  (see the conventions section for the general rules they produced):
+  a stale `pilot.*` module surviving a re-clone (`KeyError: 'commit'` for
+  a variant that was demonstrably on disk — the auth cell now purges
+  `sys.modules` first), and a **silent 4-bit fallback** that would have
+  confounded the entire screen against its bf16 baseline (the sample cell
+  now compares the reference CSV's `quantized` column against the session
+  and refuses to run on a mismatch). The 4-bit one is the more dangerous:
+  it would have produced normal-looking, uninterpretable numbers.
+
 ## Repo-specific conventions
 
 - **Don't touch `report/` unless explicitly asked.** As of 2026-08-02 the user
