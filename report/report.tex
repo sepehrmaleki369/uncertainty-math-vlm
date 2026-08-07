@@ -17,7 +17,7 @@
 \newcommand{\unresolved}[1]{\textcolor{darkamber}{\textbf{#1}}}
 
 \title{Uncertainty Signal Pilot: Perception and Reasoning Entropy\\
-\large FERMAT Handwritten Math, Qwen2.5-VL-3B and 7B}
+\large FERMAT Handwritten Math, Qwen2.5-VL-3B/7B and LLaVA-NeXT}
 \author{}
 \date{\today}
 
@@ -28,13 +28,16 @@
 This study tests whether two entropy-based uncertainty signals -- \emph{perception
 entropy} (instability in transcribing a handwritten math answer) and
 \emph{reasoning entropy} (instability in grading whether an answer contains an
-error) -- predict model correctness, using Qwen2.5-VL on the FERMAT dataset.
-It ran in four phases: an exploratory $n=100$ pilot on the 3B model, a
-confirmatory $n=300$ run with a pre-registered analysis and a deliberately
-rebalanced label distribution, a follow-up closing the two gaps that run left
-open, and a fourth phase testing a 7B model on the reasoning arm specifically.
-Perception is unambiguous; reasoning is more specific than either a clean
-positive or a clean negative, and resolving that took the whole fourth phase.
+error) -- predict model correctness, on the FERMAT dataset. It ran in five
+phases: an exploratory $n=100$ pilot on Qwen2.5-VL-3B, a confirmatory
+$n=300$ run with a pre-registered analysis and a deliberately rebalanced
+label distribution, a follow-up closing the two gaps that run left open, a
+fourth phase testing Qwen2.5-VL-7B on the reasoning arm specifically, and a
+fifth phase testing a second model family, LLaVA-NeXT. Perception is
+unambiguous on Qwen; reasoning is more specific than either a clean
+positive or a clean negative, and resolving that took Phase 4. Phase 5
+confirms the reasoning result generalizes across model families and finds
+a real limit on how far the perception result can currently be tested.
 
 \textbf{Perception entropy works.} At $n=300$ it reaches AUROC~$=0.835$,
 95\% CI $[0.787, 0.879]$, replicating the pilot's 0.788 and tightening the
@@ -105,6 +108,19 @@ design decision was not the metric or the model but the \emph{label balance
 of the evaluation set} -- and Phase 4 shows the same lesson applies a second
 time, one level up: a real effect survived being pooled away only once the
 pooling itself was diagnosed and undone.
+
+\textbf{A second, architecturally different model family (Phase 5) confirms
+the reasoning result and exposes a real limit on the perception result.}
+LLaVA-NeXT (\texttt{llava-v1.6-mistral-7b-hf}) cannot be used to test
+perception entropy at all: its free-response transcription accuracy is
+0.8\% (2/243 items) against Qwen's $\sim$42\%, a capability gate of the
+same kind Phase 4 applied to reasoning, now applied to perception for the
+first time. Its reasoning arm is unaffected by that gate and, once powered
+the same way as Phase 4, confirms: \textbf{AUROC 0.775 $[0.694, 0.848]$ on
+34 misgraded items}, a CI overlapping Qwen-7B's confirmed
+$[0.751, 0.846]$ almost entirely. This is the first confirmed replication
+across model families in this project -- every earlier confirmation
+compared model sizes within Qwen2.5-VL.
 \end{abstract}
 
 \section{Goal}
@@ -113,33 +129,42 @@ Given a vision-language model transcribing and grading handwritten math answers,
 does the entropy of its own repeated outputs -- how much it disagrees with
 itself across independent samples -- predict when it is actually wrong?
 
-The work ran in four phases, and the distinction matters for how much weight
+The work ran in five phases, and the distinction matters for how much weight
 any individual number carries:
 
 \begin{itemize}
-  \item \textbf{Phase 1 ($n=100$, exploratory, 3B).} Whether either signal
-    exists at all. Sections~\ref{sec:perception}--\ref{sec:reasoning-pilot}.
+  \item \textbf{Phase 1 ($n=100$, exploratory, Qwen-3B).} Whether either
+    signal exists at all. Sections~\ref{sec:perception}--\ref{sec:reasoning-pilot}.
     Several analyses here were chosen after seeing data, and are labelled as
     such.
-  \item \textbf{Phase 2 ($n=300$, confirmatory, 3B).}
+  \item \textbf{Phase 2 ($n=300$, confirmatory, Qwen-3B).}
     Section~\ref{sec:scaleup}. A rebalanced sample with thresholds registered
     before the run (\texttt{pilot.plotting.SCALEUP\_PREREGISTRATION}). This is
     the phase the headline perception claim rests on. Includes a
     risk-coverage and conformal deferral analysis of the $n=300$ result
     (\S\ref{sec:deferral}).
-  \item \textbf{Phase 3 (same $n=300$ items, follow-up, 3B).} Section~\ref{sec:phase3}.
+  \item \textbf{Phase 3 (same $n=300$ items, follow-up, Qwen-3B).} Section~\ref{sec:phase3}.
     Closes two gaps Phase 2 left open: an independent baseline for perception
     entropy, and a screen of alternative grading prompts for the reasoning arm.
-  \item \textbf{Phase 4 ($n=300$ then $n=500$, 7B).} Section~\ref{sec:phase4}.
+  \item \textbf{Phase 4 ($n=300$ then $n=650$, Qwen-7B).} Section~\ref{sec:phase4}.
     Tests whether a larger model changes the reasoning-arm conclusion: a
     pre-registered capability gate, a stratified re-analysis, and a targeted
-    200-item extension that resolves the stratum Phase 2 could not test.
+    extension that resolves the stratum Phase 2 could not test, on both
+    Qwen sizes.
+  \item \textbf{Phase 5 ($n=300$ then $n=550$, LLaVA-NeXT).} Section~\ref{sec:phase5}.
+    Tests whether a \emph{different model family}, not just a different
+    size, changes either conclusion: a capability gate for perception (it
+    does not clear it) and a powered stratified re-analysis for reasoning
+    (it confirms, and replicates Qwen-7B's magnitude).
 \end{itemize}
 
-Still out of scope: no human double grading, no full-dataset run, and no
-model larger than 7B. What Phase 4 removed from this list is the single
-biggest one -- whether reasoning entropy could work at all on a model with
-some real grading competence is no longer open (\S\ref{sec:phase4}).
+Still out of scope: no human double grading, no full-dataset run, no model
+larger than 7B, and no second dataset/task. What Phase 4 removed from this
+list was whether reasoning entropy could work at all on a model with some
+real grading competence; what Phase 5 removed was whether either result is
+specific to the Qwen2.5-VL family (reasoning: no, confirmed; perception:
+untested, gated by a capability gap in the one alternative model tried so
+far).
 
 Every AUROC below is reported with a 95\% bootstrap confidence interval
 (10{,}000 item-level resamples, seed 0; \texttt{pilot.plotting.bootstrap\_auroc\_ci}).
@@ -167,7 +192,9 @@ test.
     stratum the 300-item sample could not measure.
   \item \textbf{Model}: Qwen2.5-VL-3B-Instruct (Phases 1--3);
     Qwen2.5-VL-7B-Instruct, full bf16, reasoning arm only (Phase 4,
-    \S\ref{sec:phase4}).
+    \S\ref{sec:phase4}); LLaVA-NeXT (\texttt{llava-v1.6-mistral-7b-hf}),
+    full bf16, both arms attempted but perception gated (Phase 5,
+    \S\ref{sec:phase5}).
   \item \textbf{Perception}: the model transcribes a handwritten Question--Answer
     pair; $K=5$ samples at temperature 0.7, plus 2 samples at temperature 0 as a
     determinism sanity anchor.
@@ -1242,6 +1269,94 @@ both are measured on the same items.} Reported here rather than quietly
 revised in place, since the closer-looking number was the one already
 circulated before this check ran.
 
+\section{Phase 5: A Second Model Family (LLaVA-NeXT)}
+\label{sec:phase5}
+
+Every result so far is one model family, Qwen2.5-VL, at two sizes. The
+single largest remaining external-validity gap is whether either result is
+Qwen-specific. This phase repeats both headline measurements --
+perception AUROC and the \texttt{has\_error}=1 stratified reasoning AUROC
+-- on \textbf{LLaVA-NeXT} (\texttt{llava-hf/llava-v1.6-mistral-7b-hf},
+$\sim$7B, a different architecture and training recipe entirely) at the
+identical $n=300$ balanced sample every reference run in this report used.
+
+\subsection{Perception: gated by a real capability gap, not usable}
+\label{sec:phase5-perception-gate}
+
+Transcription accuracy is 3.0\% (9/300), against Qwen's $\sim$42\%. This
+was diagnosed directly rather than reported at face value. Two checks
+ruled out a pipeline bug: independently recomputing
+\texttt{transcription\_correct} from the raw text matches the stored value
+on all 300/300 rows (not a scoring bug), and the parse-failure rate is
+only 9.6\% (144/1500), so the model is not failing to follow the
+\texttt{**Question:**}/\texttt{**Answer:**} format either. The actual
+cause, found by reading real samples and then confirming it systematically:
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+Item type & $n$ & Accuracy \\
+\midrule
+Multiple-choice & 57 & 12.3\% \\
+Free-response & 243 & \textbf{0.8\%} (2 correct) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+LLaVA-NeXT can occasionally identify a multiple-choice letter but is at a
+practical floor on free-response transcription, which is 81\% of the
+dataset. This is the same capability-gate logic as \S\ref{sec:phase4-gate}
+applied to the perception arm for the first time: an AUROC computed from 9
+correct items (0.710 $[0.525, 0.886]$) is an order of magnitude below the
+registered power minimum used everywhere else in this report and is not
+reported as a result. \textbf{Perception's entropy claim requires a second
+model with real OCR competence to test} -- not yet chosen.
+
+\subsection{Reasoning: confirmed, the first cross-model-family replication in this project}
+\label{sec:phase5-reasoning}
+
+The reasoning arm does not depend on fine-grained OCR -- grading is a
+holistic judgment from the image -- and is unaffected by
+\S\ref{sec:phase5-perception-gate}'s gate. The $n=300$ reference run found
+a promising but underpowered echo of the Qwen results: clean-stratum
+0.283 $[0.178, 0.398]$ (14 correct items), \texttt{has\_error}=1 stratum
+0.766 $[0.628, 0.883]$ (14 misgraded items) -- both short of the
+registered minimum of 30. 250 additional \texttt{has\_error}=1 items
+(sized from the observed 9.3\% error rate on this stratum, 90\% Wilson CI
+$[6.1\%, 14.0\%]$) were drawn and merged, mirroring
+\S\ref{sec:phase4-confirmed}/\S\ref{sec:phase4-3b} exactly:
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+& AUROC (95\% CI) & $n_{\text{wrong}}$ & Verdict \\
+\midrule
+LLaVA, before ($n=150$) & 0.766 $[0.628, 0.883]$ & 14 & \unresolved{underpowered} \\
+LLaVA, after ($n=400$) & \textbf{0.775} $[0.694, 0.848]$ & \textbf{34} & \worked{confirmed} \\
+Qwen-7B ($n=648$, \S\ref{sec:phase4-matched}) & 0.801 $[0.751, 0.846]$ & 73 & \worked{confirmed} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{LLaVA-NeXT's \texttt{has\_error}=1 stratum clears the registered
+power bar (34 $\geq$ 30) and the 0.70 threshold, with a CI (upper bound
+0.848) that overlaps Qwen-7B's confirmed interval almost entirely.} The two
+model families are not resolvably different on this measurement. The clean
+stratum remains at its original, underpowered 0.283 (14 correct items --
+the extension targeted only \texttt{has\_error}=1) but is itself close to
+Qwen-7B's confirmed 0.280, and the same response bias that drives the
+sign-reversal pattern replicates too: LLaVA answers ``there is an error''
+91.1\% of the time, close to Qwen-3B's 93\% and higher than Qwen-7B's 80\%.
+
+\textbf{This is the first confirmed replication across model families in
+this project.} Every prior confirmation (\S\ref{sec:phase4-confirmed},
+\S\ref{sec:phase4-3b}, \S\ref{sec:phase4-matched}) compared 3B against 7B
+within Qwen2.5-VL. A second, architecturally distinct model reproducing
+the same stratified effect at a statistically indistinguishable magnitude
+is evidence the effect is a property of this task and pipeline, not of
+Qwen specifically -- directly addressing the single largest gap identified
+for this line of work.
+
 \section{Integrity Checks}
 
 Both entropy signals depend on the sampling and parsing pipeline actually
@@ -1271,7 +1386,7 @@ a full-width colon); widening the pattern recovered most of the missed samples.
 
 \section{Summary}
 
-\subsection{Final conclusions (Phase 2--4)}
+\subsection{Final conclusions (Phase 2--5)}
 
 \begin{center}
 \begin{tabular}{llcl}
@@ -1290,6 +1405,9 @@ Reasoning, pooled (7B) & \failed{Fails} & 0.520 $[0.458, 0.582]$ & Capability ga
 \quad Clean stratum (7B) & \worked{Inverted} & 0.280 $[0.200, 0.366]$ & Confirmed, $n_{\text{wrong}}=44$ -- \S\ref{sec:phase4-stratified} \\
 \quad \texttt{has\_error}=1 stratum (3B, $n=650$) & \worked{Works} & \textbf{0.854} $[0.796, 0.902]$ & Confirmed, $n_{\text{wrong}}=42$ -- \S\ref{sec:phase4-3b} \\
 \quad \texttt{has\_error}=1 stratum (7B, $n=648$) & \worked{Works} & 0.801 $[0.751, 0.846]$ & Confirmed, matched to 3B -- \S\ref{sec:phase4-matched} \\
+Perception (LLaVA-NeXT) & \unresolved{Gated} & 0.710 $[0.525, 0.886]$ & Not reportable, $n_{\text{correct}}=9$ -- \S\ref{sec:phase5-perception-gate} \\
+\quad \texttt{has\_error}=1 stratum (LLaVA) & \worked{Works} & 0.775 $[0.694, 0.848]$ & Confirmed, $n_{\text{wrong}}=34$ -- \S\ref{sec:phase5-reasoning} \\
+\quad Clean stratum (LLaVA) & \unresolved{Inverted} & 0.283 $[0.178, 0.398]$ & Underpowered, $n_{\text{correct}}=14$ -- \S\ref{sec:phase5-reasoning} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1309,6 +1427,17 @@ not as numerically close as an earlier, differently-sized comparison
 suggested. The pooled/stratified split is now the central caveat on
 reading \emph{any} AUROC in this report: pooling can hide as much as it
 reveals when a model's own response bias is asymmetric.
+
+Phase 5 extends this from model \emph{size} to model \emph{family}.
+LLaVA-NeXT's confirmed \texttt{has\_error}=1 result (0.775) has a CI that
+overlaps Qwen-7B's confirmed interval almost entirely -- the first
+cross-family replication in this report, not just cross-size. Its
+perception arm could not be tested at all: a 0.8\% free-response
+transcription accuracy is a capability gate, the same concept
+\S\ref{sec:phase4-gate} used for reasoning, now shown to apply to
+perception too. The reasoning result generalizes across the two
+model families tested; whether the perception result does remains open,
+gated on finding a second model with real OCR competence.
 
 \subsection{Phase 1 exploratory results (superseded)}
 
@@ -1403,18 +1532,27 @@ standing rests on its own CI excluding chance and surviving
     once adequately powered, is a confirmed 0.834 -- so the caveat this
     bullet used to raise as untested is now resolved, and resolved in the
     direction it hoped for (\S\ref{sec:phase4}).
-  \item \textbf{Still only two model sizes, but they now agree, on a
-    matched sample.} 3B and 7B are both tested (\S\ref{sec:phase4-gate}),
-    and their confirmed \texttt{has\_error}=1 AUROCs (0.801 and 0.854 on
-    the same 648/650 items, \S\ref{sec:phase4-matched}) have overlapping
-    CIs -- not resolvably different -- evidence the stratified effect is
-    not specific to one model size, though a still-larger model or a
-    text-only model given the ground-truth transcription remains untested.
-    Given Phase 4, this limitation is now about the ceiling of the
-    stratified effect size, not about whether reasoning entropy works at
-    all. (The baseline-uncertainty-method gap mentioned in earlier drafts
-    of this limitation is resolved: entropy has a measured, resolved win
-    over token confidence, \S\ref{sec:token-confidence}.)
+  \item \textbf{Two model sizes and now two model families agree on
+    reasoning; perception has only been tested on one family.} 3B and 7B
+    (\S\ref{sec:phase4-gate}) and now LLaVA-NeXT (\S\ref{sec:phase5})
+    all confirm the \texttt{has\_error}=1 stratified effect with
+    overlapping CIs -- evidence it is not specific to Qwen2.5-VL. The
+    perception result has no such evidence yet: LLaVA-NeXT could not test
+    it (a capability gate, not a null result), so ``does perception entropy
+    generalize across model families'' is still open, pending a second
+    model with real free-response OCR competence. A still-larger model, or
+    a text-only model given the ground-truth transcription, also remain
+    untested for either arm. (The baseline-uncertainty-method gap mentioned
+    in earlier drafts of this limitation is resolved: entropy has a
+    measured, resolved win over token confidence, \S\ref{sec:token-confidence}.)
+  \item \textbf{The perception capability gate is diagnosed on one model,
+    not systematically characterized.} LLaVA-NeXT's MCQ-vs-free-response
+    accuracy split (12.3\% vs.\ 0.8\%) is a clean, specific finding, but it
+    rests on manual inspection of a handful of real samples plus one
+    systematic recount, not a broader audit of failure modes across many
+    models. It explains why this specific model cannot be used to test
+    perception entropy; it is not a general theory of when a VLM will or
+    will not clear the gate.
   \item \textbf{The stratified reasoning hypothesis is now confirmed at both
     model sizes, not merely at 7B.} 3B's version was originally untestable
     (8 misgraded items among 150 error-containing ones, under the
@@ -1480,19 +1618,27 @@ standing rests on its own CI excluding chance and surviving
 
 \section{Recommended Next Steps}
 
-Phase 4 resolved the two items that used to head this list: the reasoning
-arm has a confirmed, sizable stratified signal, and it holds at both model
-sizes tested, not just 7B. What remains is narrower.
+Phases 4 and 5 resolved the items that used to head this list: the
+reasoning arm has a confirmed, sizable stratified signal, and it holds
+across both model sizes and, now, both model families tested. What
+remains is narrower, and is being pursued toward a paper submission (see
+the working roadmap for scope, priority order, and the current external
+deadline).
 
 \begin{enumerate}
+  \item \textbf{Find a second model with real free-response OCR competence
+    to test perception entropy.} LLaVA-NeXT could not be used
+    (\S\ref{sec:phase5-perception-gate}) -- not a null result, a capability
+    gate. This is now the single largest open item: the reasoning result
+    has cross-family evidence, perception does not.
   \item \textbf{Decide whether the reasoning arm's stratified result is the
-    headline finding or a secondary one.} It is now positive, confirmed, and
-    model-size-independent across the two sizes tested, which changes the
-    shape of this report's contribution: not ``perception works, reasoning
-    doesn't,'' but ``entropy works on both arms once a model's own response
-    bias is accounted for.'' Whether that reframing belongs in the
-    abstract's emphasis or stays a Phase 4 result is an editorial choice,
-    not a methodological one.
+    headline finding or a secondary one.} It is now positive, confirmed,
+    and holds across two model sizes \emph{and} two model families, which
+    changes the shape of this report's contribution: not ``perception
+    works, reasoning doesn't,'' but ``entropy works on both arms once a
+    model's own response bias is accounted for.'' Whether that reframing
+    belongs in the abstract's emphasis or stays a Phase 4/5 result is an
+    editorial choice, not a methodological one.
   \item \textbf{The label-noise question is resolved: there isn't any, in the
     three cases checked.} \S\ref{sec:phase4-inspection} initially raised it
     for two misgraded items with no findable error in the pert\_a text; a
