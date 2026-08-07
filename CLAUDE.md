@@ -557,6 +557,18 @@ rows, Drive-only). Locked in `pilot/tests/test_internvl3_fermat.py`
   processing) with fakes, and exec it locally to catch bugs before the user
   burns Colab time on it. This caught real bugs multiple times (checkpoint
   threshold gaps, `re.sub` backslash-escaping corrupting injected stubs).
+- **Push new `pilot/` library code BEFORE handing a notebook off — a green
+  dry run does not cover this.** Every notebook's auth cell does
+  `rm -rf repo` → `git clone` → `pip install -e repo/`, so Colab runs
+  against the *remote* `pilot/`, while `dryrun_nb*.py` inserts the *local*
+  working tree on `sys.path`. Uncommitted library code therefore passes the
+  dry run and fails in Colab. Hit for real on 2026-08-08: notebook 13's new
+  `GRADING_USER_PROMPT_COMMIT` wasn't pushed, dry run was green, Colab died
+  with `KeyError: 'commit'`. Verify with
+  `git show origin/main:pilot/<file>.py | grep <new symbol>` before saying
+  a notebook is ready. Recovery is cheap if it does happen: push, re-run
+  only the auth cell plus the failing cell — the loaded model stays in
+  memory, no GPU work is lost.
 - **Every real bug found on actual pilot data gets a regression test that
   reproduces it**, not just a fix. Search `pilot/tests/` for docstrings
   citing specific dates/numbers (e.g. "found on the 2026-08-02 K=15 run") —
