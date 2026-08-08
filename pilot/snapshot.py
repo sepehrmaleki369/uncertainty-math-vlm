@@ -22,6 +22,7 @@ import pandas as pd
 
 from pilot.plotting import (
     aurc,
+    classify_stratum_result,
     auroc_sensitivity,
     bootstrap_auroc_ci,
     evaluate_conformal_abstention,
@@ -170,6 +171,123 @@ def compare_snapshots(old: dict, new: dict, tol: float = 1e-6) -> dict:
         "added": sorted(set(b) - set(a)),
         "removed": sorted(set(a) - set(b)),
     }
+
+
+
+def snapshot_grading_metrics(
+    df: pd.DataFrame,
+    label: str = "",
+    n_boot: int = 10000,
+    seed: int = 0,
+    extra: Optional[dict] = None,
+) -> dict:
+    """Snapshot for a grading-arm-only run (no perception columns).
+
+    snapshot_metrics above assumes a full FERMAT-shaped CSV with
+    perception_entropy/transcription_correct. Most runs in this project are
+    grading-only extensions, and one (ScratchMath) has no has_error=0 items
+    at all, so it needs a shape that:
+
+      - omits the perception arm rather than emitting NaNs for it;
+      - reports the pooled AUROC but flags it, because on a non-50/50
+        sample pooling mechanically favours the larger stratum and has
+        repeatedly looked like a result when it was not (see the n=500/n=800
+        CSVs, which read 0.61 pooled while the strata run in opposite
+        directions);
+      - records an explicit verdict per stratum via classify_stratum_result,
+        including "not_measured" when a stratum is absent entirely -- which
+        is a different statement from "underpowered" and must not collapse
+        into it;
+      - records the entropy value distribution, because a degenerate one
+        (InternVL3: 67% pinned at max; ScratchMath: 70% at zero) invalidates
+        the AUROC regardless of what the CI says.
+
+    ``extra`` is merged in verbatim for run-specific evidence that does not
+    generalise -- e.g. ScratchMath's non-engagement rate.
+    """
+    gt = df["has_error"].astype(bool)
+    k = int(df["k_grading"].iloc[0]) if "k_grading" in df else 5
+
+    def ci(frame):
+        if len(frame) == 0:
+            return None
+        r = bootstrap_auroc_ci(frame, "reasoning_entropy", "grading_correct",
+                               n_boot=n_boot, seed=seed)
+        return {kk: r[kk] for kk in
+                ("auroc", "ci_low", "ci_high", "n_items", "n_error", "excludes_chance")}
+
+    error_ci = ci(df[gt])
+    clean_ci = ci(df[~gt])
+    pooled_ci = ci(df)
+
+    entropy_counts = (
+        df["reasoning_entropy"].round(3).value_counts().sort_index()
+    )
+    max_share = float(entropy_counts.max() / len(df)) if len(df) else float("nan")
+
+    out = {
+        "label": label,
+        "arm": "grading_only",
+        "n_items": int(len(df)),
+        "model_id": str(df["model_id"].iloc[0]) if "model_id" in df else None,
+        "quantized": (bool(df["quantized"].iloc[0]) if "quantized" in df else None),
+        "k_grading": k,
+        "composition": {
+            "n_has_error": int(gt.sum()),
+            "n_clean": int((~gt).sum()),
+            "frac_has_error": float(gt.mean()),
+            "is_balanced": bool(abs(gt.mean() - 0.5) < 0.01),
+        },
+        "grading": {
+            "accuracy": float(df["grading_correct"].astype(bool).mean()),
+            "baseline_accuracy": majority_class_baseline(df, "has_error")["baseline_accuracy"],
+            "accuracy_on_error_items": (
+                float(df.loc[gt, "grading_correct"].astype(bool).mean()) if gt.any() else None
+            ),
+            "accuracy_on_clean_items": (
+                float(df.loc[~gt, "grading_correct"].astype(bool).mean())
+                if (~gt).any() else None
+            ),
+        },
+        "reasoning": {
+            "pooled": pooled_ci,
+            # Load-bearing caveat, not decoration: read the strata, not this.
+            "pooled_is_misleading_unless_balanced": not bool(abs(gt.mean() - 0.5) < 0.01),
+            "error_stratum": error_ci,
+            "error_stratum_verdict": classify_stratum_result(error_ci),
+            "clean_stratum": clean_ci,
+            "clean_stratum_verdict": classify_stratum_result(clean_ci),
+        },
+        "entropy_distribution": {
+            "n_distinct_values": int(len(entropy_counts)),
+            "counts": {str(v): int(c) for v, c in entropy_counts.items()},
+            "largest_single_value_share": max_share,
+            # Mirrors the InternVL3 / ScratchMath diagnosis: past ~2/3 on one
+            # value there is little left for a ranking metric to order.
+            "is_degenerate": bool(max_share >= 0.60),
+        },
+        "integrity": {
+            "grading_parse_failure_rate": float(
+                df["n_grading_parse_failures"].sum() / (len(df) * k)
+            ) if "n_grading_parse_failures" in df else None,
+        },
+    }
+    if extra:
+        out["extra"] = extra
+    return out
+
+
+def write_grading_snapshot(
+    csv_path: str | Path,
+    out_path: str | Path,
+    label: str = "",
+    extra: Optional[dict] = None,
+) -> dict:
+    df = pd.read_csv(csv_path)
+    snap = snapshot_grading_metrics(df, label=label or Path(csv_path).stem, extra=extra)
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+    Path(out_path).write_text(json.dumps(snap, indent=2) + "\n")
+    return snap
 
 
 def write_snapshot(csv_path: str | Path, out_path: str | Path, label: str = "") -> dict:

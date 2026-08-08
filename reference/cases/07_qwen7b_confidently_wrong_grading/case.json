@@ -1,0 +1,56 @@
+{
+  "run_label": "qwen7b_matched_n650_20260806",
+  "category": "confidently_wrong_grading",
+  "arm": "grading",
+  "note": "The reasoning arm's equivalent of the low-entropy-wrong quadrant, and the ceiling on the confirmed 0.801 result. All five grading samples unanimously say 'no error' on an answer that does contain one, so entropy is 0 and has nothing to flag. Manual inspection of cases like this found the model verifies a solution's core computation and stops -- it does not check whether the final answer statement is complete, internally consistent, or licensed by the problem.",
+  "model_id": "Qwen/Qwen2.5-VL-7B-Instruct",
+  "ground_truth": {
+    "question": "The sum of three times a number and 11 is 32. Find the number.\n\n",
+    "reference_answer": " \n\\begin{itemize}\n    \\item If the unknown number is taken to be \\( \\textcolor{red}{y} \\), then three times the number is \\( 3\\textcolor{red}{y} \\) and the sum of \\( 3\\textcolor{red}{y} \\) and 11 is 32. That is, \n    \\[\n    3\\textcolor{red}{y} + 11 = 32\n    \\]\n\n    \\item To solve this equation, we transpose 11 to the right-hand side (RHS), so that \n    \\[\n    3\\textcolor{red}{y} = 32 - 11 \\quad \\text{or} \\quad 3\\textcolor{red}{y} = 21\n    \\]\n    \n    Now, divide both sides by 3:\n    \\[\n    \\textcolor{red}{y} = \\frac{21}{3} = 7\n    \\]\n    \n    The required number is \\( \\textcolor{red}{y} \\).\n\\end{itemize}\n\n",
+    "student_answer": null,
+    "has_error": 1
+  },
+  "model_output": {
+    "k": 5,
+    "samples_raw": [
+      "**Reasoning:** The answer appears to be correct. The equation setup, solving process, and final answer all align with the steps required to solve the problem. There is no indication of an error in the work shown.\n\n**Error:** 0",
+      "**Reasoning:** The answer appears to be correct. The question asks for three times a number plus eleven equals thirty-two. The equation \\(3y + 11 = 32\\) is correctly formulated, and solving it gives \\(y = 7\\). The steps to solve the equation are also logically sound. There are no apparent errors in the calculation or reasoning.\n\n**Error:** 0",
+      "**Reasoning:** The solution provided is correct. The equation \\(3y + 11 = 32\\) is correctly formed, and solving it by transposing 11 to the right side and then dividing by 3 yields \\(y = 7\\). The final statement \"The required number is y\" also correctly identifies the solution.\n\n**Error:** 0",
+      "**Reasoning:** The answer is correct. The student correctly formed the equation \\(3y + 11 = 32\\) and solved it by isolating \\(y\\). The steps taken to solve the equation are accurate: transposing \\(11\\) to the right side, simplifying to \\(3y = 21\\), and then dividing both sides by \\(3\\) to get \\(y = 7\\). The final statement confirms the number is \\(y\\).\n\n**Error:** 0",
+      "**Reasoning:** The answer is correct. The student correctly set up the equation \\(3y + 11 = 32\\), solved it by isolating \\(3y\\) by subtracting 11 from both sides, resulting in \\(3y = 21\\), and then dividing both sides by 3 to get \\(y = 7\\). The final answer is written as \"The required number is y,\" but since they found the value of \\(y\\), the correct presentation would be by substituting \\(y = 7\\).\n\n**Error:** 0"
+    ],
+    "parsed": [
+      "0",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "cluster_labels": [
+      "0",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "n_parse_failures": 0
+  },
+  "derived": {
+    "entropy": 0.0,
+    "max_possible_entropy": 1.6094379124341003,
+    "at_max_entropy": false,
+    "majority_label": "0",
+    "majority_count": 5,
+    "n_distinct_labels": 1,
+    "correct": false
+  },
+  "image": {
+    "filename": "image.jpg",
+    "width": 1600,
+    "height": 1128,
+    "original_width": 1717,
+    "original_height": 1211,
+    "downscaled": true,
+    "bytes": 266481
+  }
+}

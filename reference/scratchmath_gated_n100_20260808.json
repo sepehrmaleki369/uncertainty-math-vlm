@@ -1,0 +1,91 @@
+{
+  "label": "Qwen2.5-VL-7B on ScratchMath n=100 -- GATED: 4.0% misgrade rate, 82% of non-engagement samples still answer 'error'",
+  "arm": "grading_only",
+  "n_items": 100,
+  "model_id": "Qwen/Qwen2.5-VL-7B-Instruct",
+  "quantized": false,
+  "k_grading": 5,
+  "composition": {
+    "n_has_error": 100,
+    "n_clean": 0,
+    "frac_has_error": 1.0,
+    "is_balanced": false
+  },
+  "grading": {
+    "accuracy": 0.96,
+    "baseline_accuracy": 1.0,
+    "accuracy_on_error_items": 0.96,
+    "accuracy_on_clean_items": null
+  },
+  "reasoning": {
+    "pooled": {
+      "auroc": 0.8515625,
+      "ci_low": 0.765625,
+      "ci_high": 0.943414685461813,
+      "n_items": 100,
+      "n_error": 4,
+      "excludes_chance": true
+    },
+    "pooled_is_misleading_unless_balanced": true,
+    "error_stratum": {
+      "auroc": 0.8515625,
+      "ci_low": 0.765625,
+      "ci_high": 0.943414685461813,
+      "n_items": 100,
+      "n_error": 4,
+      "excludes_chance": true
+    },
+    "error_stratum_verdict": "inconclusive_underpowered",
+    "clean_stratum": null,
+    "clean_stratum_verdict": "not_measured"
+  },
+  "entropy_distribution": {
+    "n_distinct_values": 3,
+    "counts": {
+      "0.0": 70,
+      "0.5": 20,
+      "0.673": 10
+    },
+    "largest_single_value_share": 0.7,
+    "is_degenerate": true
+  },
+  "integrity": {
+    "grading_parse_failure_rate": 0.0
+  },
+  "extra": {
+    "verdict": "gated_not_comparable",
+    "gate_min_misgrade_rate": 0.05,
+    "observed_misgrade_rate": 0.04,
+    "says_error_rate": 0.9,
+    "non_engagement": {
+      "definition": "sample text states the model cannot read or use the image",
+      "phrases": [
+        "does not contain",
+        "no handwritten",
+        "not contain any",
+        "is unclear",
+        "quite unclear",
+        "impossible to determine",
+        "cannot be determined",
+        "no indication",
+        "illegible",
+        "not legible",
+        "difficult to interpret",
+        "does not appear to contain",
+        "no visible",
+        "unrelated",
+        "does not seem to",
+        "not clear",
+        "no mathematical work",
+        "cannot determine",
+        "hard to read"
+      ],
+      "n_samples": 500,
+      "n_cannot_read": 120,
+      "frac_cannot_read": 0.24,
+      "n_cannot_read_still_says_error": 98,
+      "frac_cannot_read_still_says_error": 0.8166666666666667
+    },
+    "why_not_merely_underpowered": "Non-engagement is concentrated on misgraded items (0.40 vs 0.23), so a powered run would substantially measure scratchwork legibility rather than uncertainty about the mathematics -- a different construct from the FERMAT result and therefore not comparable to it."
+  }
+}

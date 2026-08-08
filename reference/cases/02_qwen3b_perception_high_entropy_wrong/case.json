@@ -1,0 +1,47 @@
+{
+  "run_label": "qwen3b_fermat_n300_20260802",
+  "category": "high_entropy_wrong",
+  "arm": "transcription",
+  "note": "The signal working in the other direction: all five transcriptions disagree (entropy at the ln(5) ceiling) and the majority vote is wrong. Items like this drive the 0.835 AUROC, and the abstention rule built on them is right 57 times out of 61.",
+  "model_id": "Qwen/Qwen2.5-VL-3B-Instruct",
+  "ground_truth": {
+    "question": "Express the following in the form of \\( a + bi \\):\n\\begin{enumerate}\n    \\item \\( \\left( -5i \\right) \\left( \\frac{1}{8} i \\right) \\)\n    \\item \\( \\left( -i \\right) \\left( 2i \\right) \\left( \\frac{-1}{8} i \\right)^3 \\)\n\\end{enumerate}\n\n",
+    "reference_answer": "\n\\begin{enumerate}\n    \\item \\( \\left( -5\\textcolor{red}{j} \\right) \\left( \\frac{1}{8} \\textcolor{red}{j} \\right) = \\frac{-5}{8} \\textcolor{red}{j}^2 = \\frac{-5}{8} (-1) = \\frac{5}{8} = \\frac{5}{8} + \\textcolor{red}{j}0 \\)\n    \\item \\( \\left( -\\textcolor{red}{j} \\right) \\left( 2\\textcolor{red}{j} \\right) \\left( \\frac{-1}{8} \\textcolor{red}{j} \\right)^3 = 2 \\times \\frac{1}{8 \\times 8 \\times 8} \\times \\textcolor{red}{j}^5 = \\frac{1}{256} (\\textcolor{red}{j}^2)^2 = \\frac{1}{256} \\textcolor{red}{j} \\)\n\\end{enumerate}\n\n",
+    "student_answer": null,
+    "has_error": 0
+  },
+  "model_output": {
+    "k": 5,
+    "samples_raw": [
+      "**Question:** Express the following in the form of \\(a + bi\\):\n1. \\((-5i)\\left(\\frac{1}{8}i\\right)\\)\n2. \\((-i)(2i)\\left(\\frac{-1}{8}i\\right)^3\\)\n\n**Answer:** \n1. \\((-5i)\\left(\\frac{1}{8}i\\right) = -5j^2 = -5(-1) = \\frac{5}{8} = \\frac{5}{8} + j0\\)\n\n2. \\((-j)(2j)\\left(\\frac{-1}{8}i\\right)^3 = 2 \\times \\frac{1}{8 \\times 8 \\times 8} \\times i^5 = \\frac{1}{256}(j^2)^2 = \\frac{1}{256}j\\)",
+      "**Question:** Express the following in the form of \\(a + bi\\):\n1. \\((-5i)\\left(\\frac{1}{8}i\\right)\\)\n2. \\((-i)(2i)\\left(\\frac{-1}{8}i\\right)^3\\)\n\n**Answer:**\n1. \\((-5j)\\left(\\frac{1}{8}j\\right) = \\frac{-5j^2}{8} = \\frac{-5(-1)}{8} = \\frac{5}{8} = \\frac{5}{8} + j0\\)\n2. \\((-j)(2j)\\left(\\frac{-1}{8}j\\right)^3 = 2 \\times \\frac{1}{8 \\times 8 \\times 8} \\times j^5 = \\frac{1}{256}(j^2)^2 = \\frac{1}{256}j\\)",
+      "\\documentclass{article}\n\\begin{document}\n**Question:** Express the following in the form of $a+bi$:\n\n1. $(−5i)(\\frac{1}{8}i)$\n\n2. $(-i)(2i)(-\\frac{1}{8}i)^{3}$\n\n**Answer:** \n\n1. $(−5i)\\left(\\frac{1}{8}i\\right)= -\\frac{5}{8}j^{2}=-\\frac{5}{8}(-1)=\\frac{5}{8}= \\frac{5}{8} + j0$\n\n2. $(-i)(2i)(-\\frac{1}{8}i)^{3}=2\\times \\frac{1}{8\\times 8\\times 8}\\times i^{5}=\\frac{1}{256}(i^{2})^{2}$\n\n\\end{document}",
+      "**Question:** Express the following in the form of \\(a + bi\\):\n1. \\(( -5i ) ( \\frac{1}{8} i )\\)\n2. \\(( -i ) ( 2i ) ( \\frac{-1}{8} i )^{3}\\)\n\n**Answer:**\n1. \\(( -5i ) ( \\frac{1}{8} i ) = -\\frac{5i^2}{8} = -\\frac{5(-1)}{8} = \\frac{5}{8} = \\frac{5}{8} + j0\\)\n2. \\(( -i ) ( 2i ) ( \\frac{-1}{8} i )^{3} = 2 \\times \\frac{1}{8 \\times 8 \\times 8} \\times i^{5} = \\frac{1}{256} (i^2)^2 = \\frac{1}{256} j\\)",
+      "**Question:** Express the following in the form of \\( a + bi \\):\n\n1. \\((-5i) (\\frac{1}{8} i)\\)\n\n2. \\((-i) (2i) (\\frac{-1}{8} i)^3\\)\n\n**Answer:**\n\n1. \\((-5j) (\\frac{1}{8} j) = -5j^2 = -5(-1) = \\frac{5}{8} = \\frac{5}{8} + ji^0\\)\n\n2. \\((-j)(2j)(\\frac{-1}{8} j)^3 = 2 \\times \\frac{1}{8 \\times 8 \\times 8} \\times j^5 = \\frac{1}{256}(j^2)^3 = \\frac{1}{256} j\\)"
+    ],
+    "parsed": [
+      "1. \\((-5i)\\left(\\frac{1}{8}i\\right) = -5j^2 = -5(-1) = \\frac{5}{8} = \\frac{5}{8} + j0\\)\n\n2. \\((-j)(2j)\\left(\\frac{-1}{8}i\\right)^3 = 2 \\times \\frac{1}{8 \\times 8 \\times 8} \\times i^5 = \\frac{1}{256}(j^2)^2 = \\frac{1}{256}j\\)",
+      "1. \\((-5j)\\left(\\frac{1}{8}j\\right) = \\frac{-5j^2}{8} = \\frac{-5(-1)}{8} = \\frac{5}{8} = \\frac{5}{8} + j0\\)\n2. \\((-j)(2j)\\left(\\frac{-1}{8}j\\right)^3 = 2 \\times \\frac{1}{8 \\times 8 \\times 8} \\times j^5 = \\frac{1}{256}(j^2)^2 = \\frac{1}{256}j\\)",
+      "1. $(−5i)\\left(\\frac{1}{8}i\\right)= -\\frac{5}{8}j^{2}=-\\frac{5}{8}(-1)=\\frac{5}{8}= \\frac{5}{8} + j0$\n\n2. $(-i)(2i)(-\\frac{1}{8}i)^{3}=2\\times \\frac{1}{8\\times 8\\times 8}\\times i^{5}=\\frac{1}{256}(i^{2})^{2}$",
+      "1. \\(( -5i ) ( \\frac{1}{8} i ) = -\\frac{5i^2}{8} = -\\frac{5(-1)}{8} = \\frac{5}{8} = \\frac{5}{8} + j0\\)\n2. \\(( -i ) ( 2i ) ( \\frac{-1}{8} i )^{3} = 2 \\times \\frac{1}{8 \\times 8 \\times 8} \\times i^{5} = \\frac{1}{256} (i^2)^2 = \\frac{1}{256} j\\)",
+      "1. \\((-5j) (\\frac{1}{8} j) = -5j^2 = -5(-1) = \\frac{5}{8} = \\frac{5}{8} + ji^0\\)\n\n2. \\((-j)(2j)(\\frac{-1}{8} j)^3 = 2 \\times \\frac{1}{8 \\times 8 \\times 8} \\times j^5 = \\frac{1}{256}(j^2)^3 = \\frac{1}{256} j\\)"
+    ],
+    "cluster_labels": [
+      "text:(-j)(2j)(\\frac{-1}{8}i)^3 = 2 \\times \\frac{1}{8 \\times 8 \\times 8} \\times i^5 = \\frac{1}{256}(j^2)^2 = \\frac{1}{256}j",
+      "text:(-j)(2j)(\\frac{-1}{8}j)^3 = 2 \\times \\frac{1}{8 \\times 8 \\times 8} \\times j^5 = \\frac{1}{256}(j^2)^2 = \\frac{1}{256}j",
+      "text:(-i)(2i)(-\\frac{1}{8}i)^{3}=2\\times \\frac{1}{8\\times 8\\times 8}\\times i^{5}=\\frac{1}{256}(i^{2})^{2}",
+      "text:( -i ) ( 2i ) ( \\frac{-1}{8} i )^{3} = 2 \\times \\frac{1}{8 \\times 8 \\times 8} \\times i^{5} = \\frac{1}{256} (i^2)^2 = \\frac{1}{256} j",
+      "text:(-j)(2j)(\\frac{-1}{8} j)^3 = 2 \\times \\frac{1}{8 \\times 8 \\times 8} \\times j^5 = \\frac{1}{256}(j^2)^3 = \\frac{1}{256} j"
+    ],
+    "n_parse_failures": 0
+  },
+  "derived": {
+    "entropy": 1.6094379124341005,
+    "max_possible_entropy": 1.6094379124341003,
+    "at_max_entropy": true,
+    "majority_label": "text:(-j)(2j)(\\frac{-1}{8}i)^3 = 2 \\times \\frac{1}{8 \\times 8 \\times 8} \\times i^5 = \\frac{1}{256}(j^2)^2 = \\frac{1}{256}j",
+    "majority_count": 1,
+    "n_distinct_labels": 5,
+    "correct": false
+  }
+}

@@ -28,7 +28,7 @@
 This study tests whether two entropy-based uncertainty signals -- \emph{perception
 entropy} (instability in transcribing a handwritten math answer) and
 \emph{reasoning entropy} (instability in grading whether an answer contains an
-error) -- predict model correctness, on the FERMAT dataset. It ran in six
+error) -- predict model correctness, on the FERMAT dataset. It ran in seven
 phases: an exploratory $n=100$ pilot on Qwen2.5-VL-3B, a confirmatory
 $n=300$ run with a pre-registered analysis and a deliberately rebalanced
 label distribution, a follow-up closing the two gaps that run left open, a
@@ -153,7 +153,7 @@ Given a vision-language model transcribing and grading handwritten math answers,
 does the entropy of its own repeated outputs -- how much it disagrees with
 itself across independent samples -- predict when it is actually wrong?
 
-The work ran in six phases, and the distinction matters for how much weight
+The work ran in seven phases, and the distinction matters for how much weight
 any individual number carries:
 
 \begin{itemize}
@@ -180,6 +180,10 @@ any individual number carries:
     size, changes either conclusion: a capability gate for perception (it
     does not clear it) and a powered stratified re-analysis for reasoning
     (it confirms, and replicates Qwen-7B's magnitude).
+  \item \textbf{Phase 7 ($n=100$, ScratchMath, Qwen-7B).} Section~\ref{sec:phase7}.
+    The only dataset change in this report. A sizing check, gated: the
+    model answers ``error'' regardless of whether it can read the image,
+    so the run measures response bias rather than grading.
   \item \textbf{Phase 6 ($n=300$, InternVL3-8B).} Section~\ref{sec:phase6}.
     A third model family, trained independently of both prior families.
     Perception clears the accuracy bar this time (unlike LLaVA-NeXT) but
@@ -1557,6 +1561,77 @@ entirely: heavy churn (31 items fixed, 36 broken) with accuracy moving
 near-constant answer it gives rather than discriminating, exactly as on
 Qwen-3B.
 
+\section{Phase 7: A Second Dataset (ScratchMath) --- Gated}
+\label{sec:phase7}
+
+Every result to this point is on one dataset. With three model families
+agreeing on the \texttt{has\_error}=1 effect, a second dataset became the
+largest remaining external-validity gap. This phase holds the model fixed
+at Qwen2.5-VL-7B (confirmed 0.801 on FERMAT at $n=648$) so that only the
+dataset varies, and runs a sizing check on \textbf{ScratchMath} (1{,}720
+handwritten primary/middle-school scratchwork items).
+
+\subsection{What the candidate datasets could and could not test}
+
+Two benchmarks were viable candidates; both were inspected directly rather
+than taken from their papers, and both turned out to consist
+\emph{entirely} of error-containing items --- ErrorRadar has 0/2500 rows
+without an error annotation, and on ScratchMath the student's answer never
+equals the reference answer (0/1479). Two consequences follow immediately:
+no balanced sample can be constructed, and \textbf{the clean-stratum
+inversion confirmed in \S\ref{sec:phase4} cannot be tested on either}.
+What remains testable is the \texttt{has\_error}=1 stratum, which is the
+cross-family-confirmed result. ErrorRadar was excluded on a second ground:
+its images are the \emph{problem figures} and the student work is a text
+field, so there is no handwriting to grade.
+
+Because every item contains an error, the model's standing ``there is an
+error'' bias scores well by construction, so grading accuracy is not the
+quantity of interest. The pre-registered gate was set on the
+\emph{misgrade rate} --- the minority class the AUROC needs --- at 5\%,
+before the run.
+
+\subsection{Result: gated, and not merely underpowered}
+\label{sec:phase7-gate}
+
+\begin{center}
+\begin{tabular}{lc}
+\toprule
+Grading accuracy & 96.0\% \emph{(by construction)} \\
+Says-error rate & 90.0\% \\
+Parse failures & 0.0\% \\
+Items at zero entropy & 70/100 \\
+\textbf{Misgraded} & \textbf{4/100 = 4.0\%} \quad(bar: $\geq$5\%) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The misgrade rate falls under the bar, so the stratum cannot be powered
+without roughly 750 items. But the decisive evidence is qualitative, and
+quantified over all 500 samples rather than read off a few: \textbf{in
+24\% of samples (120/500) the model explicitly states it cannot read or
+use the image} --- ``the image does not contain any handwritten work'',
+``impossible to determine'' --- \textbf{and in 82\% of those (98/120) it
+answers \texttt{Error: 1} regardless}. On an all-error dataset that scores
+as correct. A large share of the 96\% is therefore the response bias
+firing through explicit non-engagement, not grading competence.
+
+\textbf{This is why the verdict is ``not comparable'' rather than
+``underpowered''.} Non-engagement is concentrated on the misgraded items
+(0.40 of samples versus 0.23 on correctly-graded ones), so a powered run
+would substantially be measuring whether the model can read the
+scratchwork --- a different construct from the FERMAT result, and one that
+would not be comparable to it even if it cleared the bar. Combined with
+70/100 items at exactly zero entropy, there is nothing left for a ranking
+metric to order. Decision: no further ScratchMath GPU work.
+
+Two things did replicate qualitatively. Among the four misgrades, two are
+instances of the mechanism documented in \S\ref{sec:phase4-inspection}:
+the model verified the student's \emph{own} incorrect computation rather
+than recomputing it (accepting $522 \times 5$ where the problem required
+$522 \times 3 \times 5$, and $50 - 12$ where it required $50 - 28$). The
+failure mode travels across datasets even where the metric cannot.
+
 \section{Integrity Checks}
 
 Both entropy signals depend on the sampling and parsing pipeline actually
@@ -1612,6 +1687,7 @@ Perception (InternVL3) & \failed{Not real} & 0.915 $\to$ 0.556 & Fails sensitivi
 \quad \texttt{has\_error}=1 stratum (InternVL3) & \unresolved{Below bar} & 0.628 $[0.548, 0.706]$ & Powered, resolved, not confirmed -- \S\ref{sec:phase6-reasoning} \\
 \quad prompt/$K$ screen (InternVL3) & \failed{None fix it} & -- & 3 tried, no paired diff resolves -- \S\ref{sec:phase6-screen} \\
 \quad Clean stratum (InternVL3) & \worked{Inverted} & 0.369 $[0.290, 0.454]$ & Powered, $n_{\text{wrong}}=97$ -- \S\ref{sec:phase6-reasoning} \\
+Second dataset (ScratchMath) & \failed{Gated} & -- & Not comparable; 82\% of non-engagement says ``error'' -- \S\ref{sec:phase7-gate} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1773,6 +1849,15 @@ standing rests on its own CI excluding chance and surviving
     models. It explains why this specific model cannot be used to test
     perception entropy; it is not a general theory of when a VLM will or
     will not clear the gate.
+  \item \textbf{The single-dataset limitation is not resolved, and the
+    attempt to resolve it found a structural obstacle.} The two viable
+    public benchmarks of handwritten student errors both consist entirely
+    of error-containing items (\S\ref{sec:phase7}), so neither can support
+    the balanced design this report's central pooled-versus-stratified
+    argument depends on. On the one that was runnable, the model answered
+    ``error'' even when stating it could not read the image, making the
+    result a statement about response bias rather than about grading.
+    Every quantitative claim here therefore still rests on FERMAT alone.
   \item \textbf{A pre-registered bar can be honoured exactly and still be
     the wrong bar.} \S\ref{sec:phase6-screen}'s screen was registered
     before the run and reported as written -- and one variant ``passed''

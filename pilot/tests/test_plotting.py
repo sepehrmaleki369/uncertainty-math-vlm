@@ -915,3 +915,84 @@ def test_capability_check_uses_the_passed_baseline_not_a_hardcoded_half():
     majority_class_baseline, not an assumed 0.5."""
     out = classify_capability_check(accuracy=0.60, baseline_accuracy=0.55, n_items=300)
     assert out["margin_over_baseline"] == pytest.approx(0.05)
+
+
+# --- classify_stratum_result ----------------------------------------------
+
+def _stratum_ci(auroc, lo, hi, n_error, n_items=150):
+    return {
+        "auroc": auroc, "ci_low": lo, "ci_high": hi,
+        "n_items": n_items, "n_error": n_error, "n_correct": n_items - n_error,
+        # Mirrors bootstrap_auroc_ci's ONE-SIDED definition exactly.
+        "excludes_chance": lo > 0.5,
+    }
+
+
+def test_classify_stratum_absent_is_not_measured_not_underpowered():
+    """A stratum that does not exist (ScratchMath has zero clean items) is a
+    different statement from one with too few, and must not collapse into it."""
+    from pilot.plotting import classify_stratum_result
+
+    assert classify_stratum_result(None) == "not_measured"
+    assert classify_stratum_result({"n_items": 0}) == "not_measured"
+
+
+def test_classify_stratum_underpowered_beats_a_high_point_estimate():
+    """ScratchMath's error stratum reads 0.852 on 4 misgraded items. The
+    power bar has to win, or that number gets quoted."""
+    from pilot.plotting import classify_stratum_result
+
+    assert classify_stratum_result(_stratum_ci(0.852, 0.766, 0.943, n_error=4)) == \
+        "inconclusive_underpowered"
+
+
+def test_classify_stratum_inverted_is_not_reported_as_no_signal():
+    """Regression for a real bug (2026-08-08). bootstrap_auroc_ci defines
+    excludes_chance as `ci_low > 0.5`, a one-sided above-chance test, so a
+    resolvably INVERTED stratum carries excludes_chance=False. An earlier
+    ordering checked that gate first and sent Qwen-7B's CONFIRMED clean-stratum
+    inversion -- 0.280 [0.200, 0.366], n_wrong=106 -- to "no_signal",
+    mislabelling a confirmed finding as an absence of one. Caught by the
+    snapshot of that run disagreeing with the report."""
+    from pilot.plotting import classify_stratum_result
+
+    qwen7b_clean = _stratum_ci(0.280, 0.200, 0.366, n_error=106)
+    assert qwen7b_clean["excludes_chance"] is False  # the trap
+    assert classify_stratum_result(qwen7b_clean) == "confirmed_inverted"
+
+    internvl3_clean = _stratum_ci(0.369, 0.290, 0.454, n_error=97)
+    assert classify_stratum_result(internvl3_clean) == "confirmed_inverted"
+
+
+def test_classify_stratum_confirmed_and_below_threshold_are_distinguished():
+    """The distinction that did not exist before InternVL3: powered and
+    resolved above chance, but short of the 0.70 confirmation bar."""
+    from pilot.plotting import classify_stratum_result
+
+    # Qwen-7B matched n=648, and Qwen-3B n=650 -- both confirmed.
+    assert classify_stratum_result(_stratum_ci(0.801, 0.751, 0.846, 73, 648)) == "confirmed"
+    assert classify_stratum_result(_stratum_ci(0.854, 0.796, 0.902, 42, 650)) == "confirmed"
+    # LLaVA-NeXT n=400 -- confirmed, first cross-family replication.
+    assert classify_stratum_result(_stratum_ci(0.775, 0.694, 0.848, 34, 400)) == "confirmed"
+    # InternVL3 -- powered, excludes chance, does NOT clear 0.70.
+    assert classify_stratum_result(_stratum_ci(0.628, 0.548, 0.706, 45)) == \
+        "resolved_below_threshold"
+
+
+def test_classify_stratum_no_signal_when_ci_spans_chance():
+    from pilot.plotting import classify_stratum_result
+
+    assert classify_stratum_result(_stratum_ci(0.522, 0.462, 0.582, 100, 300)) == "no_signal"
+
+
+def test_classify_stratum_threshold_boundary_is_exact():
+    """Lock the cutoff so a future edit cannot quietly move it."""
+    from pilot.plotting import classify_stratum_result
+
+    assert classify_stratum_result(_stratum_ci(0.700, 0.651, 0.780, 40)) == "confirmed"
+    assert classify_stratum_result(_stratum_ci(0.699, 0.651, 0.780, 40)) == \
+        "resolved_below_threshold"
+    # Minority exactly at the registered minimum passes; one below does not.
+    assert classify_stratum_result(_stratum_ci(0.80, 0.72, 0.88, 30)) == "confirmed"
+    assert classify_stratum_result(_stratum_ci(0.80, 0.72, 0.88, 29)) == \
+        "inconclusive_underpowered"

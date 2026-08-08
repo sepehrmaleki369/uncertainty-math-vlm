@@ -1,0 +1,47 @@
+{
+  "run_label": "qwen3b_fermat_n300_20260802",
+  "category": "low_entropy_correct",
+  "arm": "transcription",
+  "note": "The signal working as intended. All five transcriptions agree on the same final answer and the majority matches ground truth, so entropy is 0 and the item is correct. This is the contrast case the failures below are read against.",
+  "model_id": "Qwen/Qwen2.5-VL-3B-Instruct",
+  "ground_truth": {
+    "question": "The least perfect square, which is divisible by each of 21, 36 and 66 is:  \n\\begin{enumerate}\n    \\item[A)] 213444\n    \\item[B)] 214344\n    \\item[C)] 214434\n    \\item[D)] 231444\n\\end{enumerate}\n\n",
+    "reference_answer": " Option A  \nL.C.M. of 21, 36, 66 = 2772.  \nNow, \\( 2772 = 2 \\times 2 \\times 3 \\times 3 \\times 7 \\times 11 \\)  \nTo make it a perfect square, it must be multiplied by \\( 7 \\times 11 \\).  \nSo, required number = \\( 2^2 \\times 3^2 \\times 7^2 \\times 11^2 = \\textcolor{red}{231444} \\)\n\n",
+    "student_answer": null,
+    "has_error": 1
+  },
+  "model_output": {
+    "k": 5,
+    "samples_raw": [
+      "**Question:** The least perfect square, which is divisible by each of 21, 36 and 66 is :\n\n**Answer:** Option A L.C.M. of 21, 36, 66\n\nNow, 2772 = 2 × 2 × 3 × 3 × 7 × 11\n\nTo make it a perfect square, it must be multiplied by 7 × 11.\n\nSo, required number = 2^2 × 3^2 × 7^2 × 11^2 = 231444",
+      "**Question:**\nThe least perfect square,\nwhich is divisible by each of 21,\n36, and 66 is :\n\n**(A) 213444**\n\n**(B) 214349**\n\n**(C) 214434**\n\n**(D) 231444**\n\n**Answer:**\nOption A L.C.M. of 21, 36, 66\n= 2 x 3 x 7 = 42.\nNow, 42 x 2 x 3 x 3 x 7 x 11\nTo make it a perfect square, it must be multiplied by 7 x 11. So, required number = 2^2 x 3^2 x 7^2 x 11^2 = 231444",
+      "**Question:**\nThe least perfect square, which is divisible by each of 21, 36 and 66, is :\n\nA) 213444\n\nB) 214349\n\nC) 214434\n\nD) 231444\n\n**Answer:**\nOption A L.C.M. of 21, 36, 66 = 2 x 2 x 3 x 3 x 7 x 11 To make it a perfect square, it must be multiplied by 7 x 11 . So, required number = 2² x 3² x 7² x 11² = 231444",
+      "**Question:**\nThe least perfect square, which is divisible by each of 21, 36, and 66, is: \n\nA) 213444\n\nB) 214349\n\nC) 214434\n\nD) 231444\n\n**Answer:**\nOption A L.C.M. of 21, 36, 86 = 2x7x2. Now, 2772 = 2x2x3x3x7x11 To make it a perfect square, it must be multiplied by 7x11 So, required number = 2^2 x 3^2 x 7^2 x 11^2 = 231444",
+      "**Question:** The least perfect square, which is divisible by each of 21, 36, and 66, is:\n\nA) 213444\n\nB) 214349\n\nC) 214434\n\nD) 231444\n\n**Answer:** Option A L.C.M. of 21, 36, 66 = 2x3x2x3x7x11 To make it a perfect square, it must be multiplied by 7x11 So, required number = 2^2 x 3^2 x 7^2 x 11^2 = 231444"
+    ],
+    "parsed": [
+      "Option A L.C.M. of 21, 36, 66\n\nNow, 2772 = 2 × 2 × 3 × 3 × 7 × 11\n\nTo make it a perfect square, it must be multiplied by 7 × 11.\n\nSo, required number = 2^2 × 3^2 × 7^2 × 11^2 = 231444",
+      "Option A L.C.M. of 21, 36, 66\n= 2 x 3 x 7 = 42.\nNow, 42 x 2 x 3 x 3 x 7 x 11\nTo make it a perfect square, it must be multiplied by 7 x 11. So, required number = 2^2 x 3^2 x 7^2 x 11^2 = 231444",
+      "Option A L.C.M. of 21, 36, 66 = 2 x 2 x 3 x 3 x 7 x 11 To make it a perfect square, it must be multiplied by 7 x 11 . So, required number = 2² x 3² x 7² x 11² = 231444",
+      "Option A L.C.M. of 21, 36, 86 = 2x7x2. Now, 2772 = 2x2x3x3x7x11 To make it a perfect square, it must be multiplied by 7x11 So, required number = 2^2 x 3^2 x 7^2 x 11^2 = 231444",
+      "Option A L.C.M. of 21, 36, 66 = 2x3x2x3x7x11 To make it a perfect square, it must be multiplied by 7x11 So, required number = 2^2 x 3^2 x 7^2 x 11^2 = 231444"
+    ],
+    "cluster_labels": [
+      "text:option a",
+      "text:option a",
+      "text:option a",
+      "text:option a",
+      "text:option a"
+    ],
+    "n_parse_failures": 0
+  },
+  "derived": {
+    "entropy": 0.0,
+    "max_possible_entropy": 1.6094379124341003,
+    "at_max_entropy": false,
+    "majority_label": "text:option a",
+    "majority_count": 5,
+    "n_distinct_labels": 1,
+    "correct": true
+  }
+}

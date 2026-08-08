@@ -1,0 +1,47 @@
+{
+  "run_label": "qwen3b_fermat_n300_20260802",
+  "category": "low_entropy_wrong",
+  "arm": "transcription",
+  "note": "The dangerous quadrant, and the bound on what entropy can do: the model is unanimous and unanimously wrong, so there is no disagreement to detect. Any deferral system built on sampling entropy is blind to exactly these.",
+  "model_id": "Qwen/Qwen2.5-VL-3B-Instruct",
+  "ground_truth": {
+    "question": "Line through the points \\((-2, 6)\\) and \\((4, 8)\\) is perpendicular to the line through the points \\((8, 12)\\) and \\((x, 24)\\). Find the value of \\(x\\).\n\n",
+    "reference_answer": " \n\nSlope of the line through the points \\((-2, 6)\\) and \\((4, 8)\\) is \n\\[\nm_1 = \\frac{8 - 6}{4 - (-2)} = \\frac{2}{6} = \\frac{1}{3}\n\\]\n\nSlope of the line through the points \\((8, 12)\\) and \\((x, 24)\\) is \n\\[\nm_2 = \\frac{24 - 12}{x - 8} = \\frac{12}{x - 8}\n\\]\n\nSince two lines are perpendicular, \n\\[\nm_1 m_2 = -1,\n\\]\nwhich gives\n\\[\n\\frac{1}{3} \\times \\frac{12}{x - 8} = -1 \\quad \\textcolor{red}{\\text{Assuming } x > 0} \\quad \\textcolor{red}{\\text{or} \\quad x = 4}.\n\\]\n\n",
+    "student_answer": null,
+    "has_error": 1
+  },
+  "model_output": {
+    "k": 5,
+    "samples_raw": [
+      "**Question:**\nLine through the points (-2,6) and (4,8) is perpendicular to the line through the points (8,12) and (x,24). Find the value of x.\n\n**Answer:**\n\nSlope of the line through the points (-2,6) and (4,8) is\n\n\\[\nm_{1} = \\frac{8 - 6}{4 - (-2)} = \\frac{2}{6} = \\frac{1}{3}\n\\]\n\nSlope of the line through the points (8,12) and (x,24) is\n\n\\[\nm_{2} = \\frac{24 - 12}{x - 8} = \\frac{12}{x - 8}\n\\]\n\nSince two lines are perpendicular,\n\n\\[\nm_{1} m_{2} = -1,\n\\]\n\nwhich gives\n\n\\[\n\\frac{1}{3} \\times \\frac{12}{x - 8} = -1.\n\\] Assuming \\( x > 0 \\) or \\( x = 4 \\).",
+      "**Question:**\nLine through the points (-2,6) and (4,8) is perpendicular to the line through the points (8,12) and (x,24). Find the value of x.\n\n**Answer:**\nSlope of the line through the points (-2,6) and (4,8) is\n\\[\nm_1 = \\frac{8 - 6}{4 - (-2)} = \\frac{2}{6} = \\frac{1}{3}\n\\]\n\nSlope of the line through the points (8,12) and (x,24) is\n\\[\nm_2 = \\frac{24 - 12}{x - 8} = \\frac{12}{x - 8}\n\\]\n\nSince two lines are perpendicular,\n\\[\nm_1 m_2 = -1,\n\\]\n\nwhich gives\n\\[\n\\frac{1}{3} \\times \\frac{12}{x - 8} = -1.\n\\] Assuming \\( x > 0 \\) or \\( x = 4 \\).",
+      "**Question:**\nLine through the points $(-2, 6)$ and $(4, 8)$ is perpendicular to the line through the points $(8, 12)$ and $(x, 24)$. Find the value of $x$.\n\n**Answer:**\n\nSlope of the line through the points $(-2, 6)$ and $(4, 8)$ is\n\n$m_{1} = \\frac{8 - 6}{4 - (-2)} = \\frac{2}{6} = \\frac{1}{3}$\n\nSlope of the line through the points $(8, 12)$ and $(x, 24)$ is\n\n$m_{2} = \\frac{24 - 12}{x - 8} = \\frac{12}{x - 8}$\n\nSince two lines are perpendicular,\n\n$m_{1}m_{2} = -1,$\n\nwhich gives\n\n$\\frac{1}{3} \\times \\frac{12}{x - 8} = -1.$ Assuming $x > 0$ or $x = 4.$",
+      "**Question:**\nLine through the points $(-2,6)$ and $(4,8)$ is perpendicular to the line through the points $(8,12)$ and $(x,24)$. Find the value of $x$.\n\n**Answer:**\n\nSlope of the line through the points $(-2,6)$ and $(4,8)$ is\n\\[ m_{1} = \\frac{8-6}{4-(-2)} = \\frac{2}{6} = \\frac{1}{3} \\]\n\nSlope of the line through the points $(8,12)$ and $(x,24)$ is\n\\[ m_{2} = \\frac{24-12}{x-8} = \\frac{12}{x-8} \\]\n\nSince two lines are perpendicular,\n\\[ m_{1}m_{2} = -1 \\]\n\nwhich gives\n\\[ \\frac{1}{3} \\times \\frac{12}{x-8} = -1 \\]\nAssuming $x > 0$ or $x = 4$",
+      "**Question:**\nLine through the points \\((-2, 6)\\) and \\((4, 8)\\) is perpendicular to the line through the points \\((8, 12)\\) and \\((x, 24)\\). Find the value of \\(x\\).\n\n**Answer:**\nSlope of the line through the points \\((-2, 6)\\) and \\((4, 8)\\) is\n\\[ m_1 = \\frac{8 - 6}{4 - (-2)} = \\frac{2}{6} = \\frac{1}{3} \\]\n\nSlope of the line through the points \\((8, 12)\\) and \\((x, 24)\\) is\n\\[ m_2 = \\frac{24 - 12}{x - 8} = \\frac{12}{x - 8} \\]\n\nSince two lines are perpendicular,\n\\[ m_1 m_2 = -1 \\]\n\nwhich gives\n\\[ \\frac{1}{3} \\times \\frac{12}{x - 8} = -1 \\]\nAssuming \\( x > 0 \\) or \\( x = 4 \\)"
+    ],
+    "parsed": [
+      "Slope of the line through the points (-2,6) and (4,8) is\n\n\\[\nm_{1} = \\frac{8 - 6}{4 - (-2)} = \\frac{2}{6} = \\frac{1}{3}\n\\]\n\nSlope of the line through the points (8,12) and (x,24) is\n\n\\[\nm_{2} = \\frac{24 - 12}{x - 8} = \\frac{12}{x - 8}\n\\]\n\nSince two lines are perpendicular,\n\n\\[\nm_{1} m_{2} = -1,\n\\]\n\nwhich gives\n\n\\[\n\\frac{1}{3} \\times \\frac{12}{x - 8} = -1.\n\\] Assuming \\( x > 0 \\) or \\( x = 4 \\).",
+      "Slope of the line through the points (-2,6) and (4,8) is\n\\[\nm_1 = \\frac{8 - 6}{4 - (-2)} = \\frac{2}{6} = \\frac{1}{3}\n\\]\n\nSlope of the line through the points (8,12) and (x,24) is\n\\[\nm_2 = \\frac{24 - 12}{x - 8} = \\frac{12}{x - 8}\n\\]\n\nSince two lines are perpendicular,\n\\[\nm_1 m_2 = -1,\n\\]\n\nwhich gives\n\\[\n\\frac{1}{3} \\times \\frac{12}{x - 8} = -1.\n\\] Assuming \\( x > 0 \\) or \\( x = 4 \\).",
+      "Slope of the line through the points $(-2, 6)$ and $(4, 8)$ is\n\n$m_{1} = \\frac{8 - 6}{4 - (-2)} = \\frac{2}{6} = \\frac{1}{3}$\n\nSlope of the line through the points $(8, 12)$ and $(x, 24)$ is\n\n$m_{2} = \\frac{24 - 12}{x - 8} = \\frac{12}{x - 8}$\n\nSince two lines are perpendicular,\n\n$m_{1}m_{2} = -1,$\n\nwhich gives\n\n$\\frac{1}{3} \\times \\frac{12}{x - 8} = -1.$ Assuming $x > 0$ or $x = 4.$",
+      "Slope of the line through the points $(-2,6)$ and $(4,8)$ is\n\\[ m_{1} = \\frac{8-6}{4-(-2)} = \\frac{2}{6} = \\frac{1}{3} \\]\n\nSlope of the line through the points $(8,12)$ and $(x,24)$ is\n\\[ m_{2} = \\frac{24-12}{x-8} = \\frac{12}{x-8} \\]\n\nSince two lines are perpendicular,\n\\[ m_{1}m_{2} = -1 \\]\n\nwhich gives\n\\[ \\frac{1}{3} \\times \\frac{12}{x-8} = -1 \\]\nAssuming $x > 0$ or $x = 4$",
+      "Slope of the line through the points \\((-2, 6)\\) and \\((4, 8)\\) is\n\\[ m_1 = \\frac{8 - 6}{4 - (-2)} = \\frac{2}{6} = \\frac{1}{3} \\]\n\nSlope of the line through the points \\((8, 12)\\) and \\((x, 24)\\) is\n\\[ m_2 = \\frac{24 - 12}{x - 8} = \\frac{12}{x - 8} \\]\n\nSince two lines are perpendicular,\n\\[ m_1 m_2 = -1 \\]\n\nwhich gives\n\\[ \\frac{1}{3} \\times \\frac{12}{x - 8} = -1 \\]\nAssuming \\( x > 0 \\) or \\( x = 4 \\)"
+    ],
+    "cluster_labels": [
+      "sympy:eq(x, 4)",
+      "sympy:eq(x, 4)",
+      "sympy:eq(x, 4)",
+      "sympy:eq(x, 4)",
+      "sympy:eq(x, 4)"
+    ],
+    "n_parse_failures": 0
+  },
+  "derived": {
+    "entropy": 0.0,
+    "max_possible_entropy": 1.6094379124341003,
+    "at_max_entropy": false,
+    "majority_label": "sympy:eq(x, 4)",
+    "majority_count": 5,
+    "n_distinct_labels": 1,
+    "correct": false
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "label": "Qwen2.5-VL-7B matched to 3B's items (n=648) -- CONFIRMED 0.801",
+  "arm": "grading_only",
+  "n_items": 798,
+  "model_id": "Qwen/Qwen2.5-VL-7B-Instruct",
+  "quantized": false,
+  "k_grading": 5,
+  "composition": {
+    "n_has_error": 648,
+    "n_clean": 150,
+    "frac_has_error": 0.8120300751879699,
+    "is_balanced": false
+  },
+  "grading": {
+    "accuracy": 0.7756892230576441,
+    "baseline_accuracy": 0.8120300751879699,
+    "accuracy_on_error_items": 0.8873456790123457,
+    "accuracy_on_clean_items": 0.29333333333333333
+  },
+  "reasoning": {
+    "pooled": {
+      "auroc": 0.6409599191343038,
+      "ci_low": 0.5971041820801388,
+      "ci_high": 0.6840646215692842,
+      "n_items": 798,
+      "n_error": 179,
+      "excludes_chance": true
+    },
+    "pooled_is_misleading_unless_balanced": true,
+    "error_stratum": {
+      "auroc": 0.8007504466944609,
+      "ci_low": 0.7508830671562111,
+      "ci_high": 0.8462676721104682,
+      "n_items": 648,
+      "n_error": 73,
+      "excludes_chance": true
+    },
+    "error_stratum_verdict": "confirmed",
+    "clean_stratum": {
+      "auroc": 0.2800171526586621,
+      "ci_low": 0.20036516879351876,
+      "ci_high": 0.3657427434159545,
+      "n_items": 150,
+      "n_error": 106,
+      "excludes_chance": false
+    },
+    "clean_stratum_verdict": "confirmed_inverted"
+  },
+  "entropy_distribution": {
+    "n_distinct_values": 4,
+    "counts": {
+      "0.0": 378,
+      "0.5": 226,
+      "0.673": 193,
+      "0.95": 1
+    },
+    "largest_single_value_share": 0.47368421052631576,
+    "is_degenerate": false
+  },
+  "integrity": {
+    "grading_parse_failure_rate": 0.0005012531328320802
+  }
+}

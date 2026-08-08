@@ -1,0 +1,64 @@
+{
+  "label": "Qwen2.5-VL-3B, has_error=1 stratum powered to n=650 -- CONFIRMED 0.854",
+  "arm": "grading_only",
+  "n_items": 800,
+  "model_id": "Qwen/Qwen2.5-VL-3B-Instruct",
+  "quantized": null,
+  "k_grading": 5,
+  "composition": {
+    "n_has_error": 650,
+    "n_clean": 150,
+    "frac_has_error": 0.8125,
+    "is_balanced": false
+  },
+  "grading": {
+    "accuracy": 0.77625,
+    "baseline_accuracy": 0.8125,
+    "accuracy_on_error_items": 0.9353846153846154,
+    "accuracy_on_clean_items": 0.08666666666666667
+  },
+  "reasoning": {
+    "pooled": {
+      "auroc": 0.6099461132252,
+      "ci_low": 0.5648924266781528,
+      "ci_high": 0.6555517028820129,
+      "n_items": 800,
+      "n_error": 179,
+      "excludes_chance": true
+    },
+    "pooled_is_misleading_unless_balanced": true,
+    "error_stratum": {
+      "auroc": 0.8540296052631579,
+      "ci_low": 0.7955254691385489,
+      "ci_high": 0.902066767988596,
+      "n_items": 650,
+      "n_error": 42,
+      "excludes_chance": true
+    },
+    "error_stratum_verdict": "confirmed",
+    "clean_stratum": {
+      "auroc": 0.23919146546883774,
+      "ci_low": 0.1276595744680851,
+      "ci_high": 0.37395198537430235,
+      "n_items": 150,
+      "n_error": 137,
+      "excludes_chance": false
+    },
+    "clean_stratum_verdict": "inconclusive_underpowered"
+  },
+  "entropy_distribution": {
+    "n_distinct_values": 5,
+    "counts": {
+      "0.0": 363,
+      "0.5": 284,
+      "0.673": 143,
+      "0.95": 7,
+      "1.055": 3
+    },
+    "largest_single_value_share": 0.45375,
+    "is_degenerate": false
+  },
+  "integrity": {
+    "grading_parse_failure_rate": 0.008
+  }
+}

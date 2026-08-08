@@ -584,6 +584,73 @@ rows, Drive-only). Locked in `pilot/tests/test_internvl3_fermat.py`
   and refuses to run on a mismatch). The 4-bit one is the more dangerous:
   it would have produced normal-looking, uninterpretable numbers.
 
+### RUN 2026-08-08: second dataset (ScratchMath) — GATED, not comparable
+
+`pilot/14_scratchmath_qwen7b.ipynb`, Qwen2.5-VL-7B held fixed so only the
+dataset varies. `results/scratchmath_sizing_n100_qwen25-vl-7b-instruct_20260808T121016Z.csv`
+(100 rows, Drive-only). Locked in `pilot/tests/test_scratchmath_gate.py`.
+Verified: 0/100 mismatches recomputing from raw samples, bf16, 0% parse
+failures.
+
+- **Scouting finding worth keeping: both viable public benchmarks of
+  handwritten student errors are 100% error items.** Checked against real
+  data, not their papers — ErrorRadar 0/2500 rows without an error;
+  ScratchMath `student_answer` never equals `answer` (0/1479). So neither
+  supports a balanced sample, and **the confirmed clean-stratum inversion
+  cannot be tested on either.** ErrorRadar also excluded because its
+  images are the *problem figures* (student work is a text field) — no
+  handwriting to grade.
+- **GATED: misgrade rate 4.0% (4/100), under the pre-registered 5% bar.**
+  Accuracy 96% is meaningless here — all items are errors and the model
+  says "error" 90% of the time.
+- **The decisive evidence is qualitative, quantified over all 500 samples:
+  24% (120/500) explicitly state the model cannot read/use the image, and
+  82% of those (98/120) emit `Error: 1` anyway** — which scores as correct
+  on an all-error set. Much of the 96% is response bias firing through
+  explicit non-engagement.
+- **Why "not comparable" rather than "underpowered":** non-engagement is
+  concentrated on misgraded items (0.40 vs 0.23), so a powered run (~750
+  items) would substantially measure scratchwork legibility, not
+  uncertainty about the mathematics — a different construct from the
+  FERMAT result. Plus 70/100 items sit at exactly zero entropy.
+- **Decision (user): stop. 0.628/FERMAT-only stands; move to writing.**
+- Qualitative replication that did survive: 2 of the 4 misgrades are the
+  documented "verify the student's own computation instead of recomputing"
+  mechanism (accepting 522x5 where the problem needed 522x3x5; 50-12 where
+  it needed 50-28). The failure mode travels even where the metric cannot.
+- Locked in `report/report.tex` §Phase 7 + Summary/Limitations.
+
+### Frozen artifacts: `reference/` (2026-08-08)
+
+Two kinds, for two failure modes. **Read `reference/README.md` first.**
+
+- **Metrics snapshots** (`reference/*.json`) — one per claim-bearing run,
+  recomputed from raw columns via `pilot.snapshot`. `snapshot_metrics` for
+  full perception+reasoning runs; **`snapshot_grading_metrics` (new) for
+  grading-only runs**, which also handles the all-error case (clean stratum
+  → `not_measured`, distinct from `inconclusive_underpowered`), flags a
+  pooled AUROC on an unbalanced sample, and records whether the entropy
+  distribution is degenerate.
+- **Case snapshots** (`reference/cases/<id>/`) — the *evidence*: ground
+  truth, every raw sample verbatim, parsed values, entropy/correctness, a
+  `category` recording why the case was selected (selection is by rank, not
+  by hand), and a human-written `note`. Seven cases covering the four
+  entropy×correctness quadrants plus InternVL3 degeneration, ScratchMath
+  non-engagement, and confidently-wrong grading.
+- **Only claim-bearing runs get snapshotted** — not debug/smoke/interrupted
+  runs. If a number appears in the report, it gets frozen.
+- **Images need auth** (FERMAT is gated): text bundles build offline,
+  `pilot/15_attach_case_images.ipynb` attaches FERMAT images in Colab
+  (idempotent). ScratchMath is ungated and already attached. A bundle
+  without an image is a normal state, never an error.
+- **Real bug caught while building this:** `classify_stratum_result`
+  initially checked `excludes_chance` before the inversion case. That field
+  is defined as `ci_low > 0.5` — **one-sided** — so a resolvably *inverted*
+  stratum reports `excludes_chance=False`, and Qwen-7B's CONFIRMED clean
+  inversion (0.280 [0.200, 0.366]) was being labelled `no_signal`. Caught
+  because the snapshot disagreed with the report. Regression test in
+  `test_plotting.py`.
+
 ## Repo-specific conventions
 
 - **Don't touch `report/` unless explicitly asked.** As of 2026-08-02 the user

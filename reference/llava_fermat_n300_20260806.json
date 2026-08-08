@@ -1,0 +1,157 @@
+{
+  "label": "LLaVA-NeXT-7B, FERMAT n=300 -- perception capability-gated (0.8% free-response OCR)",
+  "n_items": 300,
+  "model_id": "llava-hf/llava-v1.6-mistral-7b-hf",
+  "k_transcription": 5,
+  "k_grading": 5,
+  "frac_has_error": 0.5,
+  "latex_parser_available": true,
+  "sympy_version": "1.14.0",
+  "perception": {
+    "auroc": 0.710385643375334,
+    "ci_low": 0.5250809857559814,
+    "ci_high": 0.8863545553849786,
+    "n_items": 300,
+    "n_error": 291,
+    "excludes_chance": true,
+    "accuracy": 0.03,
+    "aurc": 0.9641205128205128,
+    "aurc_baseline": 0.97,
+    "sensitivity": {
+      "full": {
+        "auroc": 0.710385643375334,
+        "ci_low": 0.5250809857559814,
+        "ci_high": 0.8863545553849786,
+        "n_items": 300
+      },
+      "excl_parse_failures": {
+        "auroc": 0.7145365168539326,
+        "ci_low": 0.519311797752809,
+        "ci_high": 0.9023865592947298,
+        "n_items": 186
+      },
+      "excl_max_entropy": {
+        "auroc": 0.5977272727272728,
+        "ci_low": 0.3488372093023256,
+        "ci_high": 0.925531914893617,
+        "n_items": 49
+      },
+      "excl_both": {
+        "auroc": 0.6583333333333333,
+        "ci_low": 0.3235294117647059,
+        "ci_high": 1.0,
+        "n_items": 19
+      }
+    },
+    "robust": false
+  },
+  "reasoning": {
+    "auroc": 0.5097333333333334,
+    "ci_low": 0.44735650617019973,
+    "ci_high": 0.5710292577725735,
+    "n_items": 300,
+    "n_error": 150,
+    "excludes_chance": false,
+    "aurc": 0.4854008073817763,
+    "aurc_baseline": 0.5,
+    "error_stratum": {
+      "auroc": 0.7660189075630253,
+      "ci_low": 0.6283185817805382,
+      "ci_high": 0.8827965988073337,
+      "n_items": 150,
+      "n_error": 14,
+      "excludes_chance": true
+    },
+    "clean_stratum": {
+      "auroc": 0.28282563025210083,
+      "ci_low": 0.17783763268013883,
+      "ci_high": 0.3980976507778514,
+      "n_items": 150,
+      "n_error": 136,
+      "excludes_chance": false
+    }
+  },
+  "grading": {
+    "accuracy": 0.5,
+    "accuracy_on_error_items": 0.9066666666666666,
+    "accuracy_on_clean_items": 0.09333333333333334,
+    "baseline_accuracy": 0.5
+  },
+  "abstention": {
+    "n_flagged": 251,
+    "n_flagged_wrong": 247,
+    "precision": 0.9840637450199203,
+    "recall": 0.8487972508591065
+  },
+  "risk_coverage": [
+    {
+      "threshold": 0.950271,
+      "coverage": 0.04,
+      "n_kept": 12,
+      "n_deferred": 288,
+      "accuracy_kept": 0.16666666666666663,
+      "risk_kept": 0.8333333333333334,
+      "n_errors_kept": 10
+    },
+    {
+      "threshold": 1.05492,
+      "coverage": 0.04,
+      "n_kept": 12,
+      "n_deferred": 288,
+      "accuracy_kept": 0.16666666666666663,
+      "risk_kept": 0.8333333333333334,
+      "n_errors_kept": 10
+    },
+    {
+      "threshold": 1.332179,
+      "coverage": 0.043333333333333335,
+      "n_kept": 13,
+      "n_deferred": 287,
+      "accuracy_kept": 0.15384615384615385,
+      "risk_kept": 0.8461538461538461,
+      "n_errors_kept": 11
+    },
+    {
+      "threshold": 1.609438,
+      "coverage": 1.0,
+      "n_kept": 300,
+      "n_deferred": 0,
+      "accuracy_kept": 0.030000000000000027,
+      "risk_kept": 0.97,
+      "n_errors_kept": 291
+    }
+  ],
+  "conformal": {
+    "target_0.30": {
+      "target_risk": 0.3,
+      "n_splits": 1000,
+      "n_valid": 0,
+      "n_unachievable": 1000,
+      "mean_coverage": NaN,
+      "mean_test_risk": NaN,
+      "violation_rate": NaN
+    },
+    "target_0.40": {
+      "target_risk": 0.4,
+      "n_splits": 1000,
+      "n_valid": 0,
+      "n_unachievable": 1000,
+      "mean_coverage": NaN,
+      "mean_test_risk": NaN,
+      "violation_rate": NaN
+    },
+    "target_0.50": {
+      "target_risk": 0.5,
+      "n_splits": 1000,
+      "n_valid": 0,
+      "n_unachievable": 1000,
+      "mean_coverage": NaN,
+      "mean_test_risk": NaN,
+      "violation_rate": NaN
+    }
+  },
+  "integrity": {
+    "transcription_parse_failure_rate": 0.096,
+    "grading_parse_failure_rate": 0.056
+  }
+}

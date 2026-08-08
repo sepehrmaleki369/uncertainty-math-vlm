@@ -1,0 +1,64 @@
+{
+  "label": "LLaVA-NeXT-7B, has_error=1 powered to n=400 -- CONFIRMED 0.775, first cross-family replication",
+  "arm": "grading_only",
+  "n_items": 550,
+  "model_id": "llava-hf/llava-v1.6-mistral-7b-hf",
+  "quantized": false,
+  "k_grading": 5,
+  "composition": {
+    "n_has_error": 400,
+    "n_clean": 150,
+    "frac_has_error": 0.7272727272727273,
+    "is_balanced": false
+  },
+  "grading": {
+    "accuracy": 0.6909090909090909,
+    "baseline_accuracy": 0.7272727272727273,
+    "accuracy_on_error_items": 0.915,
+    "accuracy_on_clean_items": 0.09333333333333334
+  },
+  "reasoning": {
+    "pooled": {
+      "auroc": 0.5418343653250774,
+      "ci_low": 0.4918580438925217,
+      "ci_high": 0.5920274942084942,
+      "n_items": 550,
+      "n_error": 170,
+      "excludes_chance": false
+    },
+    "pooled_is_misleading_unless_balanced": true,
+    "error_stratum": {
+      "auroc": 0.775433944069431,
+      "ci_low": 0.6937366477225579,
+      "ci_high": 0.8478067734961116,
+      "n_items": 400,
+      "n_error": 34,
+      "excludes_chance": true
+    },
+    "error_stratum_verdict": "confirmed",
+    "clean_stratum": {
+      "auroc": 0.28282563025210083,
+      "ci_low": 0.17783763268013883,
+      "ci_high": 0.3980976507778514,
+      "n_items": 150,
+      "n_error": 136,
+      "excludes_chance": false
+    },
+    "clean_stratum_verdict": "inconclusive_underpowered"
+  },
+  "entropy_distribution": {
+    "n_distinct_values": 5,
+    "counts": {
+      "0.0": 118,
+      "0.5": 221,
+      "0.673": 140,
+      "0.95": 47,
+      "1.055": 24
+    },
+    "largest_single_value_share": 0.4018181818181818,
+    "is_degenerate": false
+  },
+  "integrity": {
+    "grading_parse_failure_rate": 0.05236363636363636
+  }
+}

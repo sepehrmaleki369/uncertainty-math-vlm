@@ -1,0 +1,47 @@
+{
+  "run_label": "internvl3_fermat_n300_20260807",
+  "category": "max_entropy_degenerate",
+  "arm": "transcription",
+  "note": "Why InternVL3's headline 0.915 perception AUROC is not reportable. Its five attempts each land on a DIFFERENT incomplete slice of the derivation -- one restates a garbled question, another jumps to a mid-derivation step, another gives an unfinished fragment as the answer. Every field parses to a real label, so this is genuine model instability, not a parser failure. 202/300 items look like this and are wrong 99% of the time, manufacturing a high AUROC from a binary coherent/incoherent split rather than graded uncertainty. Chosen deliberately from the ~70% majority mechanism, not the flashier repetition-loop cases (~30%).",
+  "model_id": "OpenGVLab/InternVL3-8B-hf",
+  "ground_truth": {
+    "question": "Express the following in the form of \\( a + bi \\):\n\\begin{enumerate}\n    \\item \\( \\left( -5i \\right) \\left( \\frac{1}{8} i \\right) \\)\n    \\item \\( \\left( -i \\right) \\left( 2i \\right) \\left( \\frac{-1}{8} i \\right)^3 \\)\n\\end{enumerate}\n\n",
+    "reference_answer": "\n\\begin{enumerate}\n    \\item \\( \\left( -5\\textcolor{red}{j} \\right) \\left( \\frac{1}{8} \\textcolor{red}{j} \\right) = \\frac{-5}{8} \\textcolor{red}{j}^2 = \\frac{-5}{8} (-1) = \\frac{5}{8} = \\frac{5}{8} + \\textcolor{red}{j}0 \\)\n    \\item \\( \\left( -\\textcolor{red}{j} \\right) \\left( 2\\textcolor{red}{j} \\right) \\left( \\frac{-1}{8} \\textcolor{red}{j} \\right)^3 = 2 \\times \\frac{1}{8 \\times 8 \\times 8} \\times \\textcolor{red}{j}^5 = \\frac{1}{256} (\\textcolor{red}{j}^2)^2 = \\frac{1}{256} \\textcolor{red}{j} \\)\n\\end{enumerate}\n\n",
+    "student_answer": null,
+    "has_error": 0
+  },
+  "model_output": {
+    "k": 5,
+    "samples_raw": [
+      "**Question:** Question: Express the following of \\(a + bi\\):\n\n1. \\((-5i)(\\frac{1}{8}i)\\)\n\n**Answer:** \n1. \\((-5i)(\\frac{1}{8}i)\\)",
+      "**Question:** $2. (-i)(2i)$\n**Answer:** $1. (-5i) (\\frac{1}{8}i)$",
+      "**Question:**\\(\\left(\\frac{-1}{8}i\\right)^{3}\\)\n\n**Answer:**\\(\\frac{-5j^2}{8} = -\\frac{5}{8}(-1) = \\frac{5}{8} = \\frac{5}{8} + j0\\)",
+      "**Question:** \\( 2 \\cdot (-\\hat{i}) \\cdot (2\\hat{j}) \\cdot \\left( -\\frac{1}{8} \\hat{j} \\right)^3 = 2 \\times \\frac{1}{8 \\times 8 \\times 8} \\times \\hat{j} \\)\n\n**Answer:** \\( \\frac{1}{256} \\hat{j} \\)",
+      "**Question:** Express the following in the form of \\(a+bi\\):\n\n1. \\((-5i) \\left(\\frac{1}{8}i\\right)\\)\n\n2. \\((-i)(2i) \\left(\\frac{-1}{8}i^3\\right)\\)\n\n**Answer:**\n\n1. \\((-5i)\\left(\\frac{1}{8}i\\right) = -5\\left(\\frac{i^2}{8}\\right) = -5\\left(\\frac{-1}{8}\\right) = \\frac{5}{8} + 0i\\)\n\n2. \\((-i)(2i)\\left(\\frac{-1}{8}i^3\\right) = 2\\left(\\frac{i^4}{8}\\right) = \\frac{2\\left(\\frac{1}{8}\\right)}{256}\\)\n\n\\(\\frac{1}{256}i\\)"
+    ],
+    "parsed": [
+      "1. \\((-5i)(\\frac{1}{8}i)\\)",
+      "$1. (-5i) (\\frac{1}{8}i)$",
+      "\\(\\frac{-5j^2}{8} = -\\frac{5}{8}(-1) = \\frac{5}{8} = \\frac{5}{8} + j0\\)",
+      "\\( \\frac{1}{256} \\hat{j} \\)",
+      "1. \\((-5i)\\left(\\frac{1}{8}i\\right) = -5\\left(\\frac{i^2}{8}\\right) = -5\\left(\\frac{-1}{8}\\right) = \\frac{5}{8} + 0i\\)\n\n2. \\((-i)(2i)\\left(\\frac{-1}{8}i^3\\right) = 2\\left(\\frac{i^4}{8}\\right) = \\frac{2\\left(\\frac{1}{8}\\right)}{256}\\)\n\n\\(\\frac{1}{256}i\\)"
+    ],
+    "cluster_labels": [
+      "sympy:(-5*i)*(i/8)",
+      "text:1. (-5i) (\\frac{1}{8}i)",
+      "text:\\frac{-5j^2}{8} = -\\frac{5}{8}(-1) = \\frac{5}{8} = \\frac{5}{8} + j0",
+      "sympy:(hat*j)/256",
+      "sympy:i/256"
+    ],
+    "n_parse_failures": 0
+  },
+  "derived": {
+    "entropy": 1.6094379124341005,
+    "max_possible_entropy": 1.6094379124341003,
+    "at_max_entropy": true,
+    "majority_label": "sympy:(-5*i)*(i/8)",
+    "majority_count": 1,
+    "n_distinct_labels": 5,
+    "correct": false
+  }
+}

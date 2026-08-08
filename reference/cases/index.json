@@ -1,0 +1,79 @@
+[
+  {
+    "case_id": "01_qwen3b_perception_low_entropy_correct",
+    "run_label": "qwen3b_fermat_n300_20260802",
+    "category": "low_entropy_correct",
+    "arm": "transcription",
+    "model_id": "Qwen/Qwen2.5-VL-3B-Instruct",
+    "entropy": 0.0,
+    "correct": true,
+    "has_image": false,
+    "note": "The signal working as intended. All five transcriptions agree on the same final answer and the majority matches ground truth, so entropy is 0 and the item is correct. This is the contrast case the fai"
+  },
+  {
+    "case_id": "02_qwen3b_perception_high_entropy_wrong",
+    "run_label": "qwen3b_fermat_n300_20260802",
+    "category": "high_entropy_wrong",
+    "arm": "transcription",
+    "model_id": "Qwen/Qwen2.5-VL-3B-Instruct",
+    "entropy": 1.6094379124341005,
+    "correct": false,
+    "has_image": false,
+    "note": "The signal working in the other direction: all five transcriptions disagree (entropy at the ln(5) ceiling) and the majority vote is wrong. Items like this drive the 0.835 AUROC, and the abstention rul"
+  },
+  {
+    "case_id": "03_qwen3b_perception_high_entropy_correct",
+    "run_label": "qwen3b_fermat_n300_20260802",
+    "category": "high_entropy_correct",
+    "arm": "transcription",
+    "model_id": "Qwen/Qwen2.5-VL-3B-Instruct",
+    "entropy": 1.6094379124341005,
+    "correct": true,
+    "has_image": false,
+    "note": "A false alarm: the samples disagree but the majority is still right. These are the cost of the abstention rule -- items it would defer unnecessarily. Kept visible so the 93.4% precision figure is not "
+  },
+  {
+    "case_id": "04_qwen3b_perception_low_entropy_wrong",
+    "run_label": "qwen3b_fermat_n300_20260802",
+    "category": "low_entropy_wrong",
+    "arm": "transcription",
+    "model_id": "Qwen/Qwen2.5-VL-3B-Instruct",
+    "entropy": 0.0,
+    "correct": false,
+    "has_image": false,
+    "note": "The dangerous quadrant, and the bound on what entropy can do: the model is unanimous and unanimously wrong, so there is no disagreement to detect. Any deferral system built on sampling entropy is blin"
+  },
+  {
+    "case_id": "05_internvl3_max_entropy_degenerate",
+    "run_label": "internvl3_fermat_n300_20260807",
+    "category": "max_entropy_degenerate",
+    "arm": "transcription",
+    "model_id": "OpenGVLab/InternVL3-8B-hf",
+    "entropy": 1.6094379124341005,
+    "correct": false,
+    "has_image": false,
+    "note": "Why InternVL3's headline 0.915 perception AUROC is not reportable. Its five attempts each land on a DIFFERENT incomplete slice of the derivation -- one restates a garbled question, another jumps to a "
+  },
+  {
+    "case_id": "06_scratchmath_non_engagement_says_error",
+    "run_label": "scratchmath_gated_n100_20260808",
+    "category": "non_engagement_says_error",
+    "arm": "grading",
+    "model_id": "Qwen/Qwen2.5-VL-7B-Instruct",
+    "entropy": 0.5004024235381879,
+    "correct": true,
+    "has_image": true,
+    "note": "Why ScratchMath is gated rather than merely underpowered. The model states it cannot read or evaluate the image -- and then answers 'Error: 1' anyway. Because every ScratchMath item contains an error,"
+  },
+  {
+    "case_id": "07_qwen7b_confidently_wrong_grading",
+    "run_label": "qwen7b_matched_n650_20260806",
+    "category": "confidently_wrong_grading",
+    "arm": "grading",
+    "model_id": "Qwen/Qwen2.5-VL-7B-Instruct",
+    "entropy": 0.0,
+    "correct": false,
+    "has_image": true,
+    "note": "The reasoning arm's equivalent of the low-entropy-wrong quadrant, and the ceiling on the confirmed 0.801 result. All five grading samples unanimously say 'no error' on an answer that does contain one,"
+  }
+]

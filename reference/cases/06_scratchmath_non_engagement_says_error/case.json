@@ -1,0 +1,56 @@
+{
+  "run_label": "scratchmath_gated_n100_20260808",
+  "category": "non_engagement_says_error",
+  "arm": "grading",
+  "note": "Why ScratchMath is gated rather than merely underpowered. The model states it cannot read or evaluate the image -- and then answers 'Error: 1' anyway. Because every ScratchMath item contains an error, that scores as CORRECT. This happens in 82% of the 120/500 samples that admit non-engagement, so much of the run's 96% accuracy is the response bias firing through explicit inability, not grading competence.",
+  "model_id": "Qwen/Qwen2.5-VL-7B-Instruct",
+  "ground_truth": {
+    "question": "把一块长为80厘米，宽为60厘米的长方形的画框裱起来，四周都用金线装饰，金线每分米长度的价格是10元，那么装裱这个画框的四周需花费___1___元钱。",
+    "reference_answer": "280",
+    "student_answer": "2800",
+    "has_error": 1
+  },
+  "model_output": {
+    "k": 5,
+    "samples_raw": [
+      "**Reasoning:** The image only shows two numbers: 140 and 286. There is no indication of any calculation or application related to the question about the cost of decorating a rectangular frame with gold wire. The numbers do not seem to be part of the solution process for the given problem, which requires calculating the perimeter of the rectangle and then finding the total cost based on the price per unit length of the wire.\n\n**Error:** 1",
+      "**Reasoning:** The image shows two numbers, \"286\" and \"140,\" but there is no indication that these represent a calculation related to the perimeter of the rectangle or any other operation mentioned in the question. Since the question asks for the cost of the gold strip to decorate the perimeter of a 80 cm x 60 cm frame, the student should have calculated the perimeter first, which would be \\(2 \\times (80 + 60) = 280\\) cm or 28 dm, and then multiplied by the price per dm, which should be \\(28 \\times 10 = 280\\) yuan. The numbers \"286\" and \"140\" do not align with the required calculations.\n\n**Error:** 1",
+      "**Reasoning:** The image shows two numbers, 140 and 286, but there is no indication of any arithmetic operation being performed between these numbers. Based on the given question about calculating the cost of decorating a rectangular frame with dimensions 80 cm by 60 cm using gold thread, the image does not appear to be related to the question at all. There appears to be no error in the sense that the image should be evaluated based on the question provided, as it fails to address the question at all. However, the instruction is to judge whether the student's work contains an error given the question, which seems to imply that we interpret the image as if the student was working on the question.\n\n**Error:** 1",
+      "**Reasoning:** The image only shows two numbers, \"140\" and \"286\", which do not appear to be part of a calculation related to the given problem. The problem asks for the cost of decorating the perimeter of a rectangular frame with dimensions 80 cm x 60 cm using gold thread at a rate of 10 yuan per decimeter. However, the image does not show any calculations or steps towards solving this problem. Therefore, there is insufficient information to determine if the student made a mistake or not.\n\n**Error:** 0",
+      "**Reasoning:** The image shows the numbers 280 and 140, but there is no indication of any calculations or steps taken to arrive at these numbers. The question asks for the total cost of gold trim around a rectangular frame with dimensions 80 cm by 60 cm, which requires calculating the perimeter and then multiplying by the cost per dm. The given numbers do not reflect any part of this calculation.\n\n**Error:** 1"
+    ],
+    "parsed": [
+      "1",
+      "1",
+      "1",
+      "0",
+      "1"
+    ],
+    "cluster_labels": [
+      "1",
+      "1",
+      "1",
+      "0",
+      "1"
+    ],
+    "n_parse_failures": 0
+  },
+  "derived": {
+    "entropy": 0.5004024235381879,
+    "max_possible_entropy": 1.6094379124341003,
+    "at_max_entropy": false,
+    "majority_label": "1",
+    "majority_count": 4,
+    "n_distinct_labels": 2,
+    "correct": true
+  },
+  "image": {
+    "filename": "image.jpg",
+    "width": 1600,
+    "height": 910,
+    "original_width": 2880,
+    "original_height": 1638,
+    "downscaled": true,
+    "bytes": 16011
+  }
+}

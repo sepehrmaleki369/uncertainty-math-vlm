@@ -1084,3 +1084,66 @@ def main(results_csv: str, output_dir: str = "figures") -> None:
     summary = summarize_results(df)
     print(f"Saved {fig_path}")
     return summary
+
+
+def classify_stratum_result(
+    ci: Optional[dict],
+    threshold: float = SCALEUP_PREREGISTRATION["reasoning_stratum_auroc_min"],
+    min_minority: int = SCALEUP_PREREGISTRATION["min_minority_class"],
+) -> str:
+    """Bucket one stratum's bootstrap_auroc_ci dict against the registered bars.
+
+    A pure function so the verdict that gets reported is the verdict the
+    thresholds actually produce, in the same spirit as
+    classify_scaleup_result -- not an eyeball call on a point estimate.
+
+    The four buckets exist because this project needed all four, in this
+    order of discovery:
+
+      not_measured                -- the stratum is absent from the data
+                                     (ScratchMath has no clean items at all,
+                                     which is different from having too few).
+      inconclusive_underpowered   -- minority class below the registered
+                                     minimum; the point estimate is not
+                                     interpretable regardless of its value.
+      confirmed                   -- clears the threshold AND excludes chance
+                                     (Qwen-3B/7B and LLaVA-NeXT, 0.775-0.854).
+      resolved_below_threshold    -- powered, CI excludes chance, but does not
+                                     clear the threshold. Added 2026-08-08 for
+                                     InternVL3's 0.628 [0.548, 0.706]: real
+                                     signal, not confirmable, and previously
+                                     there was no honest label for it -- it
+                                     would have been forced into "confirmed"
+                                     or "no signal", both wrong.
+      no_signal                   -- powered but the CI includes chance.
+
+    ``inverted`` is reported as its own suffix rather than folded into
+    no_signal: a stratum whose CI sits resolvably BELOW 0.5 is a finding
+    (the clean-stratum inversion is a confirmed result here), not an
+    absence of one.
+    """
+    if ci is None or ci.get("n_items", 0) == 0:
+        return "not_measured"
+
+    n_error = ci.get("n_error", 0)
+    n_correct = ci.get("n_correct", ci.get("n_items", 0) - n_error)
+    if min(n_error, n_correct) < min_minority:
+        return "inconclusive_underpowered"
+
+    # The inversion check MUST come before the excludes_chance gate.
+    # bootstrap_auroc_ci defines excludes_chance as `ci_low > 0.5` -- a
+    # one-sided, above-chance-only test -- so a resolvably INVERTED stratum
+    # reports excludes_chance=False. Checking that first sent Qwen-7B's
+    # confirmed clean-stratum inversion (0.280 [0.200, 0.366]) to
+    # "no_signal", mislabelling one of this project's confirmed findings as
+    # an absence of one. Caught 2026-08-08 by the snapshot of that run
+    # disagreeing with the report.
+    if ci["ci_high"] < 0.5:
+        return "confirmed_inverted"
+
+    if not ci.get("excludes_chance", False):
+        return "no_signal"
+
+    if ci["auroc"] >= threshold:
+        return "confirmed"
+    return "resolved_below_threshold"

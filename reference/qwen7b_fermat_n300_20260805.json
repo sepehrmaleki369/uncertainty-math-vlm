@@ -1,0 +1,63 @@
+{
+  "label": "Qwen2.5-VL-7B, FERMAT n=300 -- capability gate marginal (59.0% vs 50.0%)",
+  "arm": "grading_only",
+  "n_items": 300,
+  "model_id": "Qwen/Qwen2.5-VL-7B-Instruct",
+  "quantized": false,
+  "k_grading": 5,
+  "composition": {
+    "n_has_error": 150,
+    "n_clean": 150,
+    "frac_has_error": 0.5,
+    "is_balanced": true
+  },
+  "grading": {
+    "accuracy": 0.59,
+    "baseline_accuracy": 0.5,
+    "accuracy_on_error_items": 0.8866666666666667,
+    "accuracy_on_clean_items": 0.29333333333333333
+  },
+  "reasoning": {
+    "pooled": {
+      "auroc": 0.5198199439621515,
+      "ci_low": 0.4584856181346953,
+      "ci_high": 0.5818316105413335,
+      "n_items": 300,
+      "n_error": 123,
+      "excludes_chance": false
+    },
+    "pooled_is_misleading_unless_balanced": false,
+    "error_stratum": {
+      "auroc": 0.7611676249447147,
+      "ci_low": 0.6456776094276094,
+      "ci_high": 0.8604733801340014,
+      "n_items": 150,
+      "n_error": 17,
+      "excludes_chance": true
+    },
+    "error_stratum_verdict": "inconclusive_underpowered",
+    "clean_stratum": {
+      "auroc": 0.2800171526586621,
+      "ci_low": 0.20036516879351876,
+      "ci_high": 0.3657427434159545,
+      "n_items": 150,
+      "n_error": 106,
+      "excludes_chance": false
+    },
+    "clean_stratum_verdict": "confirmed_inverted"
+  },
+  "entropy_distribution": {
+    "n_distinct_values": 4,
+    "counts": {
+      "0.0": 126,
+      "0.5": 97,
+      "0.673": 76,
+      "0.95": 1
+    },
+    "largest_single_value_share": 0.42,
+    "is_degenerate": false
+  },
+  "integrity": {
+    "grading_parse_failure_rate": 0.0013333333333333333
+  }
+}

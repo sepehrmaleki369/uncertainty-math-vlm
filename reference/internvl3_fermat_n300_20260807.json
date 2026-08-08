@@ -1,0 +1,166 @@
+{
+  "label": "InternVL3-8B, FERMAT n=300 -- perception 0.915 raw but fails the max-entropy cut (0.556)",
+  "n_items": 300,
+  "model_id": "OpenGVLab/InternVL3-8B-hf",
+  "k_transcription": 5,
+  "k_grading": 5,
+  "frac_has_error": 0.5,
+  "latex_parser_available": true,
+  "sympy_version": "1.14.0",
+  "perception": {
+    "auroc": 0.9145402183376867,
+    "ci_low": 0.8804411590862725,
+    "ci_high": 0.9435734933539812,
+    "n_items": 300,
+    "n_error": 237,
+    "excludes_chance": true,
+    "accuracy": 0.21,
+    "aurc": 0.7635388888888889,
+    "aurc_baseline": 0.79,
+    "sensitivity": {
+      "full": {
+        "auroc": 0.9145402183376867,
+        "ci_low": 0.8804411590862725,
+        "ci_high": 0.9435734933539812,
+        "n_items": 300
+      },
+      "excl_parse_failures": {
+        "auroc": 0.9283798882681564,
+        "ci_low": 0.8904583985880131,
+        "ci_high": 0.9606433526316542,
+        "n_items": 229
+      },
+      "excl_max_entropy": {
+        "auroc": 0.5560478511298184,
+        "ci_low": 0.4951746323529412,
+        "ci_high": 0.6139462034813925,
+        "n_items": 98
+      },
+      "excl_both": {
+        "auroc": 0.5625,
+        "ci_low": 0.4919627425639443,
+        "ci_high": 0.6276595744680851,
+        "n_items": 69
+      }
+    },
+    "robust": false
+  },
+  "reasoning": {
+    "auroc": 0.4867623462292744,
+    "ci_low": 0.42868326539151624,
+    "ci_high": 0.5454474275607344,
+    "n_items": 300,
+    "n_error": 142,
+    "excludes_chance": false,
+    "aurc": 0.46699583797844674,
+    "aurc_baseline": 0.47333333333333333,
+    "error_stratum": {
+      "auroc": 0.6283597883597883,
+      "ci_low": 0.5475486423668968,
+      "ci_high": 0.7059089193285563,
+      "n_items": 150,
+      "n_error": 45,
+      "excludes_chance": true
+    },
+    "clean_stratum": {
+      "auroc": 0.3693833884458277,
+      "ci_low": 0.29041723356009075,
+      "ci_high": 0.4542491034875489,
+      "n_items": 150,
+      "n_error": 97,
+      "excludes_chance": false
+    }
+  },
+  "grading": {
+    "accuracy": 0.5266666666666666,
+    "accuracy_on_error_items": 0.7,
+    "accuracy_on_clean_items": 0.35333333333333333,
+    "baseline_accuracy": 0.5
+  },
+  "abstention": {
+    "n_flagged": 202,
+    "n_flagged_wrong": 200,
+    "precision": 0.9900990099009901,
+    "recall": 0.8438818565400844
+  },
+  "risk_coverage": [
+    {
+      "threshold": 0.0,
+      "coverage": 0.0033333333333333335,
+      "n_kept": 1,
+      "n_deferred": 299,
+      "accuracy_kept": 1.0,
+      "risk_kept": 0.0,
+      "n_errors_kept": 0
+    },
+    {
+      "threshold": 0.950271,
+      "coverage": 0.02666666666666667,
+      "n_kept": 8,
+      "n_deferred": 292,
+      "accuracy_kept": 0.875,
+      "risk_kept": 0.125,
+      "n_errors_kept": 1
+    },
+    {
+      "threshold": 1.05492,
+      "coverage": 0.02666666666666667,
+      "n_kept": 8,
+      "n_deferred": 292,
+      "accuracy_kept": 0.875,
+      "risk_kept": 0.125,
+      "n_errors_kept": 1
+    },
+    {
+      "threshold": 1.332179,
+      "coverage": 0.04,
+      "n_kept": 12,
+      "n_deferred": 288,
+      "accuracy_kept": 0.8333333333333334,
+      "risk_kept": 0.16666666666666666,
+      "n_errors_kept": 2
+    },
+    {
+      "threshold": 1.609438,
+      "coverage": 1.0,
+      "n_kept": 300,
+      "n_deferred": 0,
+      "accuracy_kept": 0.20999999999999996,
+      "risk_kept": 0.79,
+      "n_errors_kept": 237
+    }
+  ],
+  "conformal": {
+    "target_0.30": {
+      "target_risk": 0.3,
+      "n_splits": 1000,
+      "n_valid": 0,
+      "n_unachievable": 1000,
+      "mean_coverage": NaN,
+      "mean_test_risk": NaN,
+      "violation_rate": NaN
+    },
+    "target_0.40": {
+      "target_risk": 0.4,
+      "n_splits": 1000,
+      "n_valid": 15,
+      "n_unachievable": 985,
+      "mean_coverage": 0.024444444444444446,
+      "mean_test_risk": 0.5555555555555556,
+      "violation_rate": 1.0
+    },
+    "target_0.50": {
+      "target_risk": 0.5,
+      "n_splits": 1000,
+      "n_valid": 216,
+      "n_unachievable": 784,
+      "mean_coverage": 0.0325,
+      "mean_test_risk": 0.35590828924162254,
+      "violation_rate": 0.027777777777777776
+    }
+  },
+  "integrity": {
+    "transcription_parse_failure_rate": 0.05466666666666667,
+    "grading_parse_failure_rate": 0.0006666666666666666
+  }
+}
