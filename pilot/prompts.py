@@ -212,3 +212,76 @@ def build_grading_messages_variant(image: Any, variant: str) -> list[dict]:
             f"{sorted(GRADING_VARIANTS)}"
         )
     return build_messages(GRADING_SYSTEM_PROMPT, GRADING_VARIANTS[variant], image)
+
+
+# --- ScratchMath grading (ours, second dataset) ---------------------------
+#
+# ScratchMath's structure forces a different prompt shape than FERMAT's: the
+# question is a separate text field and the image holds only the student's
+# rough scratchwork, not a complete Question-Answer page. So the question is
+# supplied as text and the image carries the work to be judged.
+#
+# What is deliberately NOT supplied: the student's final answer (ScratchMath
+# has it as a text field). Handing that over would let the model verify the
+# arithmetic textually and reduce the image to decoration -- it would stop
+# testing the vision-grounded grading claim this project actually makes.
+#
+# Output format is kept byte-identical to GRADING_USER_PROMPT's
+# **Reasoning:** / **Error:** contract so pilot.parsing.parse_grading and
+# every downstream entropy/scoring path apply unchanged. Only the question
+# changes, not the scoring path -- the same design rule the Phase 3 variants
+# followed.
+
+SCRATCHMATH_GRADING_SYSTEM_PROMPT = (
+    "You are a math assistant responsible for evaluating handwritten work by "
+    "primary and middle school students. You will be shown a math question and "
+    "an image of a student's handwritten scratchwork for that question. The "
+    "scratchwork may be rough, partial, or hard to read. Your task is to judge "
+    "whether the student's work contains an error. Follow the specific "
+    "instructions provided carefully and output your response strictly in the "
+    "requested format. Base your evaluation on the question and the work "
+    "visible in the image."
+)
+
+SCRATCHMATH_GRADING_USER_PROMPT = (
+    "Question (the student was asked to solve this):\n"
+    "{question}\n"
+    "\n"
+    "The image shows that student's handwritten scratchwork for the question "
+    "above. It may be rough or incomplete -- that on its own is not an error. "
+    "Judge whether the mathematical work the student actually carried out "
+    "contains a mistake: a wrong calculation, a misreading of the question, a "
+    "wrong method, or a wrong final result.\n"
+    "\n"
+    "Begin by providing a brief reasoning for your analysis, explaining where "
+    "and why you believe an error is present or absent. If parts of the image "
+    "are unclear, judge from whatever work you can make out rather than "
+    "defaulting to no error.\n"
+    "\n"
+    "After the reasoning, provide a binary output indicating whether an error "
+    "exists (1 for error, 0 for no error).\n"
+    "\n"
+    "Please follow the exact format below without adding any extra information:\n"
+    "\n"
+    "**Reasoning:** <Brief Explanation of Error Presence or Absence>\n"
+    "\n"
+    "**Error:** <0 or 1>"
+)
+
+
+def build_scratchmath_grading_prompt(question: str) -> str:
+    """Fill the ScratchMath grading prompt for one question.
+
+    Raises on an empty/missing question rather than silently rendering a
+    prompt with a blank question block: ScratchMath's question text is the
+    model's only statement of the task (the image has scratchwork only), so
+    a blank one would quietly turn every such item into an unanswerable
+    prompt that still parses and scores as a normal result.
+    """
+    if question is None or not str(question).strip():
+        raise ValueError(
+            "ScratchMath grading needs a non-empty question -- the image "
+            "contains only scratchwork, so a blank question makes the item "
+            "unanswerable rather than merely harder."
+        )
+    return SCRATCHMATH_GRADING_USER_PROMPT.format(question=str(question).strip())

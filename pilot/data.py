@@ -193,3 +193,134 @@ def load_fermat_extra_error_items(
         sample = sample.remove_columns(columns_to_drop)
 
     return sample
+
+
+# --- ScratchMath (second dataset, reasoning arm only) ----------------------
+#
+# Added 2026-08-08 to test whether the has_error=1 stratified reasoning
+# result -- confirmed across Qwen-3B/7B and LLaVA-NeXT on FERMAT -- also
+# holds on a genuinely different dataset. Three structural differences from
+# FERMAT, all of which have to be stated wherever this is reported:
+#
+#   1. EVERY ScratchMath item contains an error. There is no has_error=0
+#      stratum, so the clean-stratum inversion (a confirmed FERMAT finding)
+#      simply cannot be tested here, and no balanced sample can be built.
+#      This loader therefore only ever supports the has_error=1 analysis.
+#   2. The question is a separate TEXT field; the image holds only the
+#      student's rough scratchwork, not a complete Question-Answer page.
+#      The grading prompt has to supply the question in text, unlike
+#      FERMAT's single-image setup.
+#   3. Questions and error annotations are in Chinese, and the scratchwork
+#      is sparse stylus/tablet writing that is materially harder to read
+#      than FERMAT's pages -- so a capability gate is a live risk and must
+#      be checked before any entropy number is interpreted.
+#
+# `student_answer` is deliberately NOT included in the model's input by the
+# notebook that uses this: handing over the student's final answer as text
+# would let the model check the arithmetic textually and reduce the image to
+# decoration, which would stop testing the vision-grounded claim this
+# project actually makes. It is kept here only for offline analysis.
+
+SCRATCHMATH_FIELDS = [
+    "student_scratchwork",
+    "question",
+    "answer",
+    "student_answer",
+    "solution",
+    "error_category",
+    "error_explanation",
+    "question_id",
+    "study_level",
+]
+
+# The dataset ships two configs; `middle` is closer to FERMAT's grade range
+# but has only 241 items, so both are pooled and the level is recorded as a
+# column rather than dropped -- it is a plausible covariate for difficulty.
+SCRATCHMATH_CONFIGS = ("primary", "middle")
+
+
+def load_scratchmath_sample(
+    n: int = 100,
+    seed: int = 42,
+    configs: tuple = SCRATCHMATH_CONFIGS,
+    _loader: Callable[..., datasets.Dataset] = datasets.load_dataset,
+) -> datasets.Dataset:
+    """Load a deterministic random sample of n ScratchMath items.
+
+    Every returned item has an error by construction (see the module note
+    above), so callers must treat this as a has_error=1-only sample and must
+    not compute a pooled or balanced statistic from it.
+
+    Pools the `primary` and `middle` configs before shuffling so a single
+    seed gives one reproducible ordering across both, and so an extension
+    run can take the next slice of that same ordering (mirroring how
+    load_fermat_extra_error_items achieves structural disjointness).
+    """
+    parts = []
+    for config in configs:
+        part = _loader("songdj/ScratchMath", config, split="train")
+        if "study_level" not in part.column_names:
+            part = part.add_column("study_level", [config] * len(part))
+        parts.append(part)
+
+    dataset = datasets.concatenate_datasets(parts) if len(parts) > 1 else parts[0]
+    dataset = dataset.shuffle(seed=seed)
+
+    actual_n = min(n, len(dataset))
+    if actual_n < n:
+        logger.warning(
+            "Requested n=%d ScratchMath items but only %d are available; using %d.",
+            n, len(dataset), actual_n,
+        )
+
+    sample = dataset.select(range(actual_n))
+
+    columns_to_drop = [c for c in sample.column_names if c not in SCRATCHMATH_FIELDS]
+    if columns_to_drop:
+        sample = sample.remove_columns(columns_to_drop)
+
+    return sample
+
+
+def load_scratchmath_extra(
+    n_extra: int,
+    seed: int = 42,
+    skip: int = 100,
+    configs: tuple = SCRATCHMATH_CONFIGS,
+    _loader: Callable[..., datasets.Dataset] = datasets.load_dataset,
+) -> datasets.Dataset:
+    """Load n_extra MORE ScratchMath items, disjoint from a prior sample.
+
+    Same structural-disjointness argument as load_fermat_extra_error_items:
+    with the same seed and the same config order, the pooled shuffle
+    reproduces one ordering, so ``[:skip]`` is exactly what a prior
+    load_scratchmath_sample(n=skip, seed=seed) took and ``[skip:skip+n_extra]``
+    is guaranteed to be the next, non-overlapping slice. The caller must pass
+    the ``skip`` matching the prior run's n -- this function cannot verify it.
+    """
+    parts = []
+    for config in configs:
+        part = _loader("songdj/ScratchMath", config, split="train")
+        if "study_level" not in part.column_names:
+            part = part.add_column("study_level", [config] * len(part))
+        parts.append(part)
+
+    dataset = datasets.concatenate_datasets(parts) if len(parts) > 1 else parts[0]
+    dataset = dataset.shuffle(seed=seed)
+
+    available = max(0, len(dataset) - skip)
+    actual_n = min(n_extra, available)
+    if actual_n < n_extra:
+        logger.warning(
+            "Requested %d extra ScratchMath items beyond the first %d, but only "
+            "%d are available. Returning %d instead.",
+            n_extra, skip, available, actual_n,
+        )
+
+    sample = dataset.select(range(skip, skip + actual_n))
+
+    columns_to_drop = [c for c in sample.column_names if c not in SCRATCHMATH_FIELDS]
+    if columns_to_drop:
+        sample = sample.remove_columns(columns_to_drop)
+
+    return sample
