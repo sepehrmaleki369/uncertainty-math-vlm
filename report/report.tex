@@ -147,6 +147,47 @@ does not clear this report's 0.70 confirmation threshold -- a new,
 in-between verdict this report has not needed before.
 \end{abstract}
 
+\section*{Retraction (2026-08-09)}
+\addcontentsline{toc}{section}{Retraction}
+
+\textbf{The \texttt{has\_error}=1 stratified reasoning result reported in
+\S\ref{sec:phase4} and \S\ref{sec:phase5} --- AUROC $0.775$--$0.854$,
+described there as confirmed across three model families --- is withdrawn.
+It is an artifact.} Those sections have not yet been rewritten; read them
+only as a record of what was believed. The corrected treatment is in
+\texttt{paper/main.tex}.
+
+Within a stratum in which every item carries the same ground-truth label,
+``was the model correct'' is not a separate fact from ``what did the model
+answer'': the two are the same column, agreeing on $100\%$ of items in the
+$7$B run. Reasoning entropy is computed from precisely the votes that
+produce that answer, so the stratified AUROC is near-circular. A
+signal-free null --- a model answering ``error'' with fixed probability per
+sample, carrying no item-level information at all --- attains a
+\emph{higher} AUROC than any model tested here: null medians $0.901$,
+$0.868$ and $0.831$ against observed $0.854$, $0.801$ and $0.775$.
+
+The sign reversal between strata, presented in \S\ref{sec:phase4} as the
+central finding, is the same identity with its sign flipped: in the clean
+stratum correctness is the exact complement of the verdict, so the two
+stratum AUROCs sum to $1$.
+
+None of the safeguards this report relies on caught it. The pre-registered
+$0.70$ threshold is cleared by the null's $2.5$th percentile. Both strata
+were adequately powered. Replication across three model families
+reproduced the artifact three times rather than corroborating an effect.
+
+\textbf{What stands.} The perception result (\S\ref{sec:scaleup}, AUROC
+$0.835$) is unaffected, and the reason is structural: transcription
+correctness depends on \emph{which} label wins rather than on how
+concentrated the votes are, so agreement does not imply correctness ---
+$38$ items are unanimous and $3$ of those are wrong. The honest reasoning
+result is the pooled one on a balanced sample, $\approx 0.52$, no signal.
+Phase~7's gate (\S\ref{sec:phase7}) is reinforced: an all-erroneous dataset
+is a single-label stratum throughout.
+
+Locked in \texttt{pilot/tests/test\_stratum\_degeneracy.py}.
+
 \section{Goal}
 
 Given a vision-language model transcribing and grading handwritten math answers,

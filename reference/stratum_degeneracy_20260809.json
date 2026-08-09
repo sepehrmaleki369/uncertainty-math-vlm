@@ -1,0 +1,63 @@
+{
+  "label": "The single-label-stratum trap. Within a has_error stratum, correctness is the same column as the model's own verdict, so the stratified reasoning AUROCs reported earlier in this project do not measure error prediction. A signal-free biased coin exceeds them.",
+  "retracts": "the has_error=1 stratified reasoning result (0.775-0.854), previously reported as confirmed across three model families",
+  "null_spec": {
+    "n_sims": 2000,
+    "seed": 0,
+    "k": 5,
+    "model": "each sample iid Bernoulli(says_error_rate), no item-level signal"
+  },
+  "models": {
+    "Qwen2.5-VL-3B": {
+      "n_items": 650,
+      "says_error_rate": 0.8434,
+      "observed_auroc": 0.854,
+      "auroc_vs_own_verdict": 0.8491,
+      "collapse": {
+        "agreement": 0.9984615384615385,
+        "degenerate": true,
+        "n_items": 650
+      },
+      "bias_only_null": {
+        "median": 0.9012,
+        "ci_low": 0.849,
+        "ci_high": 0.9319,
+        "n_valid": 2000
+      }
+    },
+    "Qwen2.5-VL-7B": {
+      "n_items": 648,
+      "says_error_rate": 0.8132,
+      "observed_auroc": 0.8008,
+      "auroc_vs_own_verdict": 0.8008,
+      "collapse": {
+        "agreement": 1.0,
+        "degenerate": true,
+        "n_items": 648
+      },
+      "bias_only_null": {
+        "median": 0.8677,
+        "ci_low": 0.8205,
+        "ci_high": 0.9035,
+        "n_valid": 2000
+      }
+    },
+    "LLaVA-NeXT-7B": {
+      "n_items": 400,
+      "says_error_rate": 0.7795,
+      "observed_auroc": 0.7754,
+      "auroc_vs_own_verdict": 0.8298,
+      "collapse": {
+        "agreement": 0.9725,
+        "degenerate": true,
+        "n_items": 400
+      },
+      "bias_only_null": {
+        "median": 0.8305,
+        "ci_low": 0.7698,
+        "ci_high": 0.8737,
+        "n_valid": 2000
+      }
+    }
+  }
+}

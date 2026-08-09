@@ -36,8 +36,8 @@
 \newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
 \newcommand{\ci}[2]{{\small$[#1,\,#2]$}}
 
-\title{Pooling Hides It: On Evaluating Sampling-Based Uncertainty\\
-for Vision--Language Models on Handwritten Mathematics}
+\title{When Correctness Is the Prediction: An Evaluation Trap in\\
+Sampling-Based Uncertainty for Handwritten Mathematics}
 \author{}                     % double-blind: leave empty
 \date{}
 
@@ -46,28 +46,28 @@ for Vision--Language Models on Handwritten Mathematics}
 
 % =====================================================================
 \begin{abstract}
-% ~200 words. Written last, but drafted here so the argument is fixed
-% before the body is written.
 Sampling a vision--language model repeatedly and measuring how much it
-disagrees with itself is a cheap, label-free uncertainty signal. We ask
-what that signal actually measures on handwritten mathematics, and find
-that the answer depends as much on how it is evaluated as on the model.
-On transcription, self-disagreement predicts error well
-(AUROC~$0.835$), survives every artifact control we apply, and beats the
-model's own token confidence by a resolved margin; a rule that abstains
-whenever all five samples disagree flags a genuinely wrong
-transcription $57$ times out of $61$. On grading, the pooled statistic reads
-$0.520$~--- indistinguishable from chance --- and we show this is an
-evaluation artifact rather than a null result: the model answers ``there
-is an error'' for most inputs, and uncertainty predicts its mistakes in
-\emph{opposite directions} on erroneous ($0.801$) and correct ($0.280$)
-solutions, so pooling cancels a real effect. The stratified effect
-replicates across three independently trained model families. We then
-report two ways the evaluation itself misleads: a fourth model attains
-the highest raw score in our study ($0.915$) purely by generating
-incoherent output on two-thirds of inputs, and a second dataset cannot
-test the effect at all because it contains no correct solutions.
-\todo{tighten to the venue's word limit once the body is final}
+disagrees with itself is a cheap, label-free uncertainty signal. We
+evaluate it on handwritten mathematics and report one positive result, one
+negative result, and one way the evaluation itself manufactures a positive
+result that is not there. On transcription the signal works: AUROC
+$0.835$, robust to every artifact control we apply, better than the
+model's own token confidence by a resolved margin, and better than
+simpler reductions of the same samples; a rule that abstains whenever all
+five samples disagree flags a genuinely wrong transcription $57$ times out
+of $61$. On grading it does not work: AUROC $0.520$ on a balanced sample,
+indistinguishable from chance. The trap lies between the two. Stratifying
+the grading task by its ground-truth label --- a natural response to a
+model with a strong answer bias --- appears to recover a strong effect
+($0.801$--$0.854$) that replicates across three independently trained
+model families. It is an artifact. Within a single-label stratum,
+``was the model correct'' is the same column as ``what did the model
+answer'', so an uncertainty measure computed from those same answers
+predicts correctness almost by construction; a signal-free biased coin
+attains a \emph{higher} AUROC than any real model we tested. We report the
+result we initially believed, the check that retired it, and what
+distinguishes the transcription task, where the same measure is sound.
+\todo{trim to the venue's word limit once the body is final}
 \end{abstract}
 
 % =====================================================================
@@ -251,70 +251,90 @@ the harshest simultaneous cut with an interval excluding chance.
 \label{tab:sensitivity}
 \end{table}
 
-\subsection{Why does grading look like chance?}
+\subsection{Does the same signal work for grading?}
 \label{sec:q3}
-% THE CENTRAL RESULT. Give it the most space.
-Pooled over the same $300$ items, reasoning entropy predicts grading
-error with AUROC~$0.520$ \ci{0.458}{0.582} --- no signal. Read alone, that
-is a clean negative result, and we initially reported it as one.
+No. On the same $300$ images, reasoning entropy predicts grading error
+with AUROC~$0.520$ \ci{0.458}{0.582} --- an interval containing chance. The
+balanced sample matters: the model answers ``there is an error'' for the
+large majority of inputs, and on an unbalanced set that bias alone would
+score well.
 
-It is an artifact of aggregation. The model answers ``there is an error''
-for the large majority of inputs, so its mistakes are of opposite kinds
-on the two halves of the data: on solutions that do contain an error it
-is usually right and errs by missing one, while on correct solutions it
-is usually wrong and errs by inventing one. Entropy tracks both, in
-opposite directions, and pooling cancels them
-(Table~\ref{tab:stratified}).
+This is the honest reasoning result, and \S\ref{sec:trap} is an account of
+why we did not initially believe it.
 
-\begin{table}[t]
-\centering\small
-\begin{tabular}{lccl}
-\toprule
-Scored on & $n_{\text{wrong}}$ & AUROC (95\% CI) & Verdict \\
-\midrule
-Pooled              & 123 & 0.520 \ci{0.458}{0.582} & no signal \\
-Erroneous solutions &  73 & 0.801 \ci{0.751}{0.846} & confirmed \\
-Correct solutions   & 106 & 0.280 \ci{0.200}{0.366} & inverted \\
-\bottomrule
-\end{tabular}
-\caption{Qwen2.5-VL-7B. Both strata are adequately powered and each
-excludes chance; the pooled statistic reports neither. Note the
-inversion is a finding, not an absence: entropy ranks correct solutions
-\emph{backwards} because the model is confidently wrong on them.}
-\label{tab:stratified}
-\end{table}
+\subsection{The trap: stratifying by the label being predicted}
+\label{sec:trap}
+% The methodological contribution. Written as a retraction because that is
+% what it is, and because the failure is more instructive than a warning
+% stated in the abstract would be.
+A model with a strong answer bias makes a pooled statistic hard to read,
+and the natural response is to stratify by ground truth and analyse each
+label separately. Doing so appears to recover a large effect from the null
+above. Within the erroneous-solution stratum, entropy predicts grading
+error at $0.801$ \ci{0.751}{0.846}; within the correct-solution stratum it
+predicts in the opposite direction at $0.280$ \ci{0.200}{0.366}. Both
+strata are adequately powered, both intervals exclude chance, the sign
+reversal has an appealing mechanistic story, and the effect reproduces
+across three independently trained model families
+(Table~\ref{tab:trap}). We reported this as our main finding.
 
-Two consequences are worth stating separately from the numbers. First,
-the pooled statistic is not merely uninformative here, it is misleading:
-on a sample that is not balanced it drifts toward whichever stratum is
-larger, which can make an unchanged effect appear to strengthen.
-\todo{cite our own $n{=}500$/$n{=}800$ runs where pooled reads ${\sim}0.61$
-purely from the $650/150$ composition}
-Second, the diagnosis is only available because the dataset contains
-correct solutions to separate out.
-
-\subsection{Does the stratified effect replicate?}
-\label{sec:q4}
-Across three independently trained families, yes, at magnitudes whose
-intervals overlap (Table~\ref{tab:families}). This is measured on
-matched item sets where possible: the two Qwen results use essentially
-the same $650$ items.
+It is an artifact, for a reason that applies to any binary-decision task
+evaluated this way. \textbf{Within a stratum where every item shares the
+same true label, ``was the model correct'' is not a separate fact from
+``what did the model answer'' --- the two are the same column.} On our
+$7$B run they agree on $100\%$ of items, and the AUROC against correctness
+is numerically identical to the AUROC against the model's own verdict.
+Entropy is computed from precisely the votes that produce that verdict, so
+the measurement is near-circular. The sign reversal follows by the same
+identity: in the correct-solution stratum correctness is the exact
+\emph{complement} of the verdict, so anything correlating with the verdict
+must invert. The two stratum AUROCs sum to $1$.
 
 \begin{table}[t]
 \centering\small
 \begin{tabular}{lccc}
 \toprule
-Model & $n$ & $n_{\text{wrong}}$ & AUROC (95\% CI) \\
+Model & Observed & Bias-only null & Collapse \\
 \midrule
-Qwen2.5-VL-3B & 650 & 42 & 0.854 \ci{0.796}{0.902} \\
-Qwen2.5-VL-7B & 648 & 73 & 0.801 \ci{0.751}{0.846} \\
-LLaVA-NeXT-7B & 400 & 34 & 0.775 \ci{0.694}{0.848} \\
+Qwen2.5-VL-3B & 0.854 & 0.901 \ci{0.849}{0.932} & 99.8\% \\
+Qwen2.5-VL-7B & 0.801 & 0.868 \ci{0.821}{0.903} & 100.0\% \\
+LLaVA-NeXT-7B & 0.775 & 0.831 \ci{0.770}{0.874} & 97.2\% \\
 \bottomrule
 \end{tabular}
-\caption{Reasoning entropy on erroneous solutions. Each clears the
-pre-registered $0.70$ threshold and the $n{=}30$ minority-class minimum.}
-\label{tab:families}
+\caption{The apparent replication, against a null with no item-level
+signal at all: a model answering ``error'' with fixed probability per
+sample, so its entropy is pure sampling noise. The null \emph{exceeds}
+every observed value. ``Collapse'' is the fraction of items on which
+correctness and the model's own verdict are the same label. Even the
+null's $2.5$th percentile clears the $0.70$ threshold we had registered in
+advance as confirming the hypothesis, so that threshold could never have
+separated signal from arithmetic.}
+\label{tab:trap}
 \end{table}
+
+The mechanism is arithmetic rather than behavioural. On an all-erroneous
+stratum the majority vote is wrong only when most samples dissent from the
+model's default, and dissent is exactly what raises entropy. Nothing about
+the model's competence is required for the association to appear.
+
+Three things would have caught this earlier, and none of them is
+specialised. Comparing against a signal-free null rather than against
+chance, since $0.5$ is the wrong reference point for a stratified
+statistic. Checking whether the correctness label is a relabelling of the
+prediction before computing anything. And treating a pre-registered
+threshold as necessary but not sufficient --- ours was cleared by the null.
+
+\subsection{Why transcription is not affected}
+\label{sec:whyperception}
+The collapse requires correctness to be a function of the vote
+\emph{count}, which is also what entropy summarises. Transcription
+correctness instead depends on \emph{which} label wins, so agreement does
+not imply correctness: $38$ items are unanimous and $3$ of those are
+wrong, while $4$ items at maximum entropy are right. Correct and incorrect
+items occur at both ends of the entropy range, the label is not a
+relabelling of the prediction, and \S\ref{sec:q1b} shows entropy
+outperforming simpler summaries of the same votes --- which could not
+happen if it were merely counting dissent.
 
 \subsection{What happens on a second dataset?}
 \label{sec:q5}
@@ -376,36 +396,55 @@ compute. Report inter-rater agreement if a second reader is available.}
 % =====================================================================
 \section{Limitations}
 \label{sec:limitations}
-Every quantitative claim rests on a single dataset. We attempted a second
-and report in \S\ref{sec:q5} why it could not test the central result ---
-a property of the available benchmarks rather than of our design, but a
-limitation nonetheless.
+The positive result rests on one dataset and one model family. Of the two
+alternative models we tried on transcription, one is at a floor
+($0.8\%$ free-response accuracy) and cannot test it, and the other fails
+the artifact control of \S\ref{sec:q2}. Of the two alternative datasets,
+neither contains correct solutions, so neither can even be balanced ---
+and, by \S\ref{sec:trap}, an all-erroneous dataset is a single-label
+stratum, on which the measurement degenerates for the same reason.
 
-The perception result is confirmed on one model family only. Of the two
-alternatives we tried, one is at a floor on free-response transcription
-($0.8\%$ accuracy) and cannot test it, and the other fails the artifact
-control of \S\ref{sec:q2}. Whether perception entropy generalises across
-families is therefore open.
+We report the retraction of \S\ref{sec:trap} as a finding, but it was
+found late. It was not caught by the pre-registration, which set a
+threshold the null clears; nor by adequate power, which both strata had;
+nor by replication, which reproduced the artifact three times. Cross-model
+agreement is worth less than it appears when the mechanism is arithmetic
+rather than behavioural.
 
 Our clustering is exact-match over an extracted answer span, not semantic.
-Semantic clustering was attempted and abandoned: on this data an
-NLI-plus-union-find implementation merges opposed clusters through a
-single false-positive transitive link, and degrades sharply at larger
-$K$. The reported results avoid that path entirely rather than depending
-on it being fixed.
+Semantic clustering was attempted and abandoned: an NLI-plus-union-find
+implementation merges opposed clusters through a single false-positive
+transitive link and degrades at larger $K$. The reported results avoid
+that path rather than depending on it being fixed.
 
 Confidence intervals were added after the experiments were designed and
-run. They corrected several conclusions but cannot supply statistical
-power the studies were not sized for.
-\todo{add: $K{=}5$ gives few operating points, which is why two-thirds of
-conformal calibration splits cannot reach a $30\%$ risk target.}
+run. They corrected several conclusions but cannot supply power the
+studies were not sized for. $K=5$ also gives few operating points, which
+is why two-thirds of conformal calibration splits cannot reach a $30\%$
+risk target.
 
 % =====================================================================
 \section{Conclusion}
-\todo{write, ${\sim}150$ words. The line to land: whether sampling-based
-uncertainty ``works'' is not a property of the method alone --- on the same
-images and the same measure it is genuinely useful, apparently absent,
-and spuriously excellent, depending on how the evaluation is set up.}
+On handwritten transcription, self-disagreement across repeated samples is
+a usable error signal: it survives every control we apply, beats the
+model's own confidence and simpler summaries of the same samples, and
+yields a deferral rule that is right $57$ times in $61$. On grading, the
+same measure carries no signal at all.
+
+The distance between those two sentences is where the work is. Stratifying
+the grading task by ground truth --- an ordinary response to a biased
+model --- produces an effect of $0.80$--$0.85$ that is adequately powered,
+resolves against chance, clears a pre-registered threshold, and replicates
+across three independently trained model families. It is still an
+artifact, because within a single-label stratum the correctness label is
+the model's own answer under another name. A signal-free biased coin
+scores higher.
+
+We therefore recommend, for any evaluation of sampling-based uncertainty
+on a binary decision task: check whether the correctness label is a
+relabelling of the prediction before computing anything, and compare
+against a signal-free null rather than against $0.5$. Neither is
+expensive. Both would have saved us a result we believed for three weeks.
 
 % =====================================================================
 {\small

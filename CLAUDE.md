@@ -8,6 +8,44 @@ working context for future sessions, not a repeat of that.
 
 ## Current findings
 
+### RETRACTION (2026-08-09) — read this before citing any reasoning number
+
+**The has_error=1 stratified reasoning result (0.775–0.854, "confirmed
+across three model families") is withdrawn. It is an artifact.**
+
+Within a stratum where every item has the same true label, `grading_correct`
+is the *same column* as "what the model answered" — they agree on 100% of
+items at 7B. Reasoning entropy is computed from the very votes that produce
+that answer, so the stratified AUROC is near-circular. A signal-free biased
+coin (`pilot.plotting.bias_only_null_auroc`) reaches a **higher** AUROC than
+any model here: null medians 0.901 / 0.868 / 0.831 against observed
+0.854 / 0.801 / 0.775.
+
+The "sign reversal" between strata, previously the headline finding, is the
+same identity with the sign flipped: in the clean stratum correctness is the
+exact *complement* of the verdict, so the two stratum AUROCs sum to 1.
+
+**What survives:**
+- **Perception 0.835 is unaffected** and now has a demonstrated reason why:
+  correctness there depends on *which* label wins, not vote concentration.
+  38 items are unanimous and 3 of them are wrong; 4 max-entropy items are
+  right. No collapse.
+- **The honest reasoning result is the pooled one on a balanced sample:
+  ~0.52, no signal.**
+- ScratchMath's gate is reinforced — it is 100% error items, i.e. entirely a
+  single-label stratum, so its AUROC was degenerate on this ground too.
+
+**What none of the usual safeguards caught:** the pre-registered 0.70
+threshold (the null's 2.5th percentile clears it), adequate power (both
+strata had it), or replication (it reproduced the artifact three times).
+
+Locked in `pilot/tests/test_stratum_degeneracy.py` and
+`reference/stratum_degeneracy_20260809.json`. Test files asserting the old
+numbers carry a RETRACTED INTERPRETATION header — their numbers are correct,
+their meaning was not. `report/report.tex` Phases 4–5 still describe the old
+reading and are flagged but not yet rewritten; `paper/main.tex` is correct.
+
+
 **The n=300 balanced run (2026-08-02) is the current source of truth, and
 `report/report.tex` has NOT been updated with it** — the user updates the
 report on request only (see the conventions section). The report still

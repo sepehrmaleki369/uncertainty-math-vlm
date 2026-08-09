@@ -1,4 +1,20 @@
-"""Locks the 2026-08-06 3B has_error=1 stratum-powering run against the saved CSV.
+"""RETRACTED INTERPRETATION (2026-08-09). The numbers asserted below are
+correct and are kept as a record of what was measured. What they were
+taken to MEAN was wrong.
+
+Within a stratum where every item shares the same true label,
+"was the model correct" is the same column as "what did the model
+answer" -- they agree on 100% of items here. Reasoning entropy is
+computed from the very votes that produce that answer, so the
+stratified AUROC is near-circular, and a signal-free biased coin
+reaches a HIGHER value than any model in this project did. See
+pilot/tests/test_stratum_degeneracy.py.
+
+Do not cite the has_error stratified AUROCs as evidence that entropy
+predicts grading errors. The honest reasoning result is the pooled
+one on a balanced sample: ~0.52, no signal.
+
+Locks the 2026-08-06 3B has_error=1 stratum-powering run against the saved CSV.
 
 Direct follow-on to test_7b_stratum_powered.py, and the experiment that
 answers the question that run's confirmation raised: is the has_error=1

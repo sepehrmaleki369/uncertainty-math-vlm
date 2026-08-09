@@ -65,23 +65,27 @@ def build_expectations():
                  f"{ab['precision'] * 100:.1f}", f"{ab['recall'] * 100:.1f}"]))
     exp.append(("AURC", [f3(p["aurc"]), f3(p["aurc_baseline"])]))
 
+    # Grading: the paper now reports the POOLED number as the result and the
+    # stratified numbers only as the artifact they turned out to be, so the
+    # expectations follow the trap table rather than a replication table.
     q7 = snap("qwen7b_matched_n650_20260806.json")["reasoning"]
     q7_300 = snap("qwen7b_fermat_n300_20260805.json")["reasoning"]
-    exp.append(("pooled reasoning (n=300, balanced)",
+    exp.append(("pooled reasoning (the honest result)",
                 [f3(q7_300["pooled"]["auroc"]), f3(q7_300["pooled"]["ci_low"]),
                  f3(q7_300["pooled"]["ci_high"])]))
     for key, label in [("error_stratum", "error stratum"), ("clean_stratum", "clean stratum")]:
         d = q7[key]
-        exp.append((f"7B {label}",
-                    [f3(d["auroc"]), f3(d["ci_low"]), f3(d["ci_high"]), str(d["n_error"])]))
+        exp.append((f"7B {label} (shown as artifact)",
+                    [f3(d["auroc"]), f3(d["ci_low"]), f3(d["ci_high"])]))
 
-    for f, label, n in [("qwen3b_stratum_powered_n800_20260806.json", "3B", 650),
-                        ("qwen7b_matched_n650_20260806.json", "7B", 648),
-                        ("llava_stratum_powered_n550_20260807.json", "LLaVA", 400)]:
-        d = snap(f)["reasoning"]["error_stratum"]
-        exp.append((f"family table {label}",
-                    [f3(d["auroc"]), f3(d["ci_low"]), f3(d["ci_high"]),
-                     str(d["n_error"]), str(n)]))
+    deg = snap("stratum_degeneracy_20260809.json")["models"]
+    for label in ("Qwen2.5-VL-3B", "Qwen2.5-VL-7B", "LLaVA-NeXT-7B"):
+        m = deg[label]
+        n = m["bias_only_null"]
+        exp.append((f"trap table {label}",
+                    [f3(m["observed_auroc"]), f3(n["median"]),
+                     f3(n["ci_low"]), f3(n["ci_high"]),
+                     f"{m['collapse']['agreement'] * 100:.1f}"]))
 
     iv = snap("internvl3_fermat_n300_20260807.json")["perception"]
     exp.append(("InternVL3 raw",

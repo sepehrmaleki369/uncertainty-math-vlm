@@ -1147,3 +1147,99 @@ def classify_stratum_result(
     if ci["auroc"] >= threshold:
         return "confirmed"
     return "resolved_below_threshold"
+
+
+# --- The single-label-stratum trap ----------------------------------------
+#
+# Added 2026-08-09, after it invalidated this project's own headline
+# reasoning result. Recorded here as reusable code rather than as prose so
+# the check is cheap to run before trusting any future stratified AUROC.
+#
+# The trap: stratifying a binary-decision task by its ground-truth label
+# leaves a subset on which every item has the SAME true answer. Within it,
+# "was the model correct?" is no longer a separate fact from "what did the
+# model answer?" -- the two columns are identical (or exact complements).
+# Any uncertainty measure computed from the model's own samples therefore
+# predicts correctness almost by construction, because the majority vote it
+# is being scored against is a function of those same samples.
+#
+# On this project's grading data the effect is total: correctness and the
+# model's own verdict agreed on 100% of items within the has_error=1
+# stratum, and the stratified AUROC (0.801) was numerically identical to
+# the AUROC for predicting the model's own answer. The apparent
+# "sign reversal" between strata was likewise an identity, not a finding:
+# correct = said-error in one stratum and its complement in the other, so
+# anything correlating with the verdict must flip sign between them.
+
+
+def correctness_collapses_onto_prediction(
+    df: pd.DataFrame,
+    correctness_col: str,
+    prediction_col: str,
+) -> dict:
+    """How far 'was it correct' is just a relabelling of 'what did it say'.
+
+    Returns ``agreement`` (fraction of items where the two columns match)
+    and ``degenerate``, true when they agree -- or disagree -- almost
+    always, since an exact complement is just as degenerate as an exact
+    match. On a stratum flagged degenerate, an AUROC against correctness
+    is measuring the model's self-consistency, not its error rate, and
+    should not be reported as error prediction.
+    """
+    a = df[correctness_col].astype(bool).to_numpy()
+    b = df[prediction_col].astype(bool).to_numpy()
+    if len(a) == 0:
+        return {"agreement": float("nan"), "degenerate": False, "n_items": 0}
+    agreement = float((a == b).mean())
+    return {
+        "agreement": agreement,
+        # Either extreme is fatal; 0.0 means "always the complement".
+        "degenerate": bool(agreement >= 0.95 or agreement <= 0.05),
+        "n_items": int(len(a)),
+    }
+
+
+def bias_only_null_auroc(
+    n_items: int,
+    says_error_rate: float,
+    k: int = 5,
+    n_sims: int = 2000,
+    seed: int = 0,
+) -> dict:
+    """AUROC a model with NO item-level signal still attains on a single-label stratum.
+
+    Simulates a model that answers "error" with a fixed per-sample
+    probability, identical for every item, so nothing whatsoever
+    distinguishes a hard item from an easy one. Entropy over its K votes
+    is then pure sampling noise. Any AUROC it attains is manufactured by
+    the voting arithmetic: on an all-error stratum the majority is wrong
+    only when most samples dissent, and dissent is exactly what raises
+    entropy.
+
+    Use it as the floor a real stratified AUROC has to clear. On this
+    project's data none of the three models cleared it -- the observed
+    values sat *below* the null median, which is what settled the
+    question.
+    """
+    rng = np.random.default_rng(seed)
+    aurocs = []
+    for _ in range(n_sims):
+        votes = rng.random((n_items, k)) < says_error_rate
+        n_error_votes = votes.sum(axis=1)
+        # Entropy of a two-cluster split, as cluster_entropy would compute it.
+        p1 = n_error_votes / k
+        with np.errstate(divide="ignore", invalid="ignore"):
+            ent = -(np.where(p1 > 0, p1 * np.log(p1), 0.0)
+                    + np.where(p1 < 1, (1 - p1) * np.log(1 - p1), 0.0))
+        correct = n_error_votes > k / 2          # truth is "error" throughout
+        if correct.all() or (~correct).all():
+            continue
+        aurocs.append(compute_auroc(
+            pd.DataFrame({"_e": ent, "_c": correct}), "_e", "_c"))
+    arr = np.array([a for a in aurocs if not math.isnan(a)])
+    if arr.size == 0:
+        return {"median": float("nan"), "ci_low": float("nan"),
+                "ci_high": float("nan"), "n_valid": 0}
+    lo, med, hi = np.percentile(arr, [2.5, 50, 97.5])
+    return {"median": float(med), "ci_low": float(lo), "ci_high": float(hi),
+            "n_valid": int(arr.size)}
