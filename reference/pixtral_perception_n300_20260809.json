@@ -1,0 +1,184 @@
+{
+  "label": "Pixtral-12B, FERMAT n=300 balanced -- second model family for the perception arm; replicates Qwen-3B's 0.835 and survives the same artifact controls",
+  "n_items": 300,
+  "model_id": "mistral-community/pixtral-12b",
+  "k_transcription": 5,
+  "k_grading": 5,
+  "frac_has_error": 0.5,
+  "latex_parser_available": null,
+  "sympy_version": null,
+  "perception": {
+    "auroc": 0.8283657142857143,
+    "ci_low": 0.7815304022053265,
+    "ci_high": 0.8711102367108677,
+    "n_items": 300,
+    "n_error": 175,
+    "excludes_chance": true,
+    "accuracy": 0.4166666666666667,
+    "aurc": 0.3874274205028194,
+    "aurc_baseline": 0.5833333333333334,
+    "sensitivity": {
+      "full": {
+        "auroc": 0.8283657142857143,
+        "ci_low": 0.7815304022053265,
+        "ci_high": 0.8711102367108677,
+        "n_items": 300
+      },
+      "excl_parse_failures": {
+        "auroc": 0.8416213339640491,
+        "ci_low": 0.793433937574259,
+        "ci_high": 0.8864309284535773,
+        "n_items": 263
+      },
+      "excl_max_entropy": {
+        "auroc": 0.757774193548387,
+        "ci_low": 0.6968882534358296,
+        "ci_high": 0.8153884292093512,
+        "n_items": 249
+      },
+      "excl_both": {
+        "auroc": 0.7722363945578231,
+        "ci_low": 0.7100795943377352,
+        "ci_high": 0.8328240464805857,
+        "n_items": 217
+      }
+    },
+    "robust": true
+  },
+  "reasoning": {
+    "auroc": 0.5034691336061199,
+    "ci_low": 0.4518189697319881,
+    "ci_high": 0.5552850764371049,
+    "n_items": 300,
+    "n_error": 146,
+    "excludes_chance": false,
+    "aurc": 0.48195667038275736,
+    "aurc_baseline": 0.4866666666666667,
+    "error_stratum": {
+      "auroc": 0.9659863945578231,
+      "ci_low": 0.9452054794520548,
+      "ci_high": 0.9833511828264058,
+      "n_items": 150,
+      "n_error": 3,
+      "excludes_chance": true
+    },
+    "clean_stratum": {
+      "auroc": 0.13886113886113885,
+      "ci_low": 0.017605633802816902,
+      "ci_high": 0.3476027397260274,
+      "n_items": 150,
+      "n_error": 143,
+      "excludes_chance": false
+    }
+  },
+  "grading": {
+    "accuracy": 0.5133333333333333,
+    "accuracy_on_error_items": 0.98,
+    "accuracy_on_clean_items": 0.04666666666666667,
+    "baseline_accuracy": 0.5
+  },
+  "abstention": {
+    "n_flagged": 51,
+    "n_flagged_wrong": 51,
+    "precision": 1.0,
+    "recall": 0.2914285714285714
+  },
+  "risk_coverage": [
+    {
+      "threshold": 0.0,
+      "coverage": 0.18666666666666668,
+      "n_kept": 56,
+      "n_deferred": 244,
+      "accuracy_kept": 0.875,
+      "risk_kept": 0.125,
+      "n_errors_kept": 7
+    },
+    {
+      "threshold": 0.500402,
+      "coverage": 0.18666666666666668,
+      "n_kept": 56,
+      "n_deferred": 244,
+      "accuracy_kept": 0.875,
+      "risk_kept": 0.125,
+      "n_errors_kept": 7
+    },
+    {
+      "threshold": 0.673012,
+      "coverage": 0.37666666666666665,
+      "n_kept": 113,
+      "n_deferred": 187,
+      "accuracy_kept": 0.7433628318584071,
+      "risk_kept": 0.25663716814159293,
+      "n_errors_kept": 29
+    },
+    {
+      "threshold": 0.950271,
+      "coverage": 0.5533333333333333,
+      "n_kept": 166,
+      "n_deferred": 134,
+      "accuracy_kept": 0.6204819277108433,
+      "risk_kept": 0.3795180722891566,
+      "n_errors_kept": 63
+    },
+    {
+      "threshold": 1.05492,
+      "coverage": 0.5533333333333333,
+      "n_kept": 166,
+      "n_deferred": 134,
+      "accuracy_kept": 0.6204819277108433,
+      "risk_kept": 0.3795180722891566,
+      "n_errors_kept": 63
+    },
+    {
+      "threshold": 1.332179,
+      "coverage": 0.63,
+      "n_kept": 189,
+      "n_deferred": 111,
+      "accuracy_kept": 0.5767195767195767,
+      "risk_kept": 0.42328042328042326,
+      "n_errors_kept": 80
+    },
+    {
+      "threshold": 1.609438,
+      "coverage": 1.0,
+      "n_kept": 300,
+      "n_deferred": 0,
+      "accuracy_kept": 0.41666666666666663,
+      "risk_kept": 0.5833333333333334,
+      "n_errors_kept": 175
+    }
+  ],
+  "conformal": {
+    "target_0.30": {
+      "target_risk": 0.3,
+      "n_splits": 1000,
+      "n_valid": 276,
+      "n_unachievable": 724,
+      "mean_coverage": 0.18835748792270532,
+      "mean_test_risk": 0.18539204807199608,
+      "violation_rate": 0.025362318840579712
+    },
+    "target_0.40": {
+      "target_risk": 0.4,
+      "n_splits": 1000,
+      "n_valid": 934,
+      "n_unachievable": 66,
+      "mean_coverage": 0.2954389721627409,
+      "mean_test_risk": 0.21188844441124569,
+      "violation_rate": 0.006423982869379015
+    },
+    "target_0.50": {
+      "target_risk": 0.5,
+      "n_splits": 1000,
+      "n_valid": 1000,
+      "n_unachievable": 0,
+      "mean_coverage": 0.48752666666666666,
+      "mean_test_risk": 0.3329041732491709,
+      "violation_rate": 0.017
+    }
+  },
+  "integrity": {
+    "transcription_parse_failure_rate": 0.027333333333333334,
+    "grading_parse_failure_rate": 0.0026666666666666666
+  }
+}

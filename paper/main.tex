@@ -51,9 +51,10 @@ disagrees with itself is a cheap, label-free uncertainty signal. We
 evaluate it on handwritten mathematics and report one positive result, one
 negative result, and one way the evaluation itself manufactures a positive
 result that is not there. On transcription the signal works: AUROC
-$0.835$, robust to every artifact control we apply, better than the
-model's own token confidence by a resolved margin, and better than
-simpler reductions of the same samples; a rule that abstains whenever all
+$0.835$, replicated at $0.828$ on a second, architecturally independent
+model family, robust in both cases to every artifact control we apply,
+better than the model's own token confidence by a resolved margin, and
+better than simpler reductions of the same samples; a rule that abstains whenever all
 five samples disagree flags a genuinely wrong transcription $57$ times out
 of $61$. On grading it does not work: AUROC $0.520$ on a balanced sample,
 indistinguishable from chance. The trap lies between the two. Stratifying
@@ -141,8 +142,8 @@ over an \emph{extracted answer span} rather than semantic clustering of
 whole derivations; \S\ref{sec:limitations} records why.
 
 \paragraph{Models.}
-Qwen2.5-VL at 3B and 7B, LLaVA-NeXT-7B, and InternVL3-8B --- three
-independently trained families, all run in bfloat16.
+Qwen2.5-VL at 3B and 7B, Pixtral-12B, LLaVA-NeXT-7B and InternVL3-8B ---
+four independently trained families, all run in bfloat16.
 
 \paragraph{Statistics.}
 Every AUROC carries a $95\%$ bootstrap interval over $10{,}000$
@@ -173,6 +174,20 @@ precision, $31.3\%$ recall). Over the full risk--coverage curve this
 gives AURC~$0.410$ against a $0.607$ random-deferral baseline.
 \todo{Fig.~1: risk--coverage curve. Asset exists at
 report/figures/risk\_coverage\_n300.png}
+
+\subsection{Does it replicate on a second model family?}
+\label{sec:q1a}
+Yes. Pixtral-12B, architecturally independent of Qwen, reaches
+$0.828$ \ci{0.782}{0.871} on the same $300$ images at a comparable
+transcription accuracy ($41.7\%$ against $39.3\%$). The intervals overlap
+along almost their whole length, so the two are not resolvably different.
+
+More important than the point estimate is that it survives the control of
+\S\ref{sec:q2}: $0.772$ \ci{0.710}{0.833} after removing both parse
+failures and maximum-entropy items, with $17\%$ of items at the ceiling.
+\S\ref{sec:q6} describes a fourth model that scores \emph{higher} raw and
+does not survive that control, which is the reason we report the two
+together.
 
 \subsection{What does the entropy summary add?}
 \label{sec:q1b}
@@ -396,10 +411,13 @@ compute. Report inter-rater agreement if a second reader is available.}
 % =====================================================================
 \section{Limitations}
 \label{sec:limitations}
-The positive result rests on one dataset and one model family. Of the two
-alternative models we tried on transcription, one is at a floor
-($0.8\%$ free-response accuracy) and cannot test it, and the other fails
-the artifact control of \S\ref{sec:q2}. Of the two alternative datasets,
+The positive result rests on one dataset. It now holds on two model
+families (\S\ref{sec:q1a}), but two further models could not test it: one
+sits at a transcription floor of $0.8\%$, and one fails the artifact
+control of \S\ref{sec:q2}. Two of four attempts producing a usable
+measurement is itself worth stating --- the result requires a model with
+genuine dense-OCR competence, and that is not the common case among
+open-weight VLMs. Of the two alternative datasets,
 neither contains correct solutions, so neither can even be balanced ---
 and, by \S\ref{sec:trap}, an all-erroneous dataset is a single-label
 stratum, on which the measurement degenerates for the same reason.

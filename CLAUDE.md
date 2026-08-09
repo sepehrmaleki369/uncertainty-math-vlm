@@ -8,6 +8,45 @@ working context for future sessions, not a repeat of that.
 
 ## Current findings
 
+### RUN 2026-08-09: Pixtral-12B replicates the perception result
+
+`pilot/16_pixtral_perception.ipynb`, same n=300 balanced sample, bf16.
+`results/pixtral_perception_full_n300_pixtral-12b_20260809T211028Z.csv`
+(Drive-only). Locked in `pilot/tests/test_pixtral_perception.py`, snapshot
+`reference/pixtral_perception_n300_20260809.json`. Verified: 0/300
+mismatches recomputing entropy/correctness/parse-failures from raw samples.
+
+- **Perception AUROC 0.828 [0.782, 0.871]** vs Qwen-3B's 0.835
+  [0.787, 0.879]. Intervals overlap almost entirely — not resolvably
+  different. Accuracy 41.7% vs Qwen's 39.3%.
+- **Survives the control that killed InternVL3**: 0.758 excluding
+  max-entropy items, 0.772 excluding both cuts, `robust=True`. Only 17% of
+  items at the ceiling (InternVL3: 67%).
+- **So the perception claim is now two independent families, both robust** —
+  the single biggest strengthening available to the paper, and the reason
+  the InternVL3 contrast lands: it scored *higher* raw (0.915) and
+  collapsed to 0.556.
+- Model chosen on evidence: the FERMAT paper benchmarks nine VLMs and finds
+  Pixtral-124B among the strongest at reading the handwriting. Mistral is
+  genuinely independent of Qwen (unlike MiniCPM-V / olmOCR, both Qwen2-VL
+  fine-tunes). Llama-3.2-11B rejected as `gated=manual`; Phi-3.5-vision as
+  `trust_remote_code` + custom architecture, the shape that crashed
+  InternVL3.
+- **Abstention precision is 51/51 = 100% here.** Do NOT report that as
+  beating Qwen's 57/61 without the caveat — this project already watched
+  14/14 at n=100 decay to 93.4% at n=300. Treat it as small-sample optimism
+  about the tail.
+- Interface verified against the published chat template before writing
+  code: Pixtral supports a system role (so the Qwen system+user shape is
+  used, not LLaVA's folded-in workaround), the system message must be a
+  plain string, and image chunks carry no payload.
+- **Notebook gap worth fixing if reused:** the gate cell suppresses the
+  AUROC unconditionally, so even the n=300 run printed none — it was
+  computed offline from the CSV.
+- Scored into `paper/main.tex` §"Does it replicate on a second model
+  family?", Setup, Limitations and the abstract; slide 2 gained a
+  cross-model strip.
+
 ### RETRACTION (2026-08-09) — read this before citing any reasoning number
 
 **The has_error=1 stratified reasoning result (0.775–0.854, "confirmed

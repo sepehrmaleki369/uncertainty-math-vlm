@@ -186,7 +186,7 @@ p0 = tf.add_paragraph(); p0.space_before = Pt(5)
 run(p0, "We do that 5 times per page and measure how much the readings disagree.",
     15, C["soft"])
 
-table(s, M, Inches(2.9), Inches(6.9),
+table(s, M, Inches(2.72), Inches(6.9),
       header=["", "AUROC  (95% CI)"],
       rows=[[("All 300 pages", C["ink"], True),
              ("0.835", C["good"], True, 15, "[0.787, 0.879]")],
@@ -194,19 +194,43 @@ table(s, M, Inches(2.9), Inches(6.9),
              ("0.796", C["good"], True, 15, "[0.736, 0.852]")],
             [("The model's own confidence", C["ink"], True),
              ("0.537", C["bad"], True, 15, "[0.469, 0.605]")]],
-      col_w=[Inches(3.9), Inches(3.0)], row_h=Inches(0.56))
+      col_w=[Inches(3.9), Inches(3.0)], row_h=Inches(0.5))
 
-tf = tb(s, M, Inches(4.88), Inches(6.5), Inches(0.7))
+tf = tb(s, M, Inches(4.5), Inches(6.5), Inches(0.6))
 run(tf.paragraphs[0], "Row 3's interval crosses 0.50 — the model's own confidence "
     "score is no better than a coin flip here.", 12, C["soft"], italic=True)
 
-panel(s, Inches(7.9), Inches(2.8), Inches(4.8), Inches(2.5), accent=C["good"])
-tf = tb(s, Inches(8.22), Inches(3.15), Inches(4.2), Inches(2.0))
+panel(s, Inches(7.9), Inches(2.6), Inches(4.8), Inches(2.2), accent=C["good"])
+tf = tb(s, Inches(8.22), Inches(2.88), Inches(4.2), Inches(1.9))
 run(tf.paragraphs[0], "All 5 readings disagree?", 18, C["ink"], font=SERIF, bold=True)
 p = tf.add_paragraph(); p.space_before = Pt(8)
 run(p, "Wrong 57 times out of 61.", 18, C["good"], font=SERIF, bold=True)
 p = tf.add_paragraph(); p.space_before = Pt(12)
 run(p, "Flag those for a human. Catches 57 real errors, wastes 4.", 12.5, C["soft"])
+# Cross-model strip: the perception story including the trap, in three
+# rows. LLaVA is folded into the caption rather than given a row of
+# dashes -- it never produced a measurement, so it is context, not a
+# comparison. Added after Pixtral replicated the result on 2026-08-09.
+panel(s, M, Inches(5.32), W - 2 * M, Inches(1.5), accent=C["accent"])
+tf = tb(s, M + Inches(0.3), Inches(5.5), Inches(3.6), Inches(1.25))
+run(tf.paragraphs[0], "ACROSS MODEL FAMILIES", 10, C["accent"], bold=True)
+p3 = tf.add_paragraph(); p3.space_before = Pt(5)
+run(p3, "A high score means nothing until the control is applied.",
+    12.5, C["soft"])
+p3 = tf.add_paragraph(); p3.space_before = Pt(4)
+run(p3, "A fourth, LLaVA-NeXT-7B, could not read the pages at all.",
+    11.5, C["faint"])
+
+table(s, Inches(4.8), Inches(5.5), Inches(7.9),
+      header=["", "AUROC", "after control", ""],
+      rows=[[("Qwen2.5-VL-3B", C["ink"], True), ("0.835", C["good"], True, 13),
+             ("0.796", C["good"], True, 13), ("holds", C["good"], False, 12)],
+            [("Pixtral-12B", C["ink"], True), ("0.828", C["good"], True, 13),
+             ("0.772", C["good"], True, 13), ("holds", C["good"], False, 12)],
+            [("InternVL3-8B", C["ink"], True), ("0.915", C["bad"], True, 13),
+             ("0.556", C["bad"], True, 13), ("collapses", C["bad"], False, 12)]],
+      col_w=[Inches(2.4), Inches(1.4), Inches(1.9), Inches(2.2)], row_h=Inches(0.29))
+
 context(s, "FERMAT", "perception — reading the page")
 slide_num(s, 2, 8)
 
@@ -366,7 +390,7 @@ title(s, "One question")
 panel(s, M, Inches(2.0), Inches(5.95), Inches(2.75), accent=C["good"])
 tf = tb(s, M + Inches(0.32), Inches(2.3), Inches(5.3), Inches(2.3))
 run(tf.paragraphs[0], "SOLID", 11, C["good"], bold=True)
-for t in ["Perception: 0.835, survives every check",
+for t in ["Perception: 0.835, replicated at 0.828\n    on a second model family",
           "Abstention rule: 57 of 61",
           "Reasoning: no signal \u2014 measured, not assumed",
           "The stratification trap: a method finding"]:
