@@ -43,5 +43,14 @@
     "majority_count": 1,
     "n_distinct_labels": 5,
     "correct": false
+  },
+  "image": {
+    "filename": "image.jpg",
+    "width": 1600,
+    "height": 878,
+    "original_width": 2135,
+    "original_height": 1171,
+    "downscaled": true,
+    "bytes": 143615
   }
 }
