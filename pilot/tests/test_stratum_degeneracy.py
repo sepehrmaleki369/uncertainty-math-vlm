@@ -22,9 +22,12 @@ Two independent demonstrations:
    exactly what raises entropy, so the association is arithmetic.
 
 The perception arm is not affected, and one test here pins the structural
-reason: there, correctness depends on which label wins rather than on how
-concentrated the votes are, so a model can agree with itself and still be
-wrong -- which happens on real items.
+reason: label cardinality. Grading truth is binary, so stratifying makes it
+constant within a group and correctness becomes a function of the vote.
+Transcription truth is an expression from an unbounded set, so five samples
+can agree and still all be wrong -- which happens on real items. The
+collapse is caused by stratifying, not by the label type; low cardinality
+is merely what makes stratifying tempting and total.
 """
 
 import ast

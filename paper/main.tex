@@ -341,15 +341,32 @@ threshold as necessary but not sufficient --- ours was cleared by the null.
 
 \subsection{Why transcription is not affected}
 \label{sec:whyperception}
-The collapse requires correctness to be a function of the vote
-\emph{count}, which is also what entropy summarises. Transcription
-correctness instead depends on \emph{which} label wins, so agreement does
-not imply correctness: $38$ items are unanimous and $3$ of those are
-wrong, while $4$ items at maximum entropy are right. Correct and incorrect
-items occur at both ends of the entropy range, the label is not a
-relabelling of the prediction, and \S\ref{sec:q1b} shows entropy
-outperforming simpler summaries of the same votes --- which could not
-happen if it were merely counting dissent.
+Both tasks have ground truth; what differs is how many values it can take.
+Grading truth is binary, so stratifying by it makes the truth
+\emph{constant} within each group, and correctness reduces to
+$\text{correct} = (\text{majority vote} = \text{that constant})$ --- a
+function of the vote, which is also what entropy summarises.
+Transcription truth is a mathematical expression drawn from an effectively
+unbounded set. Five samples can agree perfectly on
+$\frac{5}{2(x-1)}$ and still be wrong because the reference was
+$\frac{5}{2(x+1)}$, so agreement carries no guarantee of correctness. In
+the data, $38$ items are unanimous and $3$ of those are wrong, while $4$
+items at maximum entropy are right; correct and incorrect items occur at
+both ends of the entropy range.
+
+It is worth being precise about which ingredient does the damage. The
+collapse is caused by \emph{stratifying}, not by the label type --- grouping
+transcription items by their exact reference answer would degenerate in
+exactly the same way. Low cardinality is what makes stratification both
+tempting and total: with a binary label it is the natural response to class
+imbalance, and it yields precisely two groups, each fully degenerate. With
+hundreds of distinct answers nobody would stratify, because the groups
+would have one member each. The trap is therefore specific to
+binary-decision tasks, which is where it is most likely to be walked into.
+
+Consistent with this, \S\ref{sec:q1b} shows transcription entropy
+outperforming simpler summaries of the same votes; a measure that were
+merely counting dissent could not.
 
 \subsection{What happens on a second dataset?}
 \label{sec:q5}

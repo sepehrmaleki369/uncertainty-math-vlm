@@ -65,10 +65,17 @@ same identity with the sign flipped: in the clean stratum correctness is the
 exact *complement* of the verdict, so the two stratum AUROCs sum to 1.
 
 **What survives:**
-- **Perception 0.835 is unaffected** and now has a demonstrated reason why:
-  correctness there depends on *which* label wins, not vote concentration.
+- **Perception is unaffected**, and the reason is label cardinality. Both
+  arms have ground truth; grading's is binary, so stratifying by it makes
+  the truth *constant* within a group and correctness reduces to
+  `majority == that constant` — a function of the vote. Transcription truth
+  is a math expression from an effectively unbounded set: five samples can
+  agree on `5/2(x-1)` and still be wrong because the truth was `5/2(x+1)`.
   38 items are unanimous and 3 of them are wrong; 4 max-entropy items are
-  right. No collapse.
+  right. Note it is the *stratifying* that collapses it, not the label type
+  — grouping transcription items by exact reference answer would degenerate
+  identically. Low cardinality is what makes stratification both tempting
+  and total, which is why the trap is specific to binary-decision tasks.
 - **The honest reasoning result is the pooled one on a balanced sample:
   ~0.52, no signal.**
 - ScratchMath's gate is reinforced — it is 100% error items, i.e. entirely a
