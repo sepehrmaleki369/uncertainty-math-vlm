@@ -106,8 +106,15 @@ def table(slide, x, y, w, rows, col_w, header=None, row_h=Inches(0.42)):
             color = style[0] if style else C["ink"]
             bold = style[1] if len(style) > 1 else False
             size = style[2] if len(style) > 2 else 13
+            ci = style[3] if len(style) > 3 else None
             tf = tb(slide, cx, yy, cw, row_h, anchor=MSO_ANCHOR.TOP)
             run(tf.paragraphs[0], text, size, color, bold=bold)
+            if ci:
+                # CI rides in the same cell, smaller and grey, so the point
+                # estimate stays scannable while the interval is always
+                # visible next to it -- never on its own line, which reads
+                # as a separate number.
+                run(tf.paragraphs[0], "  " + ci, size - 3.5, C["faint"])
             cx += cw
         yy += row_h
         rule(slide, yy - Inches(0.08))
@@ -153,12 +160,20 @@ tf = tb(s, M, Inches(1.75), Inches(6), Inches(0.4))
 run(tf.paragraphs[0], "Read the same page 5 times. Measure the disagreement.",
     15, C["soft"])
 
-table(s, M, Inches(2.55), Inches(6.6),
-      header=["", "AUROC"],
-      rows=[[("Self-disagreement", C["ink"], True), ("0.835", C["good"], True, 15)],
-            ["…after every artifact cut", ("0.796", C["good"], True, 15)],
-            ["Model's own confidence", ("0.537", C["bad"], True, 15)]],
-      col_w=[Inches(4.3), Inches(2.3)], row_h=Inches(0.5))
+table(s, M, Inches(2.55), Inches(6.9),
+      header=["", "AUROC  (95% CI)"],
+      rows=[[("All 300 items", C["ink"], True),
+             ("0.835", C["good"], True, 15, "[0.787, 0.879]")],
+            [("Hardest cases deleted", C["ink"], True),
+             ("0.796", C["good"], True, 15, "[0.736, 0.852]")],
+            [("Model's own confidence", C["ink"], True),
+             ("0.537", C["bad"], True, 15, "[0.469, 0.605]")]],
+      col_w=[Inches(3.5), Inches(3.4)], row_h=Inches(0.56))
+
+tf = tb(s, M, Inches(4.55), Inches(6.4), Inches(0.7))
+run(tf.paragraphs[0], "Row 2 explained on slide 5. Row 3's interval crosses 0.50 — "
+    "the model's own confidence is no better than a coin flip here.",
+    12, C["soft"], italic=True)
 
 panel(s, Inches(7.5), Inches(2.4), Inches(5.2), Inches(2.4), accent=C["good"])
 tf = tb(s, Inches(7.85), Inches(2.75), Inches(4.5), Inches(1.9))
@@ -225,13 +240,16 @@ run(tf.paragraphs[0], "Grading task. Same 300 items, split by whether an error w
 
 table(s, M, Inches(2.6), Inches(12),
       header=["Scored on", "AUROC", ""],
-      rows=[[("Everything pooled", C["ink"], True), ("0.520", C["bad"], True, 16),
+      rows=[[("Everything pooled", C["ink"], True),
+             ("0.520", C["bad"], True, 16, "[0.458, 0.582]"),
              ("looks like chance", C["bad"], False, 13)],
-            [("Items with an error", C["ink"], True), ("0.801", C["good"], True, 16),
+            [("Items with an error", C["ink"], True),
+             ("0.801", C["good"], True, 16, "[0.751, 0.846]"),
              ("works well", C["good"], False, 13)],
-            [("Items that are correct", C["ink"], True), ("0.280", C["good"], True, 16),
+            [("Items that are correct", C["ink"], True),
+             ("0.280", C["good"], True, 16, "[0.200, 0.366]"),
              ("works backwards", C["good"], False, 13)]],
-      col_w=[Inches(4.6), Inches(2.2), Inches(5.2)], row_h=Inches(0.62))
+      col_w=[Inches(4.3), Inches(3.6), Inches(4.1)], row_h=Inches(0.62))
 
 panel(s, M, Inches(5.05), W - 2 * M, Inches(1.5), accent=C["bad"])
 tf = tb(s, M + Inches(0.35), Inches(5.35), Inches(11.8), Inches(1.0))
@@ -246,27 +264,36 @@ slide_num(s, 4)
 s = prs.slides.add_slide(BLANK)
 eyebrow(s, "Replication", C["good"])
 title(s, "Holds across three model families")
+# (the lower half of this slide explains the robustness check)
 
-table(s, M, Inches(2.2), Inches(6.4),
-      header=["Model", "AUROC"],
-      rows=[["Qwen2.5-VL-3B", ("0.854", C["good"], True, 15)],
-            ["Qwen2.5-VL-7B", ("0.801", C["good"], True, 15)],
-            ["LLaVA-NeXT-7B", ("0.775", C["good"], True, 15)]],
-      col_w=[Inches(4.0), Inches(2.4)], row_h=Inches(0.52))
+table(s, M, Inches(2.15), Inches(6.1),
+      header=["Model", "AUROC  (95% CI)"],
+      rows=[[("Qwen2.5-VL-3B", C["ink"], True),
+             ("0.854", C["good"], True, 15, "[0.796, 0.902]")],
+            [("Qwen2.5-VL-7B", C["ink"], True),
+             ("0.801", C["good"], True, 15, "[0.751, 0.846]")],
+            [("LLaVA-NeXT-7B", C["ink"], True),
+             ("0.775", C["good"], True, 15, "[0.694, 0.848]")]],
+      col_w=[Inches(2.9), Inches(3.2)], row_h=Inches(0.54))
 
-tf = tb(s, M, Inches(4.15), Inches(6.4), Inches(0.5))
-run(tf.paragraphs[0], "Confidence intervals overlap. Not a Qwen quirk.", 13.5, C["soft"])
+tf = tb(s, M, Inches(4.0), Inches(6.1), Inches(0.4))
+run(tf.paragraphs[0], "Intervals overlap. Not a Qwen quirk.", 13.5, C["soft"])
 
-panel(s, Inches(7.5), Inches(2.1), Inches(5.2), Inches(3.0), accent=C["bad"])
-tf = tb(s, Inches(7.85), Inches(2.45), Inches(4.5), Inches(2.5))
-run(tf.paragraphs[0], "A 4th model looked best", 12, C["faint"], bold=True)
-p = tf.add_paragraph(); p.space_before = Pt(10)
-run(p, "0.915", 30, C["bad"], font=SERIF, bold=True)
-run(p, "   →   ", 20, C["faint"])
-run(p, "0.556", 30, C["ink"], font=SERIF, bold=True)
-p = tf.add_paragraph(); p.space_before = Pt(12)
-run(p, "InternVL3. Under the same robustness check, it collapsed to chance — "
-       "it was producing incoherent output on 2/3 of items.", 13, C["soft"])
+# The robustness check is explained here rather than on slide 2, because
+# this is where it does the work: it is the reason a 0.915 gets rejected.
+panel(s, M, Inches(4.6), W - 2 * M, Inches(2.15), accent=C["accent"])
+tf = tb(s, M + Inches(0.32), Inches(4.84), Inches(11.85), Inches(1.85))
+run(tf.paragraphs[0], "THE ROBUSTNESS CHECK", 10.5, C["accent"], bold=True)
+p2 = tf.add_paragraph(); p2.space_before = Pt(7)
+run(p2, "Delete every item where all 5 readings differed.", 15, C["ink"], bold=True)
+run(p2, "  Those are easy to flag and nearly always wrong. If the score "
+        "survives, the signal is graded. If it collapses, the score was only "
+        "detecting total breakdown.", 15, C["soft"])
+p2 = tf.add_paragraph(); p2.space_before = Pt(12)
+run(p2, "Qwen  0.835 \u2192 0.794", 15, C["good"], bold=True)
+run(p2, "   239 items left, barely moves          ", 13, C["soft"])
+run(p2, "InternVL3  0.915 \u2192 0.556", 15, C["bad"], bold=True)
+run(p2, "   only 98 left, collapses to chance", 13, C["soft"])
 slide_num(s, 5)
 
 # ─────────────── 6 · open decision ───────────────
@@ -303,7 +330,7 @@ run(p, "~3 weeks to submission. All experiments done; remaining work is the writ
     13.5, C["soft"])
 slide_num(s, 6)
 
-out = "/private/tmp/claude-501/-Users-sepehrmaleki-Documents-spring-2026-uncertainty-math-vlm/d55af82e-e184-4387-a524-130d2a77780c/scratchpad/deck/fermat_findings.pptx"
+out = "slides/fermat_findings.pptx"
 prs.save(out)
 import os
 print(f"saved {out}  ({os.path.getsize(out)/1024/1024:.2f} MB, {len(prs.slides.__iter__.__self__._sldIdLst)} slides)")
