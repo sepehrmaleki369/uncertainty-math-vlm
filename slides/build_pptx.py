@@ -177,11 +177,16 @@ s = prs.slides.add_slide(BLANK)
 eyebrow(s, "Perception — confirmed", C["good"])
 title(s, "When it can't read a page twice the same way, it's wrong")
 
-tf = tb(s, M, Inches(1.95), Inches(8), Inches(0.4))
-run(tf.paragraphs[0], "Read the same page 5 times. Measure the disagreement.",
+tf = tb(s, M, Inches(1.9), Inches(11.9), Inches(0.85))
+p0 = tf.paragraphs[0]
+run(p0, "The model is asked to ", 15, C["soft"])
+run(p0, "\u201cexplicitly perform OCR on the handwritten text and extract the "
+        "content in LaTeX format.\u201d", 15, C["ink"], italic=True)
+p0 = tf.add_paragraph(); p0.space_before = Pt(5)
+run(p0, "We do that 5 times per page and measure how much the readings disagree.",
     15, C["soft"])
 
-table(s, M, Inches(2.62), Inches(6.9),
+table(s, M, Inches(2.9), Inches(6.9),
       header=["", "AUROC  (95% CI)"],
       rows=[[("All 300 pages", C["ink"], True),
              ("0.835", C["good"], True, 15, "[0.787, 0.879]")],
@@ -191,12 +196,12 @@ table(s, M, Inches(2.62), Inches(6.9),
              ("0.537", C["bad"], True, 15, "[0.469, 0.605]")]],
       col_w=[Inches(3.9), Inches(3.0)], row_h=Inches(0.56))
 
-tf = tb(s, M, Inches(4.62), Inches(6.5), Inches(0.7))
+tf = tb(s, M, Inches(4.88), Inches(6.5), Inches(0.7))
 run(tf.paragraphs[0], "Row 3's interval crosses 0.50 — the model's own confidence "
     "score is no better than a coin flip here.", 12, C["soft"], italic=True)
 
-panel(s, Inches(7.9), Inches(2.5), Inches(4.8), Inches(2.5), accent=C["good"])
-tf = tb(s, Inches(8.22), Inches(2.85), Inches(4.2), Inches(2.0))
+panel(s, Inches(7.9), Inches(2.8), Inches(4.8), Inches(2.5), accent=C["good"])
+tf = tb(s, Inches(8.22), Inches(3.15), Inches(4.2), Inches(2.0))
 run(tf.paragraphs[0], "All 5 readings disagree?", 18, C["ink"], font=SERIF, bold=True)
 p = tf.add_paragraph(); p.space_before = Pt(8)
 run(p, "Wrong 57 times out of 61.", 18, C["good"], font=SERIF, bold=True)
@@ -406,11 +411,14 @@ run(p, "\u22127866", 13.5, C["bad"], bold=True)
 run(p, ".", 13.5, C["soft"])
 
 # what has already been screened
-panel(s, M, Inches(3.45), Inches(5.95), Inches(2.55), accent=C["bad"])
+panel(s, M, Inches(3.45), Inches(5.95), Inches(2.7), accent=C["bad"])
 tf = tb(s, M + Inches(0.32), Inches(3.68), Inches(5.3), Inches(2.2))
 run(tf.paragraphs[0], "ALREADY TRIED — PROMPT LEVEL", 10, C["faint"], bold=True)
 p = tf.add_paragraph(); p.space_before = Pt(8)
-run(p, "\u201cWork the problem yourself, then judge.\u201d", 13.5, C["ink"], italic=True)
+run(p, "\u201cFirst, transcribe the final result the student arrived at, exactly "
+       "as written. Then check that result by working the problem yourself. "
+       "Only then decide whether the Answer contains an error.\u201d",
+    12, C["ink"], italic=True)
 p = tf.add_paragraph(); p.space_before = Pt(9)
 run(p, "Qwen-3B  ", 13, C["ink"], bold=True)
 run(p, "says-error 94% \u2192 38%, accuracy 0.51 \u2192 0.55", 13, C["soft"])
@@ -421,7 +429,7 @@ p = tf.add_paragraph(); p.space_before = Pt(9)
 run(p, "Behaviour swung hard. Accuracy did not move.", 13, C["bad"], bold=True)
 
 # what is still open
-panel(s, Inches(6.95), Inches(3.45), Inches(5.75), Inches(2.55), accent=C["good"])
+panel(s, Inches(6.95), Inches(3.45), Inches(5.75), Inches(2.7), accent=C["good"])
 tf = tb(s, Inches(7.27), Inches(3.68), Inches(5.15), Inches(2.2))
 run(tf.paragraphs[0], "NOT YET TRIED — PIPELINE LEVEL", 10, C["faint"], bold=True)
 p = tf.add_paragraph(); p.space_before = Pt(8)
@@ -434,8 +442,8 @@ p = tf.add_paragraph(); p.space_before = Pt(8)
 run(p, "Then re-measure: does the split on slide 4 still hold, and does "
        "uncertainty still predict the errors?", 13, C["soft"])
 
-panel(s, M, Inches(6.25), W - 2 * M, Inches(0.72), accent=C["accent"])
-tf = tb(s, M + Inches(0.35), Inches(6.42), Inches(11.8), Inches(0.45))
+panel(s, M, Inches(6.22), W - 2 * M, Inches(0.6), accent=C["accent"])
+tf = tb(s, M + Inches(0.35), Inches(6.36), Inches(11.8), Inches(0.42))
 run(tf.paragraphs[0], "Worth the remaining time — or write up what we have?",
     15, C["ink"], font=SERIF, bold=True)
 context(s, "FERMAT", "reasoning — proposed")
