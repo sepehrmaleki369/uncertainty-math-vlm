@@ -55,8 +55,8 @@ that the answer depends as much on how it is evaluated as on the model.
 On transcription, self-disagreement predicts error well
 (AUROC~$0.835$), survives every artifact control we apply, and beats the
 model's own token confidence by a resolved margin; a rule that abstains
-when all five samples disagree is wrong-flagging correct
-$57$ of $61$ times. On grading, the pooled statistic reads
+whenever all five samples disagree flags a genuinely wrong
+transcription $57$ times out of $61$. On grading, the pooled statistic reads
 $0.520$~--- indistinguishable from chance --- and we show this is an
 evaluation artifact rather than a null result: the model answers ``there
 is an error'' for most inputs, and uncertainty predicts its mistakes in
@@ -361,7 +361,13 @@ and spuriously excellent, depending on how the evaluation is set up.}
 
 % =====================================================================
 {\small
-\bibliographystyle{ieee_fullname}
+% The official WACV/CVPR kit provides ieee_fullname.bst. It is not part of a
+% stock TeX Live install, so this falls back to a bundled IEEE-ish style to
+% keep the draft compilable outside the kit. Inside the kit the first branch
+% is taken automatically -- nothing to remember to switch back.
+\IfFileExists{ieee_fullname.bst}
+  {\bibliographystyle{ieee_fullname}}
+  {\bibliographystyle{ieeetr}}
 \bibliography{refs}
 }
 

@@ -1,0 +1,19 @@
+\begin{thebibliography}{1}
+
+\bibitem{fermat}
+``Can vision-language models evaluate handwritten math?,'' {\em arXiv preprint
+  arXiv:2501.07244}, 2025.
+\newblock VERIFY authors and venue.
+
+\bibitem{errorradar}
+``Errorradar: Benchmarking complex mathematical reasoning of multimodal large
+  language models via error detection,'' {\em arXiv preprint arXiv:2410.04509},
+  2024.
+\newblock VERIFY authors and venue.
+
+\bibitem{scratchmath}
+``Scratchmath.''
+\newblock VERIFY -- dataset used via HuggingFace songdj/ScratchMath; find and
+  cite the accompanying paper.
+
+\end{thebibliography}
