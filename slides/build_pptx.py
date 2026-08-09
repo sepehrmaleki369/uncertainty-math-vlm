@@ -62,7 +62,7 @@ def title(slide, text, y=Inches(0.78), size=31, width=11.4):
     run(tf.paragraphs[0], text, size, C["ink"], font=SERIF, bold=True)
 
 
-def slide_num(slide, n, total=7):
+def slide_num(slide, n, total=8):
     tf = tb(slide, W - M - Inches(1.2), H - Inches(0.52), Inches(1.2), Inches(0.3),
             align=PP_ALIGN.RIGHT)
     run(tf.paragraphs[0], f"{n} / {total}", 10, C["faint"])
@@ -170,7 +170,7 @@ table(s, x2, Inches(5.38), Inches(6.5),
             ["ErrorRadar  /  ScratchMath", ("no clean items", C["bad"], True)]],
       col_w=[Inches(3.6), Inches(2.9)], row_h=Inches(0.4))
 context(s, "FERMAT", "setup")
-slide_num(s, 1, 7)
+slide_num(s, 1, 8)
 
 # ───────────────────── 2 · perception result ─────────────────────
 s = prs.slides.add_slide(BLANK)
@@ -203,7 +203,7 @@ run(p, "Wrong 57 times out of 61.", 18, C["good"], font=SERIF, bold=True)
 p = tf.add_paragraph(); p.space_before = Pt(12)
 run(p, "Flag those for a human. Catches 57 real errors, wastes 4.", 12.5, C["soft"])
 context(s, "FERMAT", "perception — reading the page")
-slide_num(s, 2, 7)
+slide_num(s, 2, 8)
 
 # ─────────────── 3 · perception evidence + the check ───────────────
 s = prs.slides.add_slide(BLANK)
@@ -245,18 +245,23 @@ run(p, "delete every page where all 5 readings differed — easy to flag, nearly
 run(p, "0.835 \u2192 0.794", 13.5, C["good"], bold=True)
 run(p, ", 239 pages left.", 13.5, C["soft"])
 context(s, "FERMAT", "perception — Qwen2.5-VL-3B")
-slide_num(s, 3, 7)
+slide_num(s, 3, 8)
 
 # ─────────────── 4 · reasoning: pooled vs split ───────────────
 s = prs.slides.add_slide(BLANK)
 eyebrow(s, "Reasoning — the key finding", C["warn"])
 title(s, "The average hid the finding")
 
-tf = tb(s, M, Inches(1.85), Inches(11.5), Inches(0.4))
-run(tf.paragraphs[0], "Different task: the model grades the page. Same 300 pages, "
-    "split by whether an error was really there.", 15, C["soft"])
+tf = tb(s, M, Inches(1.8), Inches(11.7), Inches(0.85))
+p0 = tf.paragraphs[0]
+run(p0, "Different task. The model is asked only: ", 15, C["soft"])
+run(p0, "\u201canalyze the Answer to determine whether there is any error.\u201d",
+    15, C["ink"], italic=True)
+run(p0, "  It is never shown the correct answer.", 15, C["soft"])
+p0 = tf.add_paragraph(); p0.space_before = Pt(5)
+run(p0, "Same 300 pages, split by whether an error was really there.", 15, C["soft"])
 
-table(s, M, Inches(2.65), Inches(12),
+table(s, M, Inches(2.85), Inches(12),
       header=["Scored on", "AUROC  (95% CI)", ""],
       rows=[[("Everything pooled", C["ink"], True),
              ("0.520", C["bad"], True, 16, "[0.458, 0.582]"),
@@ -269,15 +274,15 @@ table(s, M, Inches(2.65), Inches(12),
              ("works backwards", C["good"], False, 13)]],
       col_w=[Inches(4.3), Inches(3.6), Inches(4.1)], row_h=Inches(0.62))
 
-panel(s, M, Inches(5.05), W - 2 * M, Inches(1.5), accent=C["bad"])
-tf = tb(s, M + Inches(0.35), Inches(5.35), Inches(11.8), Inches(1.0))
-run(tf.paragraphs[0], "0.80 and 0.28 average out to 0.52.", 23, C["ink"],
+panel(s, M, Inches(5.15), W - 2 * M, Inches(1.42), accent=C["bad"])
+tf = tb(s, M + Inches(0.35), Inches(5.42), Inches(11.8), Inches(1.0))
+run(tf.paragraphs[0], "0.80 and 0.28 average out to 0.52.", 22, C["ink"],
     font=SERIF, bold=True)
 p = tf.add_paragraph(); p.space_before = Pt(8)
 run(p, "Both halves are real. Pooling reports neither. "
        "Only visible because FERMAT has correct pages to separate out.", 13.5, C["soft"])
 context(s, "FERMAT", "reasoning — grading the page  ·  Qwen2.5-VL-7B")
-slide_num(s, 4, 7)
+slide_num(s, 4, 8)
 
 # ─────────────── 5 · reasoning replicates ───────────────
 s = prs.slides.add_slide(BLANK)
@@ -305,7 +310,7 @@ run(tf.paragraphs[0], "Three independently built models. Intervals overlap.",
 p = tf.add_paragraph(); p.space_before = Pt(7)
 run(p, "Not a quirk of one model.", 13.5, C["soft"])
 context(s, "FERMAT", "reasoning — grading the page")
-slide_num(s, 5, 7)
+slide_num(s, 5, 8)
 
 # ─────────────── 6 · what did not work ───────────────
 s = prs.slides.add_slide(BLANK)
@@ -347,7 +352,7 @@ run(tf.paragraphs[0], "Both were caught by checks we run on every number — "
     "which is why the results on the earlier slides can be trusted.",
     14.5, C["ink"], font=SERIF, bold=True)
 context(s, "InternVL3 on FERMAT  ·  Qwen2.5-VL-7B on ScratchMath")
-slide_num(s, 6, 7)
+slide_num(s, 6, 8)
 
 # ─────────────── 7 · open decision ───────────────
 s = prs.slides.add_slide(BLANK)
@@ -381,7 +386,60 @@ p = tf.add_paragraph(); p.space_before = Pt(8)
 run(p, "~3 weeks to submission. All experiments done; remaining work is the write-up.",
     13.5, C["soft"])
 context(s, "FERMAT", "both tasks")
-slide_num(s, 7, 7)
+slide_num(s, 7, 8)
+
+# ─────────────── 8 · the experiment we would still run ───────────────
+s = prs.slides.add_slide(BLANK)
+eyebrow(s, "Proposed next experiment", C["accent"])
+title(s, "Make it solve the problem, not just eyeball it")
+
+panel(s, M, Inches(1.95), W - 2 * M, Inches(1.25), accent=C["warn"])
+tf = tb(s, M + Inches(0.32), Inches(2.18), Inches(11.85), Inches(1.0))
+run(tf.paragraphs[0], "The gap: plausibility-checking instead of recomputing.",
+    18, C["ink"], font=SERIF, bold=True)
+p = tf.add_paragraph(); p.space_before = Pt(7)
+run(p, "It reads the student's steps and judges whether they look right. "
+       "One page asserts ", 13.5, C["soft"])
+run(p, "19 \u00d7 \u221218 \u00d7 23 = \u22127966", 13.5, C["ink"], bold=True)
+run(p, ". The model accepted it. The correct value is ", 13.5, C["soft"])
+run(p, "\u22127866", 13.5, C["bad"], bold=True)
+run(p, ".", 13.5, C["soft"])
+
+# what has already been screened
+panel(s, M, Inches(3.45), Inches(5.95), Inches(2.55), accent=C["bad"])
+tf = tb(s, M + Inches(0.32), Inches(3.68), Inches(5.3), Inches(2.2))
+run(tf.paragraphs[0], "ALREADY TRIED — PROMPT LEVEL", 10, C["faint"], bold=True)
+p = tf.add_paragraph(); p.space_before = Pt(8)
+run(p, "\u201cWork the problem yourself, then judge.\u201d", 13.5, C["ink"], italic=True)
+p = tf.add_paragraph(); p.space_before = Pt(9)
+run(p, "Qwen-3B  ", 13, C["ink"], bold=True)
+run(p, "says-error 94% \u2192 38%, accuracy 0.51 \u2192 0.55", 13, C["soft"])
+p = tf.add_paragraph(); p.space_before = Pt(5)
+run(p, "InternVL3  ", 13, C["ink"], bold=True)
+run(p, "accuracy 0.70 \u2192 0.67", 13, C["soft"])
+p = tf.add_paragraph(); p.space_before = Pt(9)
+run(p, "Behaviour swung hard. Accuracy did not move.", 13, C["bad"], bold=True)
+
+# what is still open
+panel(s, Inches(6.95), Inches(3.45), Inches(5.75), Inches(2.55), accent=C["good"])
+tf = tb(s, Inches(7.27), Inches(3.68), Inches(5.15), Inches(2.2))
+run(tf.paragraphs[0], "NOT YET TRIED — PIPELINE LEVEL", 10, C["faint"], bold=True)
+p = tf.add_paragraph(); p.space_before = Pt(8)
+run(p, "Solve the page independently, then compare in code.", 13.5, C["ink"], bold=True)
+p = tf.add_paragraph(); p.space_before = Pt(9)
+run(p, "Asking one prompt to do both still lets the model see the student's "
+       "answer first, so it can anchor on it. A separate solve step cannot.",
+    13, C["soft"])
+p = tf.add_paragraph(); p.space_before = Pt(8)
+run(p, "Then re-measure: does the split on slide 4 still hold, and does "
+       "uncertainty still predict the errors?", 13, C["soft"])
+
+panel(s, M, Inches(6.25), W - 2 * M, Inches(0.72), accent=C["accent"])
+tf = tb(s, M + Inches(0.35), Inches(6.42), Inches(11.8), Inches(0.45))
+run(tf.paragraphs[0], "Worth the remaining time — or write up what we have?",
+    15, C["ink"], font=SERIF, bold=True)
+context(s, "FERMAT", "reasoning — proposed")
+slide_num(s, 8, 8)
 
 out = "slides/fermat_findings.pptx"
 prs.save(out)
