@@ -1616,6 +1616,21 @@ answers \texttt{Error: 1} regardless}. On an all-error dataset that scores
 as correct. A large share of the 96\% is therefore the response bias
 firing through explicit non-engagement, not grading competence.
 
+One further check settles whether the non-engagement could simply be
+filtered out. It cannot: discarding every item on which the model states it
+cannot read the image leaves 40 of 100 items, and \textbf{all four
+misgraded items are among those discarded}. The retained subset therefore
+has no minority class at all, and the AUROC is not merely weak but
+undefined (\texttt{nan}). \textbf{Removing the outputs where the model says
+it cannot read the image removes every misgraded case, leaving no minority
+class; the analysis becomes undefined rather than cleaner.} The
+non-engagement cannot be separated from the measurement here, which is the
+structural form of the same conclusion. Note also that the partition is not
+clean --- only 3 of 100 items have all five readings flagged, the rest are
+mixed --- and that the phrase list used to detect non-engagement was written
+after reading the failures, so this cut is admissible as evidence that the
+setting cannot be measured but would not support a positive claim.
+
 \textbf{This is why the verdict is ``not comparable'' rather than
 ``underpowered''.} Non-engagement is concentrated on the misgraded items
 (0.40 of samples versus 0.23 on correctly-graded ones), so a powered run

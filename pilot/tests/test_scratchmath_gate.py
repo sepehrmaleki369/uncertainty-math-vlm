@@ -168,3 +168,45 @@ def test_entropy_is_degenerate_nothing_left_to_rank(run):
     counts = run["reasoning_entropy"].round(3).value_counts()
     assert int(counts.get(0.0, 0)) == 70
     assert set(counts.index) == {0.0, 0.5, 0.673}
+
+
+def test_filtering_out_non_engagement_makes_the_metric_undefined(run):
+    """The check that settles whether non-engagement could just be filtered
+    out: it cannot. All four misgraded items sit in the flagged group, so
+    discarding flagged items leaves a subset with no minority class and the
+    AUROC comes back nan -- undefined rather than cleaner.
+
+    Locked because it is the sharpest single argument for the gate, and
+    because a future change to CANNOT_READ_PHRASES or to the scoring path
+    could quietly turn "undefined" into a plausible-looking number.
+    """
+    import math
+
+    from pilot.plotting import bootstrap_auroc_ci, compute_auroc
+
+    run = run.copy()
+    run["_n_flagged"] = run["all_grading_samples_raw"].apply(
+        lambda raw: sum(1 for s in _samples_of(raw)
+                        if any(p in str(s).lower() for p in CANNOT_READ_PHRASES))
+    )
+    correct = run["grading_correct"].astype(bool)
+
+    # The partition is not clean: most items are a mix, only 3 are fully flagged.
+    assert int((run["_n_flagged"] >= 1).sum()) == 60
+    assert int((run["_n_flagged"] == 5).sum()) == 3
+
+    kept = run[run["_n_flagged"] == 0]
+    assert len(kept) == 40
+    assert int((~kept["grading_correct"].astype(bool)).sum()) == 0   # every misgrade discarded
+    assert int((~correct).sum()) == 4                                # ...and there were only 4
+
+    assert math.isnan(compute_auroc(kept, "reasoning_entropy", "grading_correct"))
+    r = bootstrap_auroc_ci(kept, "reasoning_entropy", "grading_correct",
+                           n_boot=200, seed=0)
+    assert r["n_error"] == 0
+    assert math.isnan(r["auroc"])
+    assert r["excludes_chance"] is False
+
+
+def _samples_of(raw):
+    return ast.literal_eval(raw)
