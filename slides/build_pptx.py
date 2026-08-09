@@ -252,69 +252,68 @@ run(p, ", 239 pages left.", 13.5, C["soft"])
 context(s, "FERMAT", "perception — Qwen2.5-VL-3B")
 slide_num(s, 3, 8)
 
-# ─────────────── 4 · reasoning: pooled vs split ───────────────
+# --------------- 4 . reasoning does not work ---------------
 s = prs.slides.add_slide(BLANK)
-eyebrow(s, "Reasoning — the key finding", C["warn"])
-title(s, "The average hid the finding")
+eyebrow(s, "Reasoning \u2014 negative", C["bad"])
+title(s, "The same signal does not work for grading")
 
 tf = tb(s, M, Inches(1.8), Inches(11.7), Inches(0.85))
 p0 = tf.paragraphs[0]
 run(p0, "Different task. The model is asked only: ", 15, C["soft"])
 run(p0, "\u201canalyze the Answer to determine whether there is any error.\u201d",
     15, C["ink"], italic=True)
-run(p0, "  It is never shown the correct answer.", 15, C["soft"])
-p0 = tf.add_paragraph(); p0.space_before = Pt(5)
-run(p0, "Same 300 pages, split by whether an error was really there.", 15, C["soft"])
+run(p0, "  It never sees the correct answer.", 15, C["soft"])
 
-table(s, M, Inches(2.85), Inches(12),
-      header=["Scored on", "AUROC  (95% CI)", ""],
-      rows=[[("Everything pooled", C["ink"], True),
-             ("0.520", C["bad"], True, 16, "[0.458, 0.582]"),
-             ("looks like chance", C["bad"], False, 13)],
-            [("Pages with an error", C["ink"], True),
-             ("0.801", C["good"], True, 16, "[0.751, 0.846]"),
-             ("works well", C["good"], False, 13)],
-            [("Pages that are correct", C["ink"], True),
-             ("0.280", C["good"], True, 16, "[0.200, 0.366]"),
-             ("works backwards", C["good"], False, 13)]],
-      col_w=[Inches(4.3), Inches(3.6), Inches(4.1)], row_h=Inches(0.62))
+table(s, M, Inches(2.95), Inches(11),
+      header=["", "AUROC  (95% CI)", ""],
+      rows=[[("Grading, 300 balanced pages", C["ink"], True),
+             ("0.520", C["bad"], True, 17, "[0.458, 0.582]"),
+             ("interval contains chance", C["bad"], False, 13)]],
+      col_w=[Inches(4.6), Inches(3.4), Inches(3.0)], row_h=Inches(0.7))
 
-panel(s, M, Inches(5.15), W - 2 * M, Inches(1.42), accent=C["bad"])
-tf = tb(s, M + Inches(0.35), Inches(5.42), Inches(11.8), Inches(1.0))
-run(tf.paragraphs[0], "0.80 and 0.28 average out to 0.52.", 22, C["ink"],
-    font=SERIF, bold=True)
-p = tf.add_paragraph(); p.space_before = Pt(8)
-run(p, "Both halves are real. Pooling reports neither. "
-       "Only visible because FERMAT has correct pages to separate out.", 13.5, C["soft"])
-context(s, "FERMAT", "reasoning — grading the page  ·  Qwen2.5-VL-7B")
+panel(s, M, Inches(4.35), W - 2 * M, Inches(1.95), accent=C["bad"])
+tf = tb(s, M + Inches(0.35), Inches(4.62), Inches(11.8), Inches(1.6))
+run(tf.paragraphs[0], "No signal. That is the honest reasoning result.",
+    22, C["ink"], font=SERIF, bold=True)
+p2 = tf.add_paragraph(); p2.space_before = Pt(10)
+run(p2, "The model answers \u201cerror\u201d for 80\u201390% of pages regardless of "
+        "what is on them. Balancing the set is what makes this readable \u2014 on an "
+        "unbalanced set that bias alone would score well.", 14, C["soft"])
+context(s, "FERMAT", "reasoning \u2014 grading the page  \u00b7  Qwen2.5-VL-7B")
 slide_num(s, 4, 8)
 
-# ─────────────── 5 · reasoning replicates ───────────────
+# --------------- 5 . the trap ---------------
 s = prs.slides.add_slide(BLANK)
-eyebrow(s, "Reasoning — replication", C["good"])
-title(s, "Holds across three model families")
+eyebrow(s, "What we got wrong", C["warn"])
+title(s, "We believed the opposite for three weeks", size=30)
 
-tf = tb(s, M, Inches(1.9), Inches(11), Inches(0.4))
-run(tf.paragraphs[0], "The 0.80 result above, on pages that contain an error.",
+tf = tb(s, M, Inches(1.72), Inches(11.9), Inches(0.6))
+run(tf.paragraphs[0], "Splitting the grading data by ground truth seemed to "
+    "recover a strong effect \u2014 replicated across three model families.",
     15, C["soft"])
 
-table(s, M, Inches(2.7), Inches(7.4),
-      header=["Model", "AUROC  (95% CI)"],
-      rows=[[("Qwen2.5-VL-3B", C["ink"], True),
-             ("0.854", C["good"], True, 15, "[0.796, 0.902]")],
-            [("Qwen2.5-VL-7B", C["ink"], True),
-             ("0.801", C["good"], True, 15, "[0.751, 0.846]")],
-            [("LLaVA-NeXT-7B", C["ink"], True),
-             ("0.775", C["good"], True, 15, "[0.694, 0.848]")]],
-      col_w=[Inches(3.6), Inches(3.8)], row_h=Inches(0.58))
+table(s, M, Inches(2.45), Inches(11.6),
+      header=["Model", "We reported", "Signal-free coin", "Collapse"],
+      rows=[[("Qwen2.5-VL-3B", C["ink"], True), ("0.854", C["good"], True, 15),
+             ("0.901", C["bad"], True, 15), ("99.8%", C["bad"], True, 14)],
+            [("Qwen2.5-VL-7B", C["ink"], True), ("0.801", C["good"], True, 15),
+             ("0.868", C["bad"], True, 15), ("100%", C["bad"], True, 14)],
+            [("LLaVA-NeXT-7B", C["ink"], True), ("0.775", C["good"], True, 15),
+             ("0.831", C["bad"], True, 15), ("97.2%", C["bad"], True, 14)]],
+      col_w=[Inches(3.4), Inches(2.7), Inches(3.0), Inches(2.5)], row_h=Inches(0.5))
 
-panel(s, M, Inches(5.0), W - 2 * M, Inches(1.35), accent=C["good"])
-tf = tb(s, M + Inches(0.35), Inches(5.3), Inches(11.8), Inches(0.9))
-run(tf.paragraphs[0], "Three independently built models. Intervals overlap.",
-    20, C["ink"], font=SERIF, bold=True)
-p = tf.add_paragraph(); p.space_before = Pt(7)
-run(p, "Not a quirk of one model.", 13.5, C["soft"])
-context(s, "FERMAT", "reasoning — grading the page")
+panel(s, M, Inches(4.7), W - 2 * M, Inches(1.9), accent=C["bad"])
+tf = tb(s, M + Inches(0.35), Inches(4.95), Inches(11.8), Inches(1.6))
+run(tf.paragraphs[0], "Inside one label group, \u201cwas it correct\u201d IS "
+    "\u201cwhat did it answer\u201d.", 19, C["ink"], font=SERIF, bold=True)
+p2 = tf.add_paragraph(); p2.space_before = Pt(8)
+run(p2, "The same column, 100% of the time. Entropy is computed from those very "
+        "votes, so it predicts correctness almost by definition. ", 13.5, C["soft"])
+run(p2, "A coin with no signal scores higher than we did.", 13.5, C["bad"], bold=True)
+p2 = tf.add_paragraph(); p2.space_before = Pt(6)
+run(p2, "Not caught by pre-registration, by power, or by replicating it three times.",
+    13, C["faint"], italic=True)
+context(s, "FERMAT", "reasoning \u2014 retracted 2026-08-09")
 slide_num(s, 5, 8)
 
 # ─────────────── 6 · what did not work ───────────────
@@ -369,8 +368,8 @@ tf = tb(s, M + Inches(0.32), Inches(2.3), Inches(5.3), Inches(2.3))
 run(tf.paragraphs[0], "SOLID", 11, C["good"], bold=True)
 for t in ["Perception: 0.835, survives every check",
           "Abstention rule: 57 of 61",
-          "Reasoning: confirmed on 3 model families",
-          "Pooled-vs-split: a method contribution"]:
+          "Reasoning: no signal \u2014 measured, not assumed",
+          "The stratification trap: a method finding"]:
     p = tf.add_paragraph(); p.space_before = Pt(9)
     run(p, "— " + t, 13.5, C["ink"])
 
