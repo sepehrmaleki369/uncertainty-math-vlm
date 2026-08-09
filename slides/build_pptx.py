@@ -62,10 +62,26 @@ def title(slide, text, y=Inches(0.78), size=31, width=11.4):
     run(tf.paragraphs[0], text, size, C["ink"], font=SERIF, bold=True)
 
 
-def slide_num(slide, n, total=6):
+def slide_num(slide, n, total=7):
     tf = tb(slide, W - M - Inches(1.2), H - Inches(0.52), Inches(1.2), Inches(0.3),
             align=PP_ALIGN.RIGHT)
     run(tf.paragraphs[0], f"{n} / {total}", 10, C["faint"])
+
+
+def context(slide, dataset, arm=None):
+    """Bottom-left label naming the dataset and which task the slide is about.
+
+    Added after a read-through showed the deck never said there were two
+    tasks at all -- so perception's 0.835 and reasoning's 0.520 looked like
+    contradictory numbers for the same thing, and one slide silently mixed
+    both arms.
+    """
+    tf = tb(slide, M, H - Inches(0.54), Inches(9), Inches(0.32))
+    p = tf.paragraphs[0]
+    run(p, dataset, 10, C["accent"], bold=True)
+    if arm:
+        run(p, "   ·   ", 10, C["rule"])
+        run(p, arm, 10, C["faint"])
 
 
 def rule(slide, y, x=M, w=None):
@@ -121,73 +137,77 @@ def table(slide, x, y, w, rows, col_w, header=None, row_h=Inches(0.42)):
     return yy
 
 
-# ───────────────────────── 1 · FERMAT ─────────────────────────
+# ───────────────────── 1 · FERMAT + the two tasks ─────────────────────
 s = prs.slides.add_slide(BLANK)
 eyebrow(s, "The dataset", C["accent"])
 title(s, "FERMAT: handwritten math,\nerrors planted on purpose")
 
 s.shapes.add_picture(f"{CASES}/07_qwen7b_confidently_wrong_grading/image.jpg",
-                     M, Inches(2.25), height=Inches(3.9))
+                     M, Inches(2.3), height=Inches(3.35))
 
-x2 = Inches(6.6)
-tf = tb(s, x2, Inches(2.25), Inches(6.1), Inches(1.6))
-for i, (a, b) in enumerate([("~2,200", " photographed solutions"),
-                            ("85%", " contain a deliberate error"),
-                            ("Question + answer", " both in the image")]):
-    p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
-    p.space_after = Pt(9)
-    run(p, a, 16, C["ink"], bold=True); run(p, b, 16, C["soft"])
+x2 = Inches(6.2)
+tf = tb(s, x2, Inches(2.25), Inches(6.5), Inches(1.0))
+for i, (a, b) in enumerate([("~2,200", " photographed solutions   ·   "),
+                            ("85%", " contain a deliberate error")]):
+    p = tf.paragraphs[0] if i == 0 else p
+    run(p, a, 15, C["ink"], bold=True); run(p, b, 15, C["soft"])
 
-tf = tb(s, x2, Inches(3.95), Inches(6.1), Inches(0.3))
-run(tf.paragraphs[0], "ONLY FERMAT HAS CORRECT ANSWERS TOO", 10.5, C["faint"], bold=True)
-table(s, x2, Inches(4.35), Inches(6.1),
+# The two arms, stated up front -- everything downstream is one or the other.
+panel(s, x2, Inches(2.85), Inches(6.5), Inches(1.85), accent=C["accent"])
+tf = tb(s, x2 + Inches(0.28), Inches(3.08), Inches(5.95), Inches(1.5))
+run(tf.paragraphs[0], "WE TEST TWO SEPARATE TASKS", 10, C["accent"], bold=True)
+p = tf.add_paragraph(); p.space_before = Pt(9)
+run(p, "Perception", 14, C["ink"], bold=True)
+run(p, " — read the page. Did it transcribe correctly?", 14, C["soft"])
+p = tf.add_paragraph(); p.space_before = Pt(6)
+run(p, "Reasoning", 14, C["ink"], bold=True)
+run(p, " — grade the page. Did it spot the error correctly?", 14, C["soft"])
+
+tf = tb(s, x2, Inches(5.0), Inches(6.5), Inches(0.3))
+run(tf.paragraphs[0], "ONLY FERMAT HAS CORRECT ANSWERS TOO", 10, C["faint"], bold=True)
+table(s, x2, Inches(5.38), Inches(6.5),
       rows=[["FERMAT", ("15% clean", C["good"], True)],
-            ["ErrorRadar", ("none", C["bad"], True)],
-            ["ScratchMath", ("none", C["bad"], True)]],
-      col_w=[Inches(3.2), Inches(2.9)])
+            ["ErrorRadar  /  ScratchMath", ("no clean items", C["bad"], True)]],
+      col_w=[Inches(3.6), Inches(2.9)], row_h=Inches(0.4))
+context(s, "FERMAT", "setup")
+slide_num(s, 1, 7)
 
-tf = tb(s, x2, Inches(5.95), Inches(6.1), Inches(0.6))
-run(tf.paragraphs[0], "No clean items → no balanced set → the finding on slide 4 "
-    "cannot be measured at all.", 12.5, C["soft"], italic=True)
-slide_num(s, 1)
-
-# ───────────────────── 2 · perception works ─────────────────────
+# ───────────────────── 2 · perception result ─────────────────────
 s = prs.slides.add_slide(BLANK)
-eyebrow(s, "Result — confirmed", C["good"])
-title(s, "Disagreement predicts error")
+eyebrow(s, "Perception — confirmed", C["good"])
+title(s, "When it can't read a page twice the same way, it's wrong")
 
-tf = tb(s, M, Inches(1.75), Inches(6), Inches(0.4))
+tf = tb(s, M, Inches(1.95), Inches(8), Inches(0.4))
 run(tf.paragraphs[0], "Read the same page 5 times. Measure the disagreement.",
     15, C["soft"])
 
-table(s, M, Inches(2.55), Inches(6.9),
+table(s, M, Inches(2.62), Inches(6.9),
       header=["", "AUROC  (95% CI)"],
-      rows=[[("All 300 items", C["ink"], True),
+      rows=[[("All 300 pages", C["ink"], True),
              ("0.835", C["good"], True, 15, "[0.787, 0.879]")],
-            [("Hardest cases deleted", C["ink"], True),
+            [("Hardest cases deleted  (slide 3)", C["ink"], True),
              ("0.796", C["good"], True, 15, "[0.736, 0.852]")],
-            [("Model's own confidence", C["ink"], True),
+            [("The model's own confidence", C["ink"], True),
              ("0.537", C["bad"], True, 15, "[0.469, 0.605]")]],
-      col_w=[Inches(3.5), Inches(3.4)], row_h=Inches(0.56))
+      col_w=[Inches(3.9), Inches(3.0)], row_h=Inches(0.56))
 
-tf = tb(s, M, Inches(4.55), Inches(6.4), Inches(0.7))
-run(tf.paragraphs[0], "Row 2 explained on slide 5. Row 3's interval crosses 0.50 — "
-    "the model's own confidence is no better than a coin flip here.",
-    12, C["soft"], italic=True)
+tf = tb(s, M, Inches(4.62), Inches(6.5), Inches(0.7))
+run(tf.paragraphs[0], "Row 3's interval crosses 0.50 — the model's own confidence "
+    "score is no better than a coin flip here.", 12, C["soft"], italic=True)
 
-panel(s, Inches(7.5), Inches(2.4), Inches(5.2), Inches(2.4), accent=C["good"])
-tf = tb(s, Inches(7.85), Inches(2.75), Inches(4.5), Inches(1.9))
-p = tf.paragraphs[0]
-run(p, "All 5 readings disagree?", 19, C["ink"], font=SERIF, bold=True)
+panel(s, Inches(7.9), Inches(2.5), Inches(4.8), Inches(2.5), accent=C["good"])
+tf = tb(s, Inches(8.22), Inches(2.85), Inches(4.2), Inches(2.0))
+run(tf.paragraphs[0], "All 5 readings disagree?", 18, C["ink"], font=SERIF, bold=True)
 p = tf.add_paragraph(); p.space_before = Pt(8)
-run(p, "Wrong 57 times out of 61.", 19, C["good"], font=SERIF, bold=True)
+run(p, "Wrong 57 times out of 61.", 18, C["good"], font=SERIF, bold=True)
 p = tf.add_paragraph(); p.space_before = Pt(12)
-run(p, "A usable abstention rule. No training, no labels.", 12.5, C["soft"])
-slide_num(s, 2)
+run(p, "Flag those for a human. Catches 57 real errors, wastes 4.", 12.5, C["soft"])
+context(s, "FERMAT", "perception — reading the page")
+slide_num(s, 2, 7)
 
-# ─────────────── 3 · the four quadrants ───────────────
+# ─────────────── 3 · perception evidence + the check ───────────────
 s = prs.slides.add_slide(BLANK)
-eyebrow(s, "Evidence — four real pages", C["accent"])
+eyebrow(s, "Perception — evidence", C["accent"])
 title(s, "Where it works, and the blind spot", size=30)
 
 quad = [
@@ -196,57 +216,55 @@ quad = [
     ("03_qwen3b_perception_high_entropy_correct","Disagrees  ·  H = 1.61", "False alarm", C["warn"]),
     ("04_qwen3b_perception_low_entropy_wrong",   "Agrees  ·  H = 0.00", "Blind spot", C["bad"]),
 ]
-cw, ch = Inches(3.02), Inches(3.05)
-# Fit each page inside a fixed box rather than setting width: these four
-# images run from 1600x878 landscape to 1298x1600 portrait, and sizing by
-# width alone makes the tall ones ~3.4in high, overflowing the panel and
-# colliding with the caption. Scale to whichever dimension binds, then
-# centre horizontally so the row stays visually even.
-BOX_W, BOX_H = cw - Inches(0.3), Inches(2.05)
+cw, ch = Inches(3.02), Inches(2.95)
+BOX_W, BOX_H = cw - Inches(0.3), Inches(1.95)
 for i, (case, lab, verdict, col) in enumerate(quad):
     cx = M + (cw + Inches(0.14)) * i
-    panel(s, cx, Inches(1.95), cw, ch, fill=C["white"], accent=col)
-
+    panel(s, cx, Inches(1.9), cw, ch, fill=C["white"], accent=col)
     with Image.open(f"{CASES}/{case}/image.jpg") as im:
         iw, ih = im.size
-    scale = min(BOX_W / iw, BOX_H / ih)
-    pw, ph = int(iw * scale), int(ih * scale)
+    sc = min(BOX_W / iw, BOX_H / ih)
+    pw, ph = int(iw * sc), int(ih * sc)
     s.shapes.add_picture(f"{CASES}/{case}/image.jpg",
-                         cx + (cw - pw) // 2, Inches(2.12) + (BOX_H - ph) // 2,
+                         cx + (cw - pw) // 2, Inches(2.06) + (BOX_H - ph) // 2,
                          width=pw, height=ph)
-
-    tf = tb(s, cx + Inches(0.15), Inches(4.32), cw - Inches(0.3), Inches(0.6))
+    tf = tb(s, cx + Inches(0.15), Inches(4.16), cw - Inches(0.3), Inches(0.6))
     run(tf.paragraphs[0], lab, 10.5, C["soft"])
     p = tf.add_paragraph(); p.space_before = Pt(2)
     run(p, verdict, 13, col, bold=True)
 
-panel(s, M, Inches(5.32), W - 2 * M, Inches(1.35), accent=C["bad"])
-tf = tb(s, M + Inches(0.35), Inches(5.62), Inches(11.8), Inches(0.9))
-run(tf.paragraphs[0], "Page 1 and page 4 look identical to the method — both entropy zero.",
-    19, C["ink"], font=SERIF, bold=True)
-p = tf.add_paragraph(); p.space_before = Pt(7)
-run(p, "One is right, one is wrong. Confident errors are invisible to it.",
+panel(s, M, Inches(5.05), W - 2 * M, Inches(1.62), accent=C["bad"])
+tf = tb(s, M + Inches(0.32), Inches(5.28), Inches(11.85), Inches(1.35))
+run(tf.paragraphs[0], "Page 1 and page 4 look identical to the method — both entropy zero. "
+    "One is right, one is wrong.", 17, C["ink"], font=SERIF, bold=True)
+p = tf.add_paragraph(); p.space_before = Pt(9)
+run(p, "The robustness check: ", 13.5, C["accent"], bold=True)
+run(p, "delete every page where all 5 readings differed — easy to flag, nearly "
+       "always wrong. If the score survives, the signal is graded. Qwen ",
     13.5, C["soft"])
-slide_num(s, 3)
+run(p, "0.835 \u2192 0.794", 13.5, C["good"], bold=True)
+run(p, ", 239 pages left.", 13.5, C["soft"])
+context(s, "FERMAT", "perception — Qwen2.5-VL-3B")
+slide_num(s, 3, 7)
 
-# ─────────────── 4 · pooled vs stratified ───────────────
+# ─────────────── 4 · reasoning: pooled vs split ───────────────
 s = prs.slides.add_slide(BLANK)
-eyebrow(s, "Method warning — the key finding", C["warn"])
+eyebrow(s, "Reasoning — the key finding", C["warn"])
 title(s, "The average hid the finding")
 
-tf = tb(s, M, Inches(1.78), Inches(11.5), Inches(0.4))
-run(tf.paragraphs[0], "Grading task. Same 300 items, split by whether an error was really there.",
-    15, C["soft"])
+tf = tb(s, M, Inches(1.85), Inches(11.5), Inches(0.4))
+run(tf.paragraphs[0], "Different task: the model grades the page. Same 300 pages, "
+    "split by whether an error was really there.", 15, C["soft"])
 
-table(s, M, Inches(2.6), Inches(12),
-      header=["Scored on", "AUROC", ""],
+table(s, M, Inches(2.65), Inches(12),
+      header=["Scored on", "AUROC  (95% CI)", ""],
       rows=[[("Everything pooled", C["ink"], True),
              ("0.520", C["bad"], True, 16, "[0.458, 0.582]"),
              ("looks like chance", C["bad"], False, 13)],
-            [("Items with an error", C["ink"], True),
+            [("Pages with an error", C["ink"], True),
              ("0.801", C["good"], True, 16, "[0.751, 0.846]"),
              ("works well", C["good"], False, 13)],
-            [("Items that are correct", C["ink"], True),
+            [("Pages that are correct", C["ink"], True),
              ("0.280", C["good"], True, 16, "[0.200, 0.366]"),
              ("works backwards", C["good"], False, 13)]],
       col_w=[Inches(4.3), Inches(3.6), Inches(4.1)], row_h=Inches(0.62))
@@ -257,16 +275,20 @@ run(tf.paragraphs[0], "0.80 and 0.28 average out to 0.52.", 23, C["ink"],
     font=SERIF, bold=True)
 p = tf.add_paragraph(); p.space_before = Pt(8)
 run(p, "Both halves are real. Pooling reports neither. "
-       "Only visible because FERMAT has correct items.", 13.5, C["soft"])
-slide_num(s, 4)
+       "Only visible because FERMAT has correct pages to separate out.", 13.5, C["soft"])
+context(s, "FERMAT", "reasoning — grading the page  ·  Qwen2.5-VL-7B")
+slide_num(s, 4, 7)
 
-# ─────────────── 5 · replication ───────────────
+# ─────────────── 5 · reasoning replicates ───────────────
 s = prs.slides.add_slide(BLANK)
-eyebrow(s, "Replication", C["good"])
+eyebrow(s, "Reasoning — replication", C["good"])
 title(s, "Holds across three model families")
-# (the lower half of this slide explains the robustness check)
 
-table(s, M, Inches(2.15), Inches(6.1),
+tf = tb(s, M, Inches(1.9), Inches(11), Inches(0.4))
+run(tf.paragraphs[0], "The 0.80 result above, on pages that contain an error.",
+    15, C["soft"])
+
+table(s, M, Inches(2.7), Inches(7.4),
       header=["Model", "AUROC  (95% CI)"],
       rows=[[("Qwen2.5-VL-3B", C["ink"], True),
              ("0.854", C["good"], True, 15, "[0.796, 0.902]")],
@@ -274,29 +296,60 @@ table(s, M, Inches(2.15), Inches(6.1),
              ("0.801", C["good"], True, 15, "[0.751, 0.846]")],
             [("LLaVA-NeXT-7B", C["ink"], True),
              ("0.775", C["good"], True, 15, "[0.694, 0.848]")]],
-      col_w=[Inches(2.9), Inches(3.2)], row_h=Inches(0.54))
+      col_w=[Inches(3.6), Inches(3.8)], row_h=Inches(0.58))
 
-tf = tb(s, M, Inches(4.0), Inches(6.1), Inches(0.4))
-run(tf.paragraphs[0], "Intervals overlap. Not a Qwen quirk.", 13.5, C["soft"])
+panel(s, M, Inches(5.0), W - 2 * M, Inches(1.35), accent=C["good"])
+tf = tb(s, M + Inches(0.35), Inches(5.3), Inches(11.8), Inches(0.9))
+run(tf.paragraphs[0], "Three independently built models. Intervals overlap.",
+    20, C["ink"], font=SERIF, bold=True)
+p = tf.add_paragraph(); p.space_before = Pt(7)
+run(p, "Not a quirk of one model.", 13.5, C["soft"])
+context(s, "FERMAT", "reasoning — grading the page")
+slide_num(s, 5, 7)
 
-# The robustness check is explained here rather than on slide 2, because
-# this is where it does the work: it is the reason a 0.915 gets rejected.
-panel(s, M, Inches(4.6), W - 2 * M, Inches(2.15), accent=C["accent"])
-tf = tb(s, M + Inches(0.32), Inches(4.84), Inches(11.85), Inches(1.85))
-run(tf.paragraphs[0], "THE ROBUSTNESS CHECK", 10.5, C["accent"], bold=True)
-p2 = tf.add_paragraph(); p2.space_before = Pt(7)
-run(p2, "Delete every item where all 5 readings differed.", 15, C["ink"], bold=True)
-run(p2, "  Those are easy to flag and nearly always wrong. If the score "
-        "survives, the signal is graded. If it collapses, the score was only "
-        "detecting total breakdown.", 15, C["soft"])
-p2 = tf.add_paragraph(); p2.space_before = Pt(12)
-run(p2, "Qwen  0.835 \u2192 0.794", 15, C["good"], bold=True)
-run(p2, "   239 items left, barely moves          ", 13, C["soft"])
-run(p2, "InternVL3  0.915 \u2192 0.556", 15, C["bad"], bold=True)
-run(p2, "   only 98 left, collapses to chance", 13, C["soft"])
-slide_num(s, 5)
+# ─────────────── 6 · what did not work ───────────────
+s = prs.slides.add_slide(BLANK)
+eyebrow(s, "What did not work", C["bad"])
+title(s, "Two results we had to throw out")
 
-# ─────────────── 6 · open decision ───────────────
+# InternVL3 -- perception, failed the robustness check
+panel(s, M, Inches(2.05), Inches(5.95), Inches(3.5), accent=C["bad"])
+tf = tb(s, M + Inches(0.32), Inches(2.3), Inches(5.3), Inches(3.1))
+run(tf.paragraphs[0], "A 4TH MODEL, PERCEPTION", 10, C["faint"], bold=True)
+p = tf.add_paragraph(); p.space_before = Pt(9)
+run(p, "0.915", 27, C["bad"], font=SERIF, bold=True)
+run(p, "  \u2192  ", 18, C["faint"])
+run(p, "0.556", 27, C["ink"], font=SERIF, bold=True)
+p = tf.add_paragraph(); p.space_before = Pt(11)
+run(p, "InternVL3 looked like our best result. Under the robustness check it "
+       "collapsed to chance — ", 13.5, C["soft"])
+run(p, "2 of every 3 pages were total breakdowns", 13.5, C["ink"], bold=True)
+run(p, ", and that binary was all the score was detecting.", 13.5, C["soft"])
+
+# ScratchMath -- the second dataset
+panel(s, Inches(6.95), Inches(2.05), Inches(5.75), Inches(3.5), accent=C["warn"])
+tf = tb(s, Inches(7.27), Inches(2.3), Inches(5.15), Inches(3.1))
+run(tf.paragraphs[0], "A 2ND DATASET, REASONING", 10, C["faint"], bold=True)
+p = tf.add_paragraph(); p.space_before = Pt(9)
+run(p, "96%", 27, C["warn"], font=SERIF, bold=True)
+run(p, "  accuracy, and meaningless", 14, C["soft"])
+p = tf.add_paragraph(); p.space_before = Pt(11)
+run(p, "ScratchMath, 100 pages. Every page contains an error, and the model "
+       "answers “error” 90% of the time — so it scores well by construction.",
+    13.5, C["soft"])
+p = tf.add_paragraph(); p.space_before = Pt(8)
+run(p, "In 24% of readings it said it could not read the image. "
+       "It answered “error” anyway in 82% of those.", 13.5, C["ink"], bold=True)
+
+panel(s, M, Inches(5.78), W - 2 * M, Inches(0.95), accent=C["accent"])
+tf = tb(s, M + Inches(0.35), Inches(5.98), Inches(11.8), Inches(0.6))
+run(tf.paragraphs[0], "Both were caught by checks we run on every number — "
+    "which is why the results on the earlier slides can be trusted.",
+    14.5, C["ink"], font=SERIF, bold=True)
+context(s, "InternVL3 on FERMAT  ·  Qwen2.5-VL-7B on ScratchMath")
+slide_num(s, 6, 7)
+
+# ─────────────── 7 · open decision ───────────────
 s = prs.slides.add_slide(BLANK)
 eyebrow(s, "Open decision", C["accent"])
 title(s, "One question")
@@ -304,9 +357,9 @@ title(s, "One question")
 panel(s, M, Inches(2.0), Inches(5.95), Inches(2.75), accent=C["good"])
 tf = tb(s, M + Inches(0.32), Inches(2.3), Inches(5.3), Inches(2.3))
 run(tf.paragraphs[0], "SOLID", 11, C["good"], bold=True)
-for t in ["Perception signal 0.835, robust",
-          "Abstention rule 57/61",
-          "Confirmed on 3 model families",
+for t in ["Perception: 0.835, survives every check",
+          "Abstention rule: 57 of 61",
+          "Reasoning: confirmed on 3 model families",
           "Pooled-vs-split: a method contribution"]:
     p = tf.add_paragraph(); p.space_before = Pt(9)
     run(p, "— " + t, 13.5, C["ink"])
@@ -314,23 +367,23 @@ for t in ["Perception signal 0.835, robust",
 panel(s, Inches(6.95), Inches(2.0), Inches(5.75), Inches(2.75), accent=C["warn"])
 tf = tb(s, Inches(7.27), Inches(2.3), Inches(5.1), Inches(2.3))
 run(tf.paragraphs[0], "LIMITED", 11, C["warn"], bold=True)
-for t in ["Everything sits on one dataset",
-          "Both alternatives are 100% error items",
-          "…so they cannot test the split at all",
-          "On one, the model said “error” while\n    saying it could not read the image"]:
+for t in ["Every result sits on FERMAT alone",
+          "Both alternative datasets are 100%\n    error items",
+          "…so neither can test the split on\n    slide 4 at all"]:
     p = tf.add_paragraph(); p.space_before = Pt(9)
     run(p, "— " + t, 13.5, C["ink"])
 
 panel(s, M, Inches(5.05), W - 2 * M, Inches(1.5), accent=C["accent"])
 tf = tb(s, M + Inches(0.35), Inches(5.35), Inches(11.8), Inches(1.0))
-run(tf.paragraphs[0], "Accept one dataset as a limitation — or label correct items ourselves?",
+run(tf.paragraphs[0], "Accept one dataset as a limitation — or label correct pages ourselves?",
     21, C["ink"], font=SERIF, bold=True)
 p = tf.add_paragraph(); p.space_before = Pt(8)
 run(p, "~3 weeks to submission. All experiments done; remaining work is the write-up.",
     13.5, C["soft"])
-slide_num(s, 6)
+context(s, "FERMAT", "both tasks")
+slide_num(s, 7, 7)
 
 out = "slides/fermat_findings.pptx"
 prs.save(out)
 import os
-print(f"saved {out}  ({os.path.getsize(out)/1024/1024:.2f} MB, {len(prs.slides.__iter__.__self__._sldIdLst)} slides)")
+print(f"saved {out}  ({os.path.getsize(out)/1024/1024:.2f} MB, {len(prs.slides._sldIdLst)} slides)")
