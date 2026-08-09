@@ -1,0 +1,368 @@
+% =====================================================================
+%  WACV 2027 (Round 2) submission -- Evaluations & Datasets track
+%
+%  IMPORTANT: this file is a CONTENT skeleton, not a submission-ready
+%  document. WACV rejects without review any paper that does not use the
+%  official template. Download the WACV 2027 Author Kit, then move this
+%  content into it -- do not try to reproduce the style file by hand.
+%      https://wacv.thecvf.com/Conferences/2027/AuthorGuides
+%
+%  Hard rules from the author guides:
+%    * 8 pages maximum EXCLUDING references. Over-length = desk reject.
+%    * Double-blind. No author names, no grant IDs, no identifying repo
+%      links anywhere -- including in the supplementary and in any code.
+%    * Reviewers are encouraged to run submitted code.
+%
+%  Dates (WACV 2027, Round 2 -- note: 2027, not 2026):
+%    enrollment 21 Aug 2026 | paper 28 Aug 2026 | supplementary 30 Aug 2026
+%
+%  EVERY numeric claim below is taken from reference/*.json, which are
+%  recomputed from raw model output and asserted by pilot/tests/. Do not
+%  retype a number from memory; run paper/check_numbers.py after editing.
+% =====================================================================
+
+\documentclass[10pt,twocolumn,letterpaper]{article}
+% >>> REPLACE the two lines below with the official WACV 2027 style <<<
+\usepackage[margin=0.75in]{geometry}
+\usepackage{times}
+
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{xcolor}
+\usepackage[colorlinks,allcolors=blue]{hyperref}
+
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+\newcommand{\ci}[2]{{\small$[#1,\,#2]$}}
+
+\title{Pooling Hides It: On Evaluating Sampling-Based Uncertainty\\
+for Vision--Language Models on Handwritten Mathematics}
+\author{}                     % double-blind: leave empty
+\date{}
+
+\begin{document}
+\maketitle
+
+% =====================================================================
+\begin{abstract}
+% ~200 words. Written last, but drafted here so the argument is fixed
+% before the body is written.
+Sampling a vision--language model repeatedly and measuring how much it
+disagrees with itself is a cheap, label-free uncertainty signal. We ask
+what that signal actually measures on handwritten mathematics, and find
+that the answer depends as much on how it is evaluated as on the model.
+On transcription, self-disagreement predicts error well
+(AUROC~$0.835$), survives every artifact control we apply, and beats the
+model's own token confidence by a resolved margin; a rule that abstains
+when all five samples disagree is wrong-flagging correct
+$57$ of $61$ times. On grading, the pooled statistic reads
+$0.520$~--- indistinguishable from chance --- and we show this is an
+evaluation artifact rather than a null result: the model answers ``there
+is an error'' for most inputs, and uncertainty predicts its mistakes in
+\emph{opposite directions} on erroneous ($0.801$) and correct ($0.280$)
+solutions, so pooling cancels a real effect. The stratified effect
+replicates across three independently trained model families. We then
+report two ways the evaluation itself misleads: a fourth model attains
+the highest raw score in our study ($0.915$) purely by generating
+incoherent output on two-thirds of inputs, and a second dataset cannot
+test the effect at all because it contains no correct solutions.
+\todo{tighten to the venue's word limit once the body is final}
+\end{abstract}
+
+% =====================================================================
+\section{Introduction}
+% ~1 page. FERMAT's own paper uses narrative prose and NO bulleted
+% contributions list; matching that is the safer choice for this venue.
+%
+% Argument to make, in order:
+%   1. Automated marking of handwritten work is a real application, and it
+%      fails silently -- a wrong transcription looks exactly like a right
+%      one. So knowing WHEN to defer matters more than raw accuracy.
+%   2. Sampling-based uncertainty is the obvious candidate: no training,
+%      no labels, works on a closed model.
+%   3. But whether it works is an empirical question, and -- our point --
+%      the headline number is easy to get wrong in both directions.
+%   4. State the two directions concretely (pooling hides a real effect;
+%      degeneracy manufactures a fake one). This is the contribution.
+%   5. Say plainly this is an evaluation paper, not a method paper.
+\todo{write. Do not open with ``Large language models have recently\ldots''}
+
+% =====================================================================
+\section{Related Work}
+% ~0.75 page. FERMAT's paper uses unnumbered thematic paragraphs rather
+% than subsections -- follow that.
+%
+% \paragraph{Sampling-based uncertainty.} semantic entropy and its
+%   variants; self-consistency; what is inherited and what is not (we use
+%   exact-match clustering over an extracted answer span, not NLI).
+% \paragraph{Selective prediction and abstention.} risk--coverage, AURC,
+%   conformal methods; we report AURC 0.410 against a 0.607 random-deferral
+%   baseline.
+% \paragraph{VLMs on handwritten and mathematical content.} FERMAT,
+%   ErrorRadar, ScratchMath; what they measure and what they omit.
+% \paragraph{Evaluation pitfalls.} Simpson's-paradox-style aggregation,
+%   class imbalance, and metric artifacts. This is where our contribution
+%   is positioned -- find the closest prior work and be honest about it.
+\todo{write. VERIFY EVERY CITATION AGAINST THE REAL PAPER -- do not cite
+from memory. This section is the largest genuinely-new writing task.}
+
+% =====================================================================
+\section{Setup}
+\label{sec:setup}
+
+\paragraph{Data.}
+FERMAT~\cite{fermat} contains ${\sim}2{,}200$ photographed handwritten
+solutions to middle- and high-school problems, in which errors were
+deliberately introduced by the dataset authors and annotated by type.
+Each image contains a complete question and its answer, and $15\%$ of
+items are error-free. That last property is load-bearing for this paper:
+\S\ref{sec:q5} shows the analysis in \S\ref{sec:q3} is impossible on
+datasets that lack it. Unless stated otherwise we use a balanced $n=300$
+sample ($150$ with an error, $150$ without), drawn once with a fixed seed.
+
+\paragraph{Tasks.}
+We evaluate two distinct tasks on the same images.
+\emph{Perception} asks the model to
+``explicitly perform OCR on the handwritten text and extract the content
+in \LaTeX{} format''; it is correct when the extracted final answer
+matches the reference after canonicalisation.
+\emph{Reasoning} asks it to ``analyze the Answer to determine whether
+there is any error'' and emit a binary judgement; it is correct when that
+judgement matches the annotation. The model is never shown the reference
+answer.
+
+\paragraph{Uncertainty measure.}
+For each item we draw $K=5$ samples at temperature $0.7$, reduce each to
+a canonical label, and take the Shannon entropy of the resulting cluster
+distribution, $H=-\sum_i p_i \ln p_i$. $H=0$ when all samples agree and
+$H=\ln K$ when all differ. We deliberately use exact-match clustering
+over an \emph{extracted answer span} rather than semantic clustering of
+whole derivations; \S\ref{sec:limitations} records why.
+
+\paragraph{Models.}
+Qwen2.5-VL at 3B and 7B, LLaVA-NeXT-7B, and InternVL3-8B --- three
+independently trained families, all run in bfloat16.
+
+\paragraph{Statistics.}
+Every AUROC carries a $95\%$ bootstrap interval over $10{,}000$
+item-level resamples. Comparisons between conditions use a \emph{paired}
+bootstrap over the same resampled items rather than checking whether two
+marginal intervals overlap. Before any run we registered a minimum
+minority-class size of $30$ and, for the stratified reasoning hypothesis,
+an AUROC threshold of $0.70$; verdicts below are assigned by a pure
+function of those thresholds, not by inspection.
+
+% =====================================================================
+\section{Results}
+% ~3 pages. Organised as questions, following FERMAT's Section 5.
+
+\subsection{Does self-disagreement predict transcription error?}
+\label{sec:q1}
+Yes, and by a margin that does not depend on the model's own confidence
+being poor. On the balanced $n=300$ sample, perception entropy predicts
+transcription error with AUROC~$0.835$ \ci{0.787}{0.879}. The model's own
+mean token log-probability reaches only $0.537$ \ci{0.469}{0.605} --- an
+interval that includes chance --- and the paired difference is
+$+0.297$ \ci{+0.214}{+0.380}, resolved. The signal is therefore not
+recoverable from information the model already exposes.
+
+Read as a deferral rule the result is directly usable: of the $61$ items
+on which all five transcriptions disagree, $57$ are wrong ($93.4\%$
+precision, $31.3\%$ recall). Over the full risk--coverage curve this
+gives AURC~$0.410$ against a $0.607$ random-deferral baseline.
+\todo{Fig.~1: risk--coverage curve. Asset exists at
+report/figures/risk\_coverage\_n300.png}
+
+\subsection{Does the signal survive artifact controls?}
+\label{sec:q2}
+A cluster-entropy AUROC can be manufactured two ways that have nothing to
+do with useful uncertainty. Unparseable samples receive their own cluster
+label, which both inflates entropy and correlates with being scored
+wrong, so the metric could be measuring the parser. And items pinned at
+the ceiling $H=\ln K$ can carry the entire ranking if that cell happens to
+be uniformly incorrect, leaving a binary breakdown detector rather than a
+graded signal. Table~\ref{tab:sensitivity} removes each, and both.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{lcc}
+\toprule
+Subset & $n$ & AUROC (95\% CI) \\
+\midrule
+All items                 & 300 & 0.835 \ci{0.787}{0.879} \\
+Excl.\ parse failures     & 255 & 0.839 \ci{0.790}{0.886} \\
+Excl.\ max-entropy items  & 239 & 0.794 \ci{0.737}{0.848} \\
+Excl.\ both               & 206 & 0.796 \ci{0.736}{0.852} \\
+\bottomrule
+\end{tabular}
+\caption{Perception entropy under artifact controls, Qwen2.5-VL-3B.
+The signal is graded rather than concentrated at the ceiling: it survives
+the harshest simultaneous cut with an interval excluding chance.
+\S\ref{sec:q6} shows a model for which it does not.}
+\label{tab:sensitivity}
+\end{table}
+
+\subsection{Why does grading look like chance?}
+\label{sec:q3}
+% THE CENTRAL RESULT. Give it the most space.
+Pooled over the same $300$ items, reasoning entropy predicts grading
+error with AUROC~$0.520$ \ci{0.458}{0.582} --- no signal. Read alone, that
+is a clean negative result, and we initially reported it as one.
+
+It is an artifact of aggregation. The model answers ``there is an error''
+for the large majority of inputs, so its mistakes are of opposite kinds
+on the two halves of the data: on solutions that do contain an error it
+is usually right and errs by missing one, while on correct solutions it
+is usually wrong and errs by inventing one. Entropy tracks both, in
+opposite directions, and pooling cancels them
+(Table~\ref{tab:stratified}).
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{lccl}
+\toprule
+Scored on & $n_{\text{wrong}}$ & AUROC (95\% CI) & Verdict \\
+\midrule
+Pooled              & 123 & 0.520 \ci{0.458}{0.582} & no signal \\
+Erroneous solutions &  73 & 0.801 \ci{0.751}{0.846} & confirmed \\
+Correct solutions   & 106 & 0.280 \ci{0.200}{0.366} & inverted \\
+\bottomrule
+\end{tabular}
+\caption{Qwen2.5-VL-7B. Both strata are adequately powered and each
+excludes chance; the pooled statistic reports neither. Note the
+inversion is a finding, not an absence: entropy ranks correct solutions
+\emph{backwards} because the model is confidently wrong on them.}
+\label{tab:stratified}
+\end{table}
+
+Two consequences are worth stating separately from the numbers. First,
+the pooled statistic is not merely uninformative here, it is misleading:
+on a sample that is not balanced it drifts toward whichever stratum is
+larger, which can make an unchanged effect appear to strengthen.
+\todo{cite our own $n{=}500$/$n{=}800$ runs where pooled reads ${\sim}0.61$
+purely from the $650/150$ composition}
+Second, the diagnosis is only available because the dataset contains
+correct solutions to separate out.
+
+\subsection{Does the stratified effect replicate?}
+\label{sec:q4}
+Across three independently trained families, yes, at magnitudes whose
+intervals overlap (Table~\ref{tab:families}). This is measured on
+matched item sets where possible: the two Qwen results use essentially
+the same $650$ items.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{lccc}
+\toprule
+Model & $n$ & $n_{\text{wrong}}$ & AUROC (95\% CI) \\
+\midrule
+Qwen2.5-VL-3B & 650 & 42 & 0.854 \ci{0.796}{0.902} \\
+Qwen2.5-VL-7B & 648 & 73 & 0.801 \ci{0.751}{0.846} \\
+LLaVA-NeXT-7B & 400 & 34 & 0.775 \ci{0.694}{0.848} \\
+\bottomrule
+\end{tabular}
+\caption{Reasoning entropy on erroneous solutions. Each clears the
+pre-registered $0.70$ threshold and the $n{=}30$ minority-class minimum.}
+\label{tab:families}
+\end{table}
+
+\subsection{What happens on a second dataset?}
+\label{sec:q5}
+The analysis in \S\ref{sec:q3} requires a dataset containing correct
+solutions, and the two public alternatives we examined do not have any:
+in ErrorRadar~\cite{errorradar} no item is annotated error-free, and in
+ScratchMath~\cite{scratchmath} the student answer never equals the
+reference. Neither can be balanced, and neither can exhibit the
+inversion.
+
+On ScratchMath, which is the only one of the two with handwriting to
+grade, the measurement fails for a second and more instructive reason.
+Grading accuracy reads $96.0\%$, but every item contains an error and the
+model answers ``error'' for $90\%$ of them, so it scores well by
+construction. In $24\%$ of readings ($120/500$) the model explicitly
+states it cannot read the image, and in $82\%$ of those ($98/120$) it
+answers ``error'' regardless. Excluding those readings does not clean the
+estimate: all four misgraded items lie among them, so the retained subset
+has no minority class and the AUROC is undefined rather than improved.
+We therefore report this setting as \emph{gated}: not a negative result
+about uncertainty, but a statement that the pair cannot test it.
+
+\subsection{When does a high score mean nothing?}
+\label{sec:q6}
+InternVL3-8B attains the highest raw perception AUROC in our study,
+$0.915$ \ci{0.880}{0.944}, on a transcription accuracy of $21.0\%$ ---
+about half that of the model in \S\ref{sec:q1}. Independently recomputing
+every derived column from raw output reproduces the stored values
+exactly, so this is model behaviour rather than a scoring defect. Under
+the control of \S\ref{sec:q2} it collapses to $0.556$ \ci{0.495}{0.614}.
+
+The mechanism is visible in the entropy distribution: $202$ of $300$
+items sit at the ceiling, and accuracy within that group is $0.99\%$
+against $62.2\%$ elsewhere. The score is separating total generation
+breakdown from everything else, which is a binary property of the output,
+not graded uncertainty about content. Reported without the control, it
+would have been the strongest number in this paper.
+\todo{Fig.~2: the four-quadrant figure (low/high entropy $\times$
+correct/wrong) with real pages. Assets exist at reference/cases/01--04.}
+
+% =====================================================================
+\section{Failure Analysis}
+\label{sec:failures}
+% ~0.75 page. Reading real cases; this is what the E&D track rewards and
+% what a reviewer will look for beyond the tables.
+%
+% Established from manual inspection so far:
+%   (a) the model verifies a solution's core computation and stops --- it
+%       does not check whether the final statement is complete
+%       (unsubstituted variable), internally consistent (mismatched
+%       notation), or licensed by the problem (fabricated unit);
+%   (b) it pattern-matches a stated result instead of recomputing --- it
+%       accepted 19 x -18 x 23 = -7966 (correct: -7866);
+%   (c) confidently-wrong items are structurally invisible to the method.
+\todo{expand to the 50--100 coded cases. Tooling exists
+(pilot/07\_manual\_case\_inspection.ipynb); this is reading time, not
+compute. Report inter-rater agreement if a second reader is available.}
+
+% =====================================================================
+\section{Limitations}
+\label{sec:limitations}
+Every quantitative claim rests on a single dataset. We attempted a second
+and report in \S\ref{sec:q5} why it could not test the central result ---
+a property of the available benchmarks rather than of our design, but a
+limitation nonetheless.
+
+The perception result is confirmed on one model family only. Of the two
+alternatives we tried, one is at a floor on free-response transcription
+($0.8\%$ accuracy) and cannot test it, and the other fails the artifact
+control of \S\ref{sec:q2}. Whether perception entropy generalises across
+families is therefore open.
+
+Our clustering is exact-match over an extracted answer span, not semantic.
+Semantic clustering was attempted and abandoned: on this data an
+NLI-plus-union-find implementation merges opposed clusters through a
+single false-positive transitive link, and degrades sharply at larger
+$K$. The reported results avoid that path entirely rather than depending
+on it being fixed.
+
+Confidence intervals were added after the experiments were designed and
+run. They corrected several conclusions but cannot supply statistical
+power the studies were not sized for.
+\todo{add: $K{=}5$ gives few operating points, which is why two-thirds of
+conformal calibration splits cannot reach a $30\%$ risk target.}
+
+% =====================================================================
+\section{Conclusion}
+\todo{write, ${\sim}150$ words. The line to land: whether sampling-based
+uncertainty ``works'' is not a property of the method alone --- on the same
+images and the same measure it is genuinely useful, apparently absent,
+and spuriously excellent, depending on how the evaluation is set up.}
+
+% =====================================================================
+{\small
+\bibliographystyle{ieee_fullname}
+\bibliography{refs}
+}
+
+\end{document}

@@ -1,0 +1,50 @@
+{
+  "label": "Qwen2.5-VL-3B, K=10 confidence-baseline run (2026-08-04) -- entropy vs the model's own token confidence, and K=5 vs K=10",
+  "arm": "perception_baselines",
+  "n_items": 300,
+  "model_id": "Qwen/Qwen2.5-VL-3B-Instruct",
+  "entropy_k5": {
+    "auroc": 0.8346060718942074,
+    "ci_low": 0.7867651965754574,
+    "ci_high": 0.8788473744739388,
+    "n_items": 300,
+    "n_error": 182,
+    "excludes_chance": true
+  },
+  "entropy_k10": {
+    "auroc": 0.8064322546230441,
+    "ci_low": 0.7560936823178812,
+    "ci_high": 0.8538907618602997,
+    "n_items": 300,
+    "n_error": 148,
+    "excludes_chance": true
+  },
+  "neg_mean_logprob": {
+    "auroc": 0.5374371391320544,
+    "ci_low": 0.4691319788359788,
+    "ci_high": 0.604562740687861,
+    "n_items": 300,
+    "n_error": 182,
+    "excludes_chance": false
+  },
+  "neg_min_logprob": {
+    "auroc": 0.4599087353324641,
+    "ci_low": 0.3923951109915511,
+    "ci_high": 0.5271381509443998,
+    "n_items": 300,
+    "n_error": 182,
+    "excludes_chance": false
+  },
+  "entropy_minus_token_confidence": {
+    "difference": 0.29716893276215306,
+    "ci_low": 0.213922939781825,
+    "ci_high": 0.38026780956187434,
+    "difference_excludes_zero": true
+  },
+  "k10_minus_k5": {
+    "difference": 0.045252489331436774,
+    "ci_low": 0.005217212562139141,
+    "ci_high": 0.08702609004844652,
+    "difference_excludes_zero": true
+  }
+}
