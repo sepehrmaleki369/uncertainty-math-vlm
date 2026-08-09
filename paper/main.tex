@@ -174,6 +174,54 @@ gives AURC~$0.410$ against a $0.607$ random-deferral baseline.
 \todo{Fig.~1: risk--coverage curve. Asset exists at
 report/figures/risk\_coverage\_n300.png}
 
+\subsection{What does the entropy summary add?}
+\label{sec:q1b}
+All five samples per item support several summaries, and a natural
+objection is that entropy is merely a dressed-up count of distinct
+answers. Table~\ref{tab:baselines} tests that directly. The three
+sample-based alternatives are computed from the \emph{same} generations at
+no additional cost, so the comparison isolates the summary rather than the
+sampling budget.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{lcc}
+\toprule
+Signal & AUROC (95\% CI) & vs.\ entropy \\
+\midrule
+Sampling entropy      & 0.835 \ci{0.787}{0.879} & --- \\
+$1-$majority fraction & 0.793 \ci{0.742}{0.841} & $+0.042$ \ci{+0.011}{+0.073} \\
+Distinct count        & 0.790 \ci{0.739}{0.838} & $+0.045$ \ci{+0.016}{+0.075} \\
+Majority margin       & 0.779 \ci{0.727}{0.830} & $+0.055$ \ci{+0.018}{+0.092} \\
+\midrule
+Token log-probability & 0.537 \ci{0.469}{0.605} & $+0.297$ \ci{+0.214}{+0.380} \\
+\bottomrule
+\end{tabular}
+\caption{Perception baselines, Qwen2.5-VL-3B, $n=300$. The upper block
+reduces the same five samples in different ways; the lower is a
+model-internal signal requiring no sampling. Differences are paired
+bootstraps over the same resampled items, and every one excludes zero.
+Entropy's margin over the simpler summaries is small but resolved, so the
+shape of the cluster distribution carries information that a count or a
+majority does not. The simple summaries are related to entropy but not
+redundant with it (Spearman $0.83$--$0.89$).}
+\label{tab:baselines}
+\end{table}
+
+Two of these deserve comment. The majority margin separates a
+three--two split from a three--one--one split, which the majority
+fraction cannot, and it is nonetheless the weakest of the three --- the
+information entropy uses is in the full distribution, not in the top two
+clusters. Token log-probability is the only baseline here that is not a
+function of the samples, and it is also the only one that fails to beat
+chance; a model that is verbally or numerically confident about a page it
+has misread is not detectable from its own output distribution, but is
+detectable from asking it twice.
+\todo{we also have verbalized confidence, but only on the grading arm
+($0.547$ \ci{0.432}{0.661}, no signal, $n{=}100$). Either run it for
+perception or report it in \S\ref{sec:q3} where the data exists ---
+do not quietly omit it.}
+
 \subsection{Does the signal survive artifact controls?}
 \label{sec:q2}
 A cluster-entropy AUROC can be manufactured two ways that have nothing to

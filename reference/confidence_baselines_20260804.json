@@ -46,5 +46,22 @@
     "ci_low": 0.005217212562139141,
     "ci_high": 0.08702609004844652,
     "difference_excludes_zero": true
+  },
+  "verbalized_confidence_grading": {
+    "note": "The model is asked to state a 0-100 confidence alongside its grading verdict. GRADING arm only -- there is no perception equivalent, which would need a new generation run. Reported so the baseline is not silently omitted.",
+    "source_csv": "results/grading_variants_qwen25-vl-3b-instruct_20260804T203938Z.csv",
+    "auroc_ci": {
+      "auroc": 0.5470188075230092,
+      "ci_low": 0.4319700830148461,
+      "ci_high": 0.6608081350921368,
+      "n_items": 100,
+      "n_error": 49,
+      "excludes_chance": false
+    },
+    "stated_confidence_range": [
+      56.0,
+      95.0
+    ],
+    "stated_confidence_median": 82.5
   }
 }

@@ -84,3 +84,64 @@ def majority_cluster(
     normalized = [normalize_fn(s) for s in samples]
     counts = Counter(normalized)
     return counts.most_common(1)[0]
+
+
+# --- Simpler summaries of the same cluster distribution --------------------
+#
+# These exist as baselines, and specifically to answer the question a reader
+# will ask about cluster_entropy: is entropy over K samples doing anything
+# that counting distinct answers does not? On the real n=300 perception data
+# it is -- entropy beats all three below by a paired margin that excludes
+# zero -- but that only became sayable once the comparison existed.
+#
+# Direction differs between them and is easy to get backwards. distinct_count
+# rises with uncertainty, like entropy; majority_fraction and majority_margin
+# rise with CONFIDENCE and must be negated before being fed to an AUROC that
+# predicts "is wrong". Each docstring states its direction; the sign is not
+# baked in here, matching how the token-confidence baseline is stored
+# negated at the point of use rather than at the point of computation.
+
+
+def distinct_count(
+    samples: Sequence[Optional[str]],
+    normalize_fn: Callable[[Optional[str]], str] = normalize_string,
+) -> int:
+    """Number of distinct clusters among the samples. Higher = less certain.
+
+    The crudest possible summary: 1 when the model always says the same
+    thing, K when it never repeats itself. Empty input returns 0.
+    """
+    return len({normalize_fn(s) for s in samples})
+
+
+def majority_fraction(
+    samples: Sequence[Optional[str]],
+    normalize_fn: Callable[[Optional[str]], str] = normalize_string,
+) -> float:
+    """Share of samples falling in the largest cluster. Higher = MORE certain.
+
+    Negate before using as an uncertainty score. Empty input returns 0.0,
+    which is the conservative direction (reads as maximally uncertain).
+    """
+    if len(samples) == 0:
+        return 0.0
+    counts = Counter(normalize_fn(s) for s in samples)
+    return counts.most_common(1)[0][1] / len(samples)
+
+
+def majority_margin(
+    samples: Sequence[Optional[str]],
+    normalize_fn: Callable[[Optional[str]], str] = normalize_string,
+) -> float:
+    """(largest cluster - second largest) / K. Higher = MORE certain.
+
+    Distinguishes a 3-2 split from a 3-1-1 split, which distinct_count
+    cannot and majority_fraction cannot: both of those score 3/5 on the
+    fraction, but the margin is 0.2 and 0.4 respectively. Negate before
+    using as an uncertainty score. Empty input returns 0.0.
+    """
+    if len(samples) == 0:
+        return 0.0
+    counts = [c for _, c in Counter(normalize_fn(s) for s in samples).most_common()]
+    second = counts[1] if len(counts) > 1 else 0
+    return (counts[0] - second) / len(samples)

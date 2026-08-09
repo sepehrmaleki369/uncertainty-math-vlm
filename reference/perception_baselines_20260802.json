@@ -1,0 +1,93 @@
+{
+  "label": "Perception baselines on the n=300 balanced Qwen2.5-VL-3B run. All four are computed from the SAME five samples per item -- no extra generation -- so they isolate what the entropy summary adds over simpler reductions of the same cluster distribution.",
+  "arm": "perception_baselines",
+  "source_csv": "results/scaleup_n300_bal50_qwen25-vl-3b-instruct_20260802T163202Z.csv",
+  "n_items": 300,
+  "signals": {
+    "sampling_entropy": {
+      "auroc_ci": {
+        "auroc": 0.8346060718942074,
+        "ci_low": 0.7867651965754574,
+        "ci_high": 0.8788473744739388,
+        "n_items": 300,
+        "n_error": 182,
+        "excludes_chance": true
+      },
+      "vs_entropy": null,
+      "direction": "higher = less certain"
+    },
+    "distinct_count": {
+      "auroc_ci": {
+        "auroc": 0.7897886012292792,
+        "ci_low": 0.739153523952833,
+        "ci_high": 0.8384129658595877,
+        "n_items": 300,
+        "n_error": 182,
+        "excludes_chance": true
+      },
+      "vs_entropy": {
+        "difference": 0.04481747066492825,
+        "ci_low": 0.015991477318939178,
+        "ci_high": 0.07472305188094255,
+        "difference_excludes_zero": true
+      },
+      "direction": "higher = less certain"
+    },
+    "neg_majority_frac": {
+      "auroc_ci": {
+        "auroc": 0.7928385174147886,
+        "ci_low": 0.7420703414898302,
+        "ci_high": 0.8406159817652143,
+        "n_items": 300,
+        "n_error": 182,
+        "excludes_chance": true
+      },
+      "vs_entropy": {
+        "difference": 0.04176755447941882,
+        "ci_low": 0.01142263717462277,
+        "ci_high": 0.0725043398424727,
+        "difference_excludes_zero": true
+      },
+      "direction": "majority_fraction negated"
+    },
+    "neg_majority_margin": {
+      "auroc_ci": {
+        "auroc": 0.7794980443285529,
+        "ci_low": 0.7273822869337138,
+        "ci_high": 0.8297475275109749,
+        "n_items": 300,
+        "n_error": 182,
+        "excludes_chance": true
+      },
+      "vs_entropy": {
+        "difference": 0.05510802756565458,
+        "ci_low": 0.01838246151596134,
+        "ci_high": 0.09232103981238901,
+        "difference_excludes_zero": true
+      },
+      "direction": "majority_margin negated"
+    }
+  },
+  "token_confidence": {
+    "note": "from reference/confidence_baselines_20260804.json; a genuinely different information source (model-internal), not a reduction of the samples",
+    "auroc_ci": {
+      "auroc": 0.5374371391320544,
+      "ci_low": 0.4691319788359788,
+      "ci_high": 0.604562740687861,
+      "n_items": 300,
+      "n_error": 182,
+      "excludes_chance": false
+    },
+    "vs_entropy": {
+      "difference": 0.29716893276215306,
+      "ci_low": 0.213922939781825,
+      "ci_high": 0.38026780956187434,
+      "difference_excludes_zero": true
+    }
+  },
+  "spearman_with_entropy": {
+    "distinct_count": 0.893,
+    "neg_majority_frac": 0.884,
+    "neg_majority_margin": 0.825
+  }
+}
