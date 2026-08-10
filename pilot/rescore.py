@@ -159,11 +159,28 @@ def score_item(
     }
 
 
+def _maybe_tqdm(iterable, total, desc, progress):
+    """tqdm when asked for and available, otherwise the bare iterable.
+
+    Rescoring is slow enough (SymPy parses every label) that a silent
+    multi-minute cell reads as a hang. tqdm is optional rather than a hard
+    dependency so the test suite and any headless caller stay quiet.
+    """
+    if not progress:
+        return iterable
+    try:
+        from tqdm.auto import tqdm
+    except ImportError:
+        return iterable
+    return tqdm(iterable, total=total, desc=desc, leave=False)
+
+
 def rescore_run(
     df: pd.DataFrame,
     rule: str = "strict_v1",
     samples_col: str = "all_transcription_samples_raw",
     gt_col: str = "pert_a",
+    progress: bool = False,
 ) -> pd.DataFrame:
     """Recompute entropy and correctness for a whole results CSV under `rule`.
 
@@ -171,7 +188,8 @@ def rescore_run(
     accidentally overwrite the as-run columns a snapshot was built from.
     """
     records = []
-    for _, row in df.iterrows():
+    rows = _maybe_tqdm(df.iterrows(), len(df), rule, progress)
+    for _, row in rows:
         raw = row[samples_col]
         samples = ast.literal_eval(raw) if isinstance(raw, str) else list(raw)
         records.append(score_item(samples, row[gt_col], rule))
@@ -188,6 +206,7 @@ def scoring_sensitivity(
     n_boot: int = 10000,
     seed: int = 0,
     k: int = 5,
+    progress: bool = False,
     **kwargs,
 ) -> pd.DataFrame:
     """One row per rule: accuracy, AUROC with a bootstrap CI, max-entropy count.
@@ -200,8 +219,12 @@ def scoring_sensitivity(
     from pilot.plotting import bootstrap_auroc_ci  # local: avoids a cycle
 
     rows = []
-    for rule in rules:
-        scored = rescore_run(df, rule, **kwargs)
+    for n, rule in enumerate(rules, 1):
+        if progress:
+            print(f"[{n}/{len(rules)}] {rule}: rescoring {len(df)} items...", flush=True)
+        scored = rescore_run(df, rule, progress=progress, **kwargs)
+        if progress:
+            print(f"          bootstrapping {n_boot} resamples...", flush=True)
         ci = bootstrap_auroc_ci(scored, "perception_entropy",
                                 "transcription_correct", n_boot=n_boot, seed=seed)
         n_correct = int(scored["transcription_correct"].sum())
