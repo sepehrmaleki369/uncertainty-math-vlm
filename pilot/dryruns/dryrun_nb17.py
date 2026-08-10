@@ -26,15 +26,21 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 NB = ROOT / "pilot" / "17_scoring_inspection.ipynb"
-CSV = (ROOT / "results"
-       / "scaleup_n300_bal50_qwen25-vl-3b-instruct_20260802T163202Z.csv")
+CSVS = {
+    "Qwen2.5-VL-3B": ROOT / "results"
+    / "scaleup_n300_bal50_qwen25-vl-3b-instruct_20260802T163202Z.csv",
+    "Pixtral-12B": ROOT / "results"
+    / "pixtral_perception_full_n300_pixtral-12b_20260809T211028Z.csv",
+}
+CSV = CSVS["Qwen2.5-VL-3B"]  # the sample stub is built from this one
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--fast", action="store_true")
 args = parser.parse_args()
 
-if not CSV.exists():
-    sys.exit(f"SKIP: {CSV} not present (download from Drive)")
+missing = [str(p) for p in CSVS.values() if not p.exists()]
+if missing:
+    sys.exit(f"SKIP: not present (download from Drive): {missing}")
 
 sys.path.insert(0, str(ROOT))
 
@@ -117,7 +123,8 @@ def prepare(src: str, idx: int) -> str:
 DRIVE = str(ROOT / ".dryrun_scratch" / "drive")
 Path(DRIVE, "results").mkdir(parents=True, exist_ok=True)
 import shutil  # noqa: E402
-shutil.copy(CSV, Path(DRIVE, "results", CSV.name))
+for _csv in CSVS.values():
+    shutil.copy(_csv, Path(DRIVE, "results", _csv.name))
 
 nb = json.loads(NB.read_text())
 code_cells = [(i, "".join(c["source"])) for i, c in enumerate(nb["cells"])
@@ -142,17 +149,41 @@ print("DRY RUN PASSED -- every cell executed against the real n=300 data")
 print("=" * 74)
 
 # --- post-conditions the notebook is supposed to establish ----------------
-sens = ns["sens"].set_index("rule")
-assert bool(sens["excludes_chance"].all()), "a rule stopped excluding chance"
-assert sens.loc["strict_v1", "n_correct"] == 141
-assert sens.loc["fixed_v2", "n_correct"] == 141
-assert sens.loc["relaxed_v3", "n_correct"] == 162
-assert sens.loc["final_term_v4", "n_correct"] == 190
-buckets = ns["buckets"]
-assert buckets["cosmetic"], "no cosmetic near-misses found -- selection is broken"
-assert buckets["scope"], "no scope mismatches found -- selection is broken"
-assert buckets["genuinely_wrong"], "no control items -- selection is broken"
-assert int((ns["flags"].n_tiers > 1).sum()) == 153
-print(f"post-conditions OK: buckets "
-      f"{ {k: len(v) for k, v in buckets.items()} }")
+from pilot.rescore import CATEGORIES  # noqa: E402
+
+qwen = ns["sens"]["Qwen2.5-VL-3B"].set_index("rule")
+assert bool(qwen["excludes_chance"].all()), "a rule stopped excluding chance"
+assert qwen.loc["strict_v1", "n_correct"] == 141
+assert qwen.loc["fixed_v2", "n_correct"] == 141
+assert qwen.loc["relaxed_v3", "n_correct"] == 162
+assert qwen.loc["final_term_v4", "n_correct"] == 190
+assert bool(ns["sens"]["Pixtral-12B"]["excludes_chance"].all())
+
+EXPECTED = {
+    "Qwen2.5-VL-3B": {"correct_robust": 134, "bug_fix_recovered": 6,
+                      "cosmetic_mismatch": 22, "scope_mismatch": 27,
+                      "false_pass_removed": 6, "broken_by_relaxation": 1,
+                      "genuinely_wrong": 104},
+    "Pixtral-12B": {"correct_robust": 118, "bug_fix_recovered": 9,
+                    "cosmetic_mismatch": 11, "scope_mismatch": 25,
+                    "false_pass_removed": 6, "broken_by_relaxation": 1,
+                    "genuinely_wrong": 130},
+}
+for model, expected in EXPECTED.items():
+    counts = ns["classified"][model]["category"].value_counts().to_dict()
+    assert counts == expected, f"{model}: {counts} != {expected}"
+    assert sum(counts.values()) == 300
+    # Every category the notebook renders an example from must be non-empty.
+    for category in ("false_pass_removed", "cosmetic_mismatch",
+                     "scope_mismatch", "genuinely_wrong"):
+        assert counts.get(category), f"{model}: no {category} to show"
+    # The taxonomy must reconcile with the sensitivity table it sits beside.
+    n_v1 = ns["sens"][model].set_index("rule").loc["strict_v1", "n_correct"]
+    assert (counts["correct_robust"] + counts["false_pass_removed"]
+            + counts["broken_by_relaxation"]) == n_v1, (
+        f"{model}: categories disagree with strict_v1's n_correct")
+
+assert set(ns["summary"]["category"]) <= set(CATEGORIES)
+print("post-conditions OK: category counts match on both models, and reconcile "
+      "with each run's strict_v1 accuracy")
 shutil.rmtree(ROOT / ".dryrun_scratch", ignore_errors=True)

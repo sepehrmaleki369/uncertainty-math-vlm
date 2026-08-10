@@ -8,6 +8,59 @@ working context for future sessions, not a repeat of that.
 
 ## Current findings
 
+### 2026-08-10: every item classified by WHY it scored — and bug 3's real damage
+
+`pilot.rescore.classify_scoring_outcome` + `scoring_category_summary`,
+`pilot.plotting.plot_scoring_categories`, `pilot.rescore.format_trace`.
+Notebook 17 rebuilt around them, now on **both Qwen-3B and Pixtral-12B**
+(same 300 images). Offline, no GPU.
+
+Notebook 17's original four buckets **overlapped** (an item could be both
+`cosmetic` and `tier_unstable`), so they could show an example but not say
+what the population is made of. Seven mutually exclusive categories, total:
+
+| category | Qwen-3B | Pixtral-12B |
+|---|---|---|
+| `correct_robust` | 134 | 118 |
+| `genuinely_wrong` | 104 | 130 |
+| `scope_mismatch` | 27 | 25 |
+| `cosmetic_mismatch` | 22 | 11 |
+| `bug_fix_recovered` | 6 | 9 |
+| `false_pass_removed` | **6** | **6** |
+| `broken_by_relaxation` | 1 | 1 |
+
+- **The categories replicate across model families** — comparable
+  `scope_mismatch` and an *identical* 6-item `false_pass_removed`. These are
+  properties of the **scoring pipeline**, not of one model.
+- **`false_pass_removed` is the cell to read first, and it shows bug 3 was
+  worse than the two example strings suggested.** Qwen items are
+  `[2, 31, 37, 117, 239, 294]`. Item 31's model text is about the rectangle's
+  *length* and the ground truth about its *perimeter* — **both canonicalize
+  to `sympy:2*(c*m)`** and the frozen rule scored it CORRECT. Items 117 and
+  239 collapse to `sympy:p` and `sympy:l`. SymPy grabbed one letter out of
+  prose and everything matched. Locked in
+  `test_false_pass_items_are_the_bug_3_collapse`.
+- **Correction to an earlier assumption: item 101 is `genuinely_wrong`, not
+  `false_pass_removed`.** It was the motivating false pass, but only under a
+  relaxed rule applied *before* the decimal fix existed; with the fix it is
+  wrong under every rule. `false_pass_removed` means *the frozen rule scored
+  it correct*, which item 101 never did.
+- **Two categories exist only because the rules are NOT monotone** —
+  `false_pass_removed` and `broken_by_relaxation`. A cumulative scheme folds
+  both into "correct" and hides the two places scoring goes backwards.
+  Separately, `later_regression` is its own column (Qwen items 129, 206):
+  one label cannot honestly carry both "first fixed at v3" and "broken at v4".
+- **Attribution by single-fix ablation** (each fix applied alone): Qwen
+  `textcolor` 6, `sympy_prefix` 5, `decimal` 1; Pixtral 8 / 6 / 1.
+- **Tier instability is a FLAG, not a category** — it cross-cuts everything.
+  **Both denominators are pinned in the test because they are easy to
+  confuse: 41.8% vs 66.7% grouping by the loosest rule's verdict, 41.1% vs
+  59.8% grouping by the frozen rule's.** Quoting one against the other
+  denominator is the specific mistake to avoid.
+- `format_trace` names every stage and adds the missing line: **the column
+  where the two labels first diverge**, with both characters by `repr`. On a
+  cosmetic mismatch the labels look identical on screen otherwise.
+
 ### 2026-08-10: E-AURC + Coverage@Risk — the deferral comparison, offline
 
 Added `oracle_aurc`, `e_aurc`/`e_aurc_on_grid` (inside `aurc()`'s dict) and

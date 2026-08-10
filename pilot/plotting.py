@@ -1346,3 +1346,89 @@ def bias_only_null_auroc(
     lo, med, hi = np.percentile(arr, [2.5, 50, 97.5])
     return {"median": float(med), "ci_low": float(lo), "ci_high": float(hi),
             "n_valid": int(arr.size)}
+
+
+def plot_scoring_categories(
+    summary: pd.DataFrame,
+    ax: Optional[plt.Axes] = None,
+    category_col: str = "category",
+    count_col: str = "n",
+    model_col: str = "model",
+) -> plt.Axes:
+    """Horizontal bars: what the scored population is actually made of.
+
+    Takes pilot.rescore.scoring_category_summary's output -- one frame, or
+    several concatenated with a `model` column, in which case the bars are
+    grouped for a side-by-side comparison.
+
+    Bars follow pilot.rescore.CATEGORIES order rather than sorting by size,
+    so the same category sits in the same place across models and the eye can
+    compare rows. The order also runs from "scored right" through the two
+    non-monotone categories to "wrong under every rule", which is the order a
+    reader needs to reason about the taxonomy.
+
+    Colour carries one bit only: whether the item ends up correct under the
+    loosest rule. Six shades for seven categories would encode nothing.
+    """
+    from pilot.rescore import CATEGORIES
+
+    present = [c for c in CATEGORIES if c in set(summary[category_col])]
+    missing = set(summary[category_col]) - set(CATEGORIES)
+    if missing:
+        raise ValueError(f"unknown categories, not in rescore.CATEGORIES: {missing}")
+
+    # Categories whose items are correct under the loosest rule.
+    ENDS_CORRECT = {"correct_robust", "bug_fix_recovered",
+                    "cosmetic_mismatch", "scope_mismatch"}
+
+    models = ([None] if model_col not in summary.columns
+              else list(dict.fromkeys(summary[model_col])))
+    if ax is None:
+        _, ax = plt.subplots(figsize=(7.4, 0.52 * len(present) * max(1, len(models)) + 1.6))
+
+    ax.set_facecolor(SURFACE)
+    if ax.figure is not None:
+        ax.figure.patch.set_facecolor(SURFACE)
+
+    y = np.arange(len(present))
+    height = 0.8 / len(models)
+    for m_i, model in enumerate(models):
+        sub = summary if model is None else summary[summary[model_col] == model]
+        counts = [int(sub.loc[sub[category_col] == c, count_col].sum()) for c in present]
+        total = sum(counts) or 1
+        offset = (m_i - (len(models) - 1) / 2) * height
+        colors = [COLOR_CORRECT if c in ENDS_CORRECT else COLOR_INCORRECT
+                  for c in present]
+        # Second and later models are drawn lighter so the grouping reads.
+        alpha = 1.0 if m_i == 0 else 0.55
+        ax.barh(y + offset, counts, height=height * 0.92, color=colors,
+                alpha=alpha, zorder=3)
+        for yi, count in zip(y + offset, counts):
+            if count:
+                ax.text(count + total * 0.008, yi, f"{count}  ({count / total:.0%})",
+                        va="center", ha="left", fontsize=8, color=INK_SECONDARY,
+                        zorder=4)
+
+    ax.set_yticks(y)
+    ax.set_yticklabels(present, fontsize=9, color=INK_SECONDARY)
+    ax.invert_yaxis()
+    ax.set_xlabel("items", fontsize=10, color=INK_SECONDARY)
+    ax.set_xlim(0, max(summary[count_col]) * 1.34)
+    if len(models) > 1 and models[0] is not None:
+        # Neutral proxy swatches: hue already encodes ends-correct vs
+        # ends-wrong, so a coloured legend key would imply a second meaning
+        # it does not have. Opacity is what separates the models.
+        from matplotlib.patches import Patch
+        handles = [Patch(facecolor=INK_SECONDARY, alpha=1.0 if i == 0 else 0.45,
+                         label=str(m)) for i, m in enumerate(models)]
+        ax.legend(handles=handles, frameon=False, fontsize=9,
+                  loc="center left", bbox_to_anchor=(0.62, 0.5),
+                  title="opacity = model", title_fontsize=8)
+
+    ax.grid(axis="x", color=GRIDLINE, linewidth=1, zorder=0)
+    ax.set_axisbelow(True)
+    for side in ("top", "right", "left"):
+        ax.spines[side].set_visible(False)
+    ax.spines["bottom"].set_color(BASELINE)
+    ax.tick_params(colors=INK_MUTED, labelsize=9, length=0)
+    return ax

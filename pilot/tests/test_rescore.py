@@ -439,3 +439,256 @@ def test_trace_item_stages_line_up_with_the_score(run):
                 sc["perception_entropy"], abs=1e-12)
             assert [s["label"] for s in tr["samples"]] == sc["labels"]
             assert math.isfinite(tr["perception_entropy"])
+
+
+# --- 7. classifying the whole population ----------------------------------
+#
+# The four buckets notebook 17 originally used to draw examples from
+# OVERLAPPED -- an item could be both a cosmetic mismatch and
+# extractor-tier-unstable -- so they could show a case of X but could not say
+# what the 300 items are made of. These categories are mutually exclusive and
+# total, which is what makes them countable, plottable and comparable across
+# models.
+
+PIXTRAL_CSV = (
+    Path(__file__).resolve().parents[2]
+    / "results"
+    / "pixtral_perception_full_n300_pixtral-12b_20260809T211028Z.csv"
+)
+
+EXPECTED_CATEGORIES = {
+    "qwen": {"correct_robust": 134, "bug_fix_recovered": 6,
+             "cosmetic_mismatch": 22, "scope_mismatch": 27,
+             "false_pass_removed": 6, "broken_by_relaxation": 1,
+             "genuinely_wrong": 104},
+    "pixtral": {"correct_robust": 118, "bug_fix_recovered": 9,
+                "cosmetic_mismatch": 11, "scope_mismatch": 25,
+                "false_pass_removed": 6, "broken_by_relaxation": 1,
+                "genuinely_wrong": 130},
+}
+
+
+@pytest.fixture(scope="module")
+def pixtral():
+    if not PIXTRAL_CSV.exists():
+        pytest.skip(f"{PIXTRAL_CSV} not present (download from Drive)")
+    return pd.read_csv(PIXTRAL_CSV)
+
+
+@pytest.fixture(scope="module")
+def classified(run):
+    return rescore.classify_scoring_outcome(run)
+
+
+@pytest.fixture(scope="module")
+def classified_pixtral(pixtral):
+    return rescore.classify_scoring_outcome(pixtral)
+
+
+def test_every_item_gets_exactly_one_known_category(classified,
+                                                    classified_pixtral):
+    """Total and mutually exclusive. If this fails the bar plot is lying about
+    the population, because some items are in no bar or in two."""
+    for name, c in (("qwen", classified), ("pixtral", classified_pixtral)):
+        assert len(c) == 300, name
+        assert c["category"].notna().all(), name
+        assert set(c["category"]) <= set(rescore.CATEGORIES), name
+        assert c["category"].value_counts().sum() == 300, name
+
+
+@pytest.mark.parametrize("which", ["qwen", "pixtral"])
+def test_category_counts(which, classified, classified_pixtral):
+    c = classified if which == "qwen" else classified_pixtral
+    assert c["category"].value_counts().to_dict() == EXPECTED_CATEGORIES[which]
+
+
+@pytest.mark.parametrize("which", ["qwen", "pixtral"])
+def test_categories_reconcile_with_the_sensitivity_table(
+        which, run, pixtral, classified, classified_pixtral):
+    """The taxonomy and the table beside it must describe the same run. Every
+    item correct under the frozen rule is in exactly one of three categories,
+    so they have to sum to that rule's n_correct."""
+    df = run if which == "qwen" else pixtral
+    c = classified if which == "qwen" else classified_pixtral
+    n_v1 = int(rescore.scoring_sensitivity(df, rules=("strict_v1",),
+                                           n_boot=50)["n_correct"].iloc[0])
+    counts = c["category"].value_counts()
+    assert (counts["correct_robust"] + counts["false_pass_removed"]
+            + counts["broken_by_relaxation"]) == n_v1
+
+
+def test_the_non_monotone_categories_are_not_empty(classified,
+                                                   classified_pixtral):
+    """Both exist because the rules are NOT monotone. A cumulative scheme
+    would silently fold them into 'correct' and hide the two cases where
+    scoring goes backwards -- which are the interesting ones."""
+    for c in (classified, classified_pixtral):
+        assert (c["category"] == "false_pass_removed").sum() == 6
+        assert (c["category"] == "broken_by_relaxation").sum() == 1
+
+
+def test_false_pass_items_are_the_bug_3_collapse(run, classified):
+    """What a false pass looks like: bug 3 mapped two unrelated strings onto
+    one label, so the frozen rule called them equal. Item 31's model text is
+    about the rectangle's LENGTH and the truth about its PERIMETER, and both
+    canonicalize to sympy:2*(c*m)."""
+    idx = classified.index[classified["category"] == "false_pass_removed"].tolist()
+    assert idx == [2, 31, 37, 117, 239, 294]
+
+    row = run.iloc[31]
+    samples = ast.literal_eval(row["all_transcription_samples_raw"])
+    strict = rescore.score_item(samples, row["pert_a"], "strict_v1")
+    assert strict["transcription_correct"] is True
+    assert strict["majority_label"] == strict["gt_label"] == "sympy:2*(c*m)"
+
+    fixed = rescore.score_item(samples, row["pert_a"], "fixed_v2")
+    assert fixed["transcription_correct"] is False
+    assert fixed["majority_label"] != fixed["gt_label"]
+
+
+def test_item_101_is_genuinely_wrong_not_a_false_pass(classified):
+    """Guards a plausible misreading. Item 101 was the motivating false pass,
+    but only under a relaxed rule applied BEFORE the decimal fix existed. With
+    the fix in place it is wrong under every rule, so it belongs in
+    genuinely_wrong -- the false_pass_removed category is for items the FROZEN
+    rule scores correct, which item 101 never did."""
+    assert classified.loc[101, "category"] == "genuinely_wrong"
+    assert not classified.loc[101, "correct_strict_v1"]
+
+
+def test_later_regression_is_separate_from_the_category(classified):
+    """One label cannot honestly carry both 'first fixed at v3' and 'broken
+    again at v4'. Two Qwen items are exactly that, so the fact is recorded in
+    its own column and the category still names the rule that fixed them."""
+    regressed = classified.index[classified["later_regression"]].tolist()
+    assert regressed == [129, 206]
+    assert classified.loc[129, "category"] == "cosmetic_mismatch"
+    assert classified.loc[206, "category"] == "bug_fix_recovered"
+    for i in regressed:
+        assert not classified.loc[i, "correct_final_term_v4"]
+
+
+def test_tier_instability_cross_cuts_the_taxonomy_so_it_is_a_flag(classified):
+    """Why extractor-tier instability is a column and not a bar: it occurs in
+    categories that end correct AND categories that end wrong, at materially
+    different rates. A bucket defined by it would overlap every other one.
+
+    Both splits are pinned because they are easy to confuse and differ: 42%
+    vs 67% grouping by the LOOSEST rule's verdict, 41% vs 60% grouping by the
+    frozen rule's. Quoting one figure against the other denominator is the
+    mistake this test exists to prevent."""
+    multi = classified["n_distinct_tiers"] > 1
+
+    ends_correct = classified["category"].isin(
+        ["correct_robust", "bug_fix_recovered", "cosmetic_mismatch",
+         "scope_mismatch"])
+    assert multi[ends_correct].mean() == pytest.approx(0.418, abs=0.01)
+    assert multi[~ends_correct].mean() == pytest.approx(0.667, abs=0.01)
+
+    strict = classified["correct_strict_v1"]
+    assert multi[strict].mean() == pytest.approx(0.411, abs=0.01)
+    assert multi[~strict].mean() == pytest.approx(0.598, abs=0.01)
+
+    # The property that makes it a flag: present at both ends, never total.
+    assert 0 < multi[ends_correct].mean() < multi[~ends_correct].mean() < 1
+
+
+@pytest.mark.parametrize("which,expected", [
+    ("qwen", {"textcolor": 6, "sympy_prefix": 5, "decimal": 1}),
+    ("pixtral", {"textcolor": 8, "sympy_prefix": 6, "decimal": 1}),
+])
+def test_single_fix_attribution(which, expected, classified,
+                                classified_pixtral):
+    """Each flip is attributed by applying one fix alone. Only the two
+    bug-related categories get an attribution -- a cosmetic mismatch has no
+    bug to blame."""
+    c = classified if which == "qwen" else classified_pixtral
+    assert c["attributed_bug"].dropna().value_counts().to_dict() == expected
+    attributed = c["attributed_bug"].notna()
+    assert set(c.loc[attributed, "category"]) == {
+        "bug_fix_recovered", "false_pass_removed"}
+
+
+def test_scoring_category_summary_is_complete_and_ordered(classified):
+    """Every category appears even at zero, in CATEGORIES order, so two models
+    plot as comparable rows rather than as differently-shaped tables."""
+    s = rescore.scoring_category_summary(classified, label="Qwen")
+    assert list(s["category"]) == list(rescore.CATEGORIES)
+    assert s["n"].sum() == 300
+    assert s["share"].sum() == pytest.approx(1.0)
+    assert (s["model"] == "Qwen").all()
+
+
+def test_classification_does_not_mutate_its_input(run):
+    before = run.copy(deep=True)
+    rescore.classify_scoring_outcome(run)
+    pd.testing.assert_frame_equal(run, before)
+
+
+# --- 8. the reading view --------------------------------------------------
+
+def test_first_difference_pinpoints_a_cosmetic_divergence():
+    """The line the view was missing. Two labels that look identical on screen
+    differ by one space, and the reader needs the column to see it."""
+    d = rescore.first_difference(r"text:(x,z) \in r", r"text:(x, z) \in r")
+    assert d["index"] == 8
+    assert d["model"] == repr("z")
+    assert d["truth"] == repr(" ")
+    assert rescore.first_difference("same", "same") is None
+
+
+def test_first_difference_handles_one_label_being_a_prefix():
+    d = rescore.first_difference("24", "24 cm")
+    assert d["index"] == 2
+    assert "longer" in d["note"]
+
+
+def test_format_trace_names_every_stage_and_both_sides(run):
+    """The view must show what the parser took from EACH side and the verdict
+    between them -- that is the whole question it exists to answer."""
+    row = run.iloc[9]
+    samples = ast.literal_eval(row["all_transcription_samples_raw"])
+    tr = rescore.trace_item(samples, row["pert_a"], "strict_v1")
+    text = rescore.format_trace(tr, question=row["orig_q"],
+                                category="cosmetic_mismatch")
+
+    for expected in ("QUESTION", "GROUND TRUTH", "raw answer (pert_a)",
+                     "parse_transcription", "extract_final_answer",
+                     "COMPARISON LABEL", "MODEL sample 1 of 5",
+                     "model majority label", "ground-truth label",
+                     "verdict", "first difference at col",
+                     "cosmetic_mismatch"):
+        assert expected in text, f"{expected!r} missing from format_trace"
+
+    assert "DIFFER" in text and "MATCH" not in text.split("verdict")[1][:20]
+
+
+def test_format_trace_verdict_agrees_with_score_item(run):
+    """The view and the numbers must not be able to disagree.
+
+    Matched by regex rather than by reconstructing the column padding: an
+    assertion that hard-codes the layout fails on a cosmetic formatting change
+    while saying nothing about whether the verdict is right."""
+    import re as _re
+    verdict_re = _re.compile(r"^\s*verdict:\s+(MATCH|DIFFER)\s*$", _re.MULTILINE)
+
+    for i in (9, 31, 49, 101, 190):
+        row = run.iloc[i]
+        samples = ast.literal_eval(row["all_transcription_samples_raw"])
+        for rule in ("strict_v1", "final_term_v4"):
+            tr = rescore.trace_item(samples, row["pert_a"], rule)
+            correct = rescore.score_item(
+                samples, row["pert_a"], rule)["transcription_correct"]
+            found = verdict_re.findall(
+                rescore.format_trace(tr, question=row["orig_q"]))
+            assert found == ["MATCH" if correct else "DIFFER"], (
+                f"item {i} under {rule}: view says {found}, score says {correct}")
+
+
+def test_format_trace_marks_truncation_rather_than_cutting_silently(run):
+    """A silently cut string reads as the model having stopped there, which is
+    exactly the confusion this module exists to remove."""
+    row = run.iloc[9]
+    samples = ast.literal_eval(row["all_transcription_samples_raw"])
+    tr = rescore.trace_item(samples, row["pert_a"], "strict_v1")
+    assert "…[+" in rescore.format_trace(tr, raw_chars=40)

@@ -12,6 +12,7 @@ from pilot.plotting import (
     auroc_sensitivity,
     coverage_at_risk,
     oracle_aurc,
+    plot_scoring_categories,
     bootstrap_auroc_ci,
     bootstrap_auroc_difference_ci,
     check_parse_failure_rate,
@@ -1121,3 +1122,48 @@ def test_coverage_at_risk_rejects_an_impossible_target(target):
     df = pd.DataFrame({"entropy": [0.0], "correct": [True]})
     with pytest.raises(ValueError, match="target_risk"):
         coverage_at_risk(df, "entropy", "correct", target)
+
+
+# --- plot_scoring_categories ---------------------------------------------
+
+
+def _category_summary(models=("A",)):
+    from pilot.rescore import CATEGORIES
+    rows = []
+    for m in models:
+        for i, c in enumerate(CATEGORIES):
+            rows.append({"model": m, "category": c, "n": 10 * (i + 1)})
+    return pd.DataFrame(rows)
+
+
+def test_plot_scoring_categories_draws_one_bar_per_category_in_order():
+    summary = _category_summary()
+    ax = plot_scoring_categories(summary.drop(columns="model"))
+    from pilot.rescore import CATEGORIES
+    assert len(ax.patches) == len(CATEGORIES)
+    # Order is CATEGORIES, not sorted by size, so the same category sits in
+    # the same row across models and the eye can compare.
+    assert [t.get_text() for t in ax.get_yticklabels()] == list(CATEGORIES)
+
+
+def test_plot_scoring_categories_groups_multiple_models():
+    from pilot.rescore import CATEGORIES
+    ax = plot_scoring_categories(_category_summary(models=("A", "B")))
+    assert len(ax.patches) == 2 * len(CATEGORIES)
+    assert ax.get_legend() is not None
+    assert [t.get_text() for t in ax.get_legend().get_texts()] == ["A", "B"]
+
+
+def test_plot_scoring_categories_rejects_an_unknown_category():
+    """A typo'd category would otherwise be silently dropped from the plot,
+    so the bars would not sum to the population they claim to describe."""
+    bad = pd.DataFrame({"category": ["correct_robust", "typo_here"], "n": [1, 2]})
+    with pytest.raises(ValueError, match="unknown categories"):
+        plot_scoring_categories(bad)
+
+
+def test_plot_scoring_categories_omits_categories_absent_from_the_data():
+    ax = plot_scoring_categories(
+        pd.DataFrame({"category": ["correct_robust", "genuinely_wrong"], "n": [3, 4]}))
+    assert [t.get_text() for t in ax.get_yticklabels()] == \
+        ["correct_robust", "genuinely_wrong"]
