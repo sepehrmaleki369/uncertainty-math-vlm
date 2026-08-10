@@ -145,6 +145,8 @@ print("=" * 74)
 sens = ns["sens"].set_index("rule")
 assert bool(sens["excludes_chance"].all()), "a rule stopped excluding chance"
 assert sens.loc["strict_v1", "n_correct"] == 141
+assert sens.loc["fixed_v2", "n_correct"] == 141
+assert sens.loc["relaxed_v3", "n_correct"] == 162
 assert sens.loc["final_term_v4", "n_correct"] == 190
 buckets = ns["buckets"]
 assert buckets["cosmetic"], "no cosmetic near-misses found -- selection is broken"

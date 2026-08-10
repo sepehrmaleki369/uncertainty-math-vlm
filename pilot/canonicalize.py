@@ -253,7 +253,51 @@ def extract_final_answer(
     return None
 
 
-def canonicalize_math(text: Optional[str]) -> str:
+# A run of >=3 plain letters that is not a LaTeX command. \frac, \sin, \circ
+# are all backslash-prefixed and so excluded; genuine implicit-multiplication
+# variables (xy, dx, dt) are 2 letters and so allowed.
+_BARE_WORD_RE = re.compile(r"(?<![\\A-Za-z])[A-Za-z]{3,}")
+
+
+def sympy_parse_is_trustworthy(cleaned: str, expr) -> bool:
+    """Whether a successful parse_latex result actually represents the input.
+
+    parse_latex does not fail loudly on input it only partly understands: it
+    parses a PREFIX and silently returns it. Both real failure modes on this
+    corpus are that one bug wearing different clothes.
+
+    1. Prose. "hence, the required number of words is 24" parses to
+       h*(e*(n*(c*e))) -- SymPy read the word "Hence" as five multiplied
+       variables, stopped at the comma, and threw the answer (24) away.
+       canonicalize_math's existing guard counts DISTINCT single-character
+       symbols and requires more than four; "hence" has exactly four (h, e,
+       n, c -- the e repeats), so it slips underneath.
+
+    2. Truncation at an unparseable token. "40^\\circ 20' = \\frac{121\\pi}{540}"
+       parses to 40**circ*20: everything from the apostrophe onward, including
+       the "=" and the entire answer, is dropped. This one is the more
+       damaging, because it is silent AND collapsing -- \\frac{1210}{540} and
+       \\frac{121\\pi}{540} are different answers that both reduce to the same
+       label, which deflates entropy and can manufacture a false match.
+
+    Two checks, one per mode: reject bare multi-letter words, and reject a
+    parse that dropped an "=" the input clearly had. Rejection means falling
+    back to the plain-text tier, which compares the string as written -- less
+    clever, but never silently wrong.
+
+    On the 2026-08-02 n=300 run this affects 37/300 ground truths and 44/1500
+    samples. Not applied to the frozen scoring rule; see structural_clean.
+    """
+    if _BARE_WORD_RE.search(cleaned):
+        return False
+    # An input asserting an equation must parse to a relation. If it did not,
+    # the "=" and everything after it was discarded.
+    if "=" in cleaned and not isinstance(expr, sympy.core.relational.Relational):
+        return False
+    return True
+
+
+def canonicalize_math(text: Optional[str], strict_parse: bool = False) -> str:
     """Canonicalize a transcribed answer for clustering.
 
     None (a parse failure) maps to the same sentinel pilot.entropy uses, so
@@ -287,6 +331,12 @@ def canonicalize_math(text: Optional[str]) -> str:
             single_char_symbols = [s for s in expr.free_symbols if len(str(s)) == 1]
             if len(single_char_symbols) > 4:
                 raise ValueError("too many single-character symbols -- likely spelled-out prose")
+            # strict_parse additionally rejects a parse that only covered a
+            # PREFIX of the input -- the guard above counts distinct symbols
+            # and so misses four-letter words like "hence", and cannot see a
+            # dropped "=" at all. See sympy_parse_is_trustworthy.
+            if strict_parse and not sympy_parse_is_trustworthy(cleaned, expr):
+                raise ValueError("parse does not represent the whole input")
             return f"sympy:{expr}"
         except Exception:
             pass  # not a parseable single expression -- fall through

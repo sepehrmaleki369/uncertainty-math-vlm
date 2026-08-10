@@ -46,7 +46,7 @@ perfect ranking would score at that same error rate (`r + (1-r)ln(1-r)`).
   `achievable=False` rather than the nearest point, which is a real and
   common K=5 outcome, not an error.
 
-### RUN 2026-08-10: the scoring rule undercounts correct reads — two real extractor bugs
+### RUN 2026-08-10: the scoring rule undercounts correct reads — three real extractor bugs
 
 Prompted by the user asking to see the 4-stage pipeline (model output →
 `parse_transcription` → `extract_final_answer` → compare against `pert_a`)
@@ -61,17 +61,17 @@ touched.
 | rule | correct | acc | AUROC [95% CI] | at max-H |
 |---|---|---|---|---|
 | `strict_v1` (frozen, as-run) | 141/300 | 47.0% | 0.850 [0.806, 0.890] | 50 |
-| `fixed_v2` (both bugs fixed) | 144/300 | 48.0% | 0.839 [0.794, 0.881] | 50 |
-| `relaxed_v3` (+ cosmetic) | 166/300 | 55.3% | 0.798 [0.747, 0.846] | 36 |
-| `final_term_v4` (+ last `=` term) | 190/300 | 63.3% | 0.819 [0.769, 0.864] | 24 |
+| `fixed_v2` (all 3 bugs fixed) | 141/300 | 47.0% | 0.838 [0.792, 0.881] | 53 |
+| `relaxed_v3` (+ cosmetic) | 162/300 | 54.0% | 0.802 [0.752, 0.849] | 37 |
+| `final_term_v4` (+ last `=` term) | 190/300 | 63.3% | 0.817 [0.765, 0.863] | 21 |
 
 - **The headline survives.** Every rule excludes chance, every `ci_low` >
   0.70. A signal that existed only because of a strict string comparison
   would not decay this gracefully. **This is the reviewer answer to "isn't
   your accuracy just a scoring artifact?"**
 - **Report transcription accuracy as a RANGE, 47–63%, never 63.3%.** 9 of
-  the 26 items `final_term_v4` newly scores correct rest on a ≤2-character
-  match (`1`, `5`, `24`), where a wrong answer can coincide. The other 17
+  the 30 items `final_term_v4` newly scores correct rest on a ≤2-character
+  match (`1`, `5`, `24`), where a wrong answer can coincide. The other 21
   are substantive. Locked in
   `test_final_term_v4s_gain_is_partly_short_label_coincidence`.
 - **Bug 1: nested `\textcolor{}{}`.** `structural_clean`'s unwrap patterns
@@ -85,6 +85,26 @@ touched.
 - **Bug 2: decimal splitting.** `extract_final_answer`'s last-line tier
   splits on `.` as a sentence terminator, so `"the area is 75.46 cm."`
   extracts as `"46 cm"`. Fix: `extract_final_answer(..., fix_decimal_split=True)`.
+- **Bug 3 (found by the user reading notebook 17's output): `parse_latex`
+  silently parses a PREFIX and returns it.** `"Hence, the required number of
+  words is 24"` → `sympy:h*(e*(n*(c*e)))` — SymPy read "Hence" as five
+  multiplied variables, stopped at the comma, discarded the 24.
+  `"40^\circ 20' = \frac{121\pi}{540}"` → `sympy:40**circ*20`, dropping the
+  `=` and the whole answer. **37/300 ground truths, 44/1500 samples.**
+  `canonicalize_math`'s existing guard counts *distinct* single-char symbols
+  and needs >4; "hence" has exactly 4 (h,e,n,c — the e repeats), so it slips
+  under. Fix: `canonicalize_math(..., strict_parse=True)` →
+  `sympy_parse_is_trustworthy`, which rejects bare ≥3-letter words and any
+  parse that dropped an `=` the input had.
+- **Bug 3 is worse in kind than the others because it COLLAPSES.**
+  `\frac{1210}{540}` and `\frac{121\pi}{540}` — different answers — both
+  reduce to `sympy:40**circ*20`, so it deflates entropy as well as
+  manufacturing matches. **Watch for any `sympy:` label containing
+  spelled-out words; that is always this bug.**
+- **Fixing them LOWERS accuracy (144 → 141 at `fixed_v2`, 166 → 162 at v3)
+  and RAISES max-entropy (50 → 53).** That is the honest direction: the
+  removed matches only existed because two answers had collapsed onto one
+  truncated label. `fixed_v2` is the one step not guaranteed monotone.
 - **Why bug 2 had to be fixed rather than noted, and the general lesson:
   relaxing a comparison is not uniformly generous.** It truncated *both*
   the ground truth and two model samples of item 101 to `"5 square meters"`,

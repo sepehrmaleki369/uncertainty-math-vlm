@@ -7,9 +7,9 @@ match between two canonicalized strings. How much of the "wrong" pile is the
 model misreading the page, and how much is the comparison being pedantic?
 
 Measured on the 2026-08-02 n=300 Qwen-3B run, that gap is large -- accuracy
-rises from 47.0% to 62.7% as the rule is loosened -- and the answer to the
+rises from 47.0% to 63.3% as the rule is loosened -- and the answer to the
 question is nevertheless reassuring: the AUROC decays gracefully (0.850 ->
-0.751) with every interval excluding chance. A signal that only existed
+0.817) with every interval excluding chance. A signal that only existed
 because of a strict comparison would not survive relaxing it.
 
 Four cumulative rules:
@@ -17,12 +17,15 @@ Four cumulative rules:
   strict_v1     Exactly pilot.canonicalize.canonical_answer_label. The rule
                 that produced every locked result and all reference/*.json.
                 FROZEN -- never change its behaviour.
-  fixed_v2      v1 with both known extractor defects corrected: the nested
-                \\textcolor{}{} that survives into the label (see
-                canonicalize.structural_clean) and the last-line tier
-                splitting decimal numbers at the point (see
-                canonicalize.extract_final_answer). Bug fixes, not
-                relaxations: they can move items either way.
+  fixed_v2      v1 with all three known extractor defects corrected: the
+                nested \\textcolor{}{} that survives into the label (see
+                canonicalize.structural_clean), the last-line tier splitting
+                decimal numbers at the point (see extract_final_answer), and
+                parse_latex silently parsing only a PREFIX of its input (see
+                sympy_parse_is_trustworthy). Bug fixes, not relaxations: they
+                move items both ways and net to no accuracy change here
+                (141 -> 141), because the third removes matches that existed
+                only because two different answers collapsed to one label.
   relaxed_v3    v2 ignoring formatting the mathematics does not depend on --
                 whitespace, LaTeX spacing macros, braces around a single-
                 character exponent, currency symbols, trailing punctuation.
@@ -118,12 +121,13 @@ def answer_label(text: Optional[str], rule: str = "strict_v1") -> str:
     if rule == "strict_v1":
         return canonicalize.canonical_answer_label(text)
 
-    # fixed_v2 and up: both known extractor defects corrected.
+    # fixed_v2 and up: all three known extractor defects corrected.
     if text is not None:
         text = canonicalize.unwrap_latex_macro(text, "textcolor")
         text = canonicalize.unwrap_latex_macro(text, "text")
     final = canonicalize.extract_final_answer(text, fix_decimal_split=True)
-    label = entropy.normalize_string(canonicalize.canonicalize_math(final))
+    label = entropy.normalize_string(
+        canonicalize.canonicalize_math(final, strict_parse=True))
 
     if rule == "fixed_v2" or label == _SENTINEL:
         return label
@@ -212,7 +216,7 @@ def scoring_sensitivity(
     """One row per rule: accuracy, AUROC with a bootstrap CI, max-entropy count.
 
     This is the table to report. The claim it supports is not "accuracy is
-    really 62.7%" -- it is that the AUROC survives every rule, so the
+    really 63.3%" -- it is that the AUROC survives every rule, so the
     perception result is a property of the entropy signal rather than of one
     string comparison.
     """
