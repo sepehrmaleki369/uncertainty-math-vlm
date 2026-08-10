@@ -90,11 +90,86 @@ _WRAPPER_PATTERNS = [
 
 
 def structural_clean(text: str) -> str:
-    """Strip LaTeX display/environment wrappers and collapse whitespace."""
+    """Strip LaTeX display/environment wrappers and collapse whitespace.
+
+    KNOWN DEFECT, deliberately not fixed here: the \\text{}/\\textcolor{}{}
+    patterns above use [^{}]* for the body, so they match only when the body
+    contains no braces of its own. \\textcolor{red}{\\hat{b}} is left
+    untouched, and "\\textcolor{red}" survives into the cluster label.
+
+    On the 2026-08-02 n=300 run that is 85/300 ground truths, 59 of them
+    has_error=1 -- FERMAT marks the *injected error* in red, so the defect
+    lands disproportionately on exactly the items the error label depends on.
+
+    It is not fixed in place because this function defines the scoring rule
+    that produced every locked result and all of reference/*.json; changing
+    it would silently invalidate those and make the next run incomparable to
+    the previous ones. unwrap_latex_macro below is the correct implementation,
+    and pilot.rescore applies it as an explicit, versioned alternative rule
+    that is reported alongside the frozen one rather than replacing it.
+    """
     for pattern, repl in _WRAPPER_PATTERNS:
         text = pattern.sub(repl, text)
     text = re.sub(r"\s+", " ", text).strip().lower().rstrip(".")
     return text
+
+
+def unwrap_latex_macro(text: str, macro: str) -> str:
+    """Replace every \\macro{...}{...} with its LAST braced argument.
+
+    A real brace counter, so it handles the nested bodies structural_clean's
+    regex silently skips: \\textcolor{red}{\\hat{b}} -> \\hat{b}, and
+    \\text{cm}^2 -> cm^2. Taking the last argument is what makes one function
+    serve both the one-argument form (\\text{B} -> B) and the two-argument
+    form (\\textcolor{colour}{B} -> B).
+
+    A macro with no braced argument at all is left verbatim rather than
+    dropped -- "\\textcolor" alone is malformed input, and deleting it would
+    quietly change the expression instead of preserving the anomaly.
+    """
+    out: list[str] = []
+    token = "\\" + macro
+    i = 0
+    while i < len(text):
+        start = text.find(token, i)
+        if start < 0:
+            out.append(text[i:])
+            break
+        # Don't match a longer macro name that merely starts with this one
+        # (\\textcolor must not be consumed by macro="text").
+        after = start + len(token)
+        if after < len(text) and (text[after].isalpha() or text[after] == "*"):
+            out.append(text[i:after])
+            i = after
+            continue
+        out.append(text[i:start])
+
+        args: list[str] = []
+        cursor = after
+        while cursor < len(text) and text[cursor] == "{":
+            depth = 0
+            body_start = cursor
+            while cursor < len(text):
+                if text[cursor] == "{":
+                    depth += 1
+                elif text[cursor] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        cursor += 1
+                        break
+                cursor += 1
+            else:  # unbalanced -- leave the rest alone
+                args = []
+                break
+            args.append(text[body_start + 1:cursor - 1])
+
+        if not args:
+            out.append(token)
+            i = after
+            continue
+        out.append(args[-1])
+        i = cursor
+    return "".join(out)
 
 
 _OPTION_RE = re.compile(r"option\s*[:\-]?\s*([a-dA-D])\b", re.IGNORECASE)
@@ -110,7 +185,16 @@ _DISPLAY_MATH_RE = re.compile(
 _ENV_MARKER_RE = re.compile(r"^\\(begin|end)\{[^{}]*\}$")
 
 
-def extract_final_answer(text: Optional[str]) -> Optional[str]:
+# The last-line tier splits on "." as a sentence terminator, which also splits
+# DECIMAL NUMBERS: "the area is 75.46 cm." yields "46 cm". fix_decimal_split
+# uses this instead, which requires a non-digit on at least one side.
+_LAST_LINE_SPLIT_RE = re.compile(r"[\n.]")
+_LAST_LINE_SPLIT_FIXED_RE = re.compile(r"\n|(?<!\d)\.|\.(?!\d)")
+
+
+def extract_final_answer(
+    text: Optional[str], fix_decimal_split: bool = False
+) -> Optional[str]:
     """Pull just the final answer/result out of a full derivation, tiered by
     reliability: an explicit multiple-choice option statement, a \\boxed{}
     result, the last display-math block, or (rarest) the last non-empty line.
@@ -122,6 +206,20 @@ def extract_final_answer(text: Optional[str]) -> Optional[str]:
     that same shared scaffolding triggers an entailment-model lexical-overlap
     bias, burying the one number that actually differs. Comparing only the
     final answer removes the scaffolding from the comparison entirely.
+
+    KNOWN DEFECT in the last-line tier, off by default: it splits on "." as a
+    sentence terminator, so a decimal answer is truncated at the point --
+    "the estimated population is 23152.5 square meters." extracts as
+    "5 square meters". On the 2026-08-02 n=300 run that hits 2/300 ground
+    truths and 13/1500 samples (low only because most items reach an earlier
+    tier first). It corrupted BOTH sides of item 101 identically, which then
+    scored as agreement under a relaxed rule -- a false pass, not a recovered
+    read.
+
+    fix_decimal_split=True is the corrected behaviour. It defaults to False
+    because this function defines the frozen scoring rule behind every locked
+    result and all of reference/*.json; see structural_clean's docstring for
+    the same reasoning. pilot.rescore turns it on from fixed_v2 onward.
     """
     if text is None:
         return None
@@ -147,7 +245,8 @@ def extract_final_answer(text: Optional[str]) -> Optional[str]:
         if content:
             return content
 
-    lines = [line.strip() for line in re.split(r"[\n.]", cleaned) if line.strip()]
+    splitter = _LAST_LINE_SPLIT_FIXED_RE if fix_decimal_split else _LAST_LINE_SPLIT_RE
+    lines = [line.strip() for line in splitter.split(cleaned) if line.strip()]
     lines = [line for line in lines if not _ENV_MARKER_RE.match(line)]
     if lines:
         return lines[-1]

@@ -8,6 +8,74 @@ working context for future sessions, not a repeat of that.
 
 ## Current findings
 
+### RUN 2026-08-10: the scoring rule undercounts correct reads — two real extractor bugs
+
+Prompted by the user asking to see the 4-stage pipeline (model output →
+`parse_transcription` → `extract_final_answer` → compare against `pert_a`)
+on real examples. It does not hold up as a point estimate of accuracy, and
+it does hold up as a ranking signal. New: `pilot/rescore.py`,
+`pilot/17_scoring_inspection.ipynb`, `pilot/tests/test_rescore.py` (44
+tests), `pilot/dryruns/dryrun_nb17.py`. Suite 342 → 385, no existing test
+touched.
+
+**Four versioned rules, all measured on the n=300 Qwen-3B run:**
+
+| rule | correct | acc | AUROC [95% CI] | at max-H |
+|---|---|---|---|---|
+| `strict_v1` (frozen, as-run) | 141/300 | 47.0% | 0.850 [0.806, 0.890] | 50 |
+| `fixed_v2` (both bugs fixed) | 144/300 | 48.0% | 0.839 [0.794, 0.881] | 50 |
+| `relaxed_v3` (+ cosmetic) | 166/300 | 55.3% | 0.798 [0.747, 0.846] | 36 |
+| `final_term_v4` (+ last `=` term) | 190/300 | 63.3% | 0.819 [0.769, 0.864] | 24 |
+
+- **The headline survives.** Every rule excludes chance, every `ci_low` >
+  0.70. A signal that existed only because of a strict string comparison
+  would not decay this gracefully. **This is the reviewer answer to "isn't
+  your accuracy just a scoring artifact?"**
+- **Report transcription accuracy as a RANGE, 47–63%, never 63.3%.** 9 of
+  the 26 items `final_term_v4` newly scores correct rest on a ≤2-character
+  match (`1`, `5`, `24`), where a wrong answer can coincide. The other 17
+  are substantive. Locked in
+  `test_final_term_v4s_gain_is_partly_short_label_coincidence`.
+- **Bug 1: nested `\textcolor{}{}`.** `structural_clean`'s unwrap patterns
+  use `[^{}]*` for the body, so `\textcolor{red}{\hat{b}}` survives into the
+  cluster label. **85/300 ground truths, 59 of them `has_error=1`** — FERMAT
+  marks the *injected error* in red, so it concentrates on exactly the items
+  the error label depends on. Correct implementation:
+  `canonicalize.unwrap_latex_macro` (brace-balanced, guards against a longer
+  macro name that merely starts with the target — `macro="text"` must not
+  eat `\textcolor` or the colour becomes the answer).
+- **Bug 2: decimal splitting.** `extract_final_answer`'s last-line tier
+  splits on `.` as a sentence terminator, so `"the area is 75.46 cm."`
+  extracts as `"46 cm"`. Fix: `extract_final_answer(..., fix_decimal_split=True)`.
+- **Why bug 2 had to be fixed rather than noted, and the general lesson:
+  relaxing a comparison is not uniformly generous.** It truncated *both*
+  the ground truth and two model samples of item 101 to `"5 square meters"`,
+  and a looser rule then scored that shared mangling as **correct** — a
+  false pass, not a recovered read. Before trusting any relaxed number,
+  check the extractor feeding it. Regression test:
+  `test_item_101_is_a_false_pass_that_the_decimal_fix_removes`.
+- **Open confound, worth a Limitations sentence: entropy partly measures the
+  extractor.** `extract_final_answer` has 4 tiers and on **153/300 items it
+  fires a different tier across the 5 samples**; mean entropy rises
+  monotonically with the count (0.685 → 1.031 → 1.243 at 1/2/3 tiers).
+  **153 is a lower bound** — item 9 has all five samples in the same
+  `display_math` tier, three returning the conclusion and two an
+  intermediate step, entropy 1.332 from samples that agree mathematically.
+  Separating extractor noise from model uncertainty needs a run where the
+  extractor cannot vary (e.g. requiring `\boxed{}` in the prompt), not a
+  rescoring.
+
+**Freeze discipline — the reason this is structured as versioned rules.**
+`canonical_answer_label` / `structural_clean` / `extract_final_answer`'s
+defaults produced every locked number and all 12 `reference/*.json`
+snapshots. Changing them in place would silently invalidate those *and*
+make the next run incomparable to previous ones. So the frozen entry points
+keep the old behaviour, each with a docstring saying why, and
+`pilot.rescore` applies the corrections as explicit alternatives reported
+alongside. `test_strict_v1_is_bit_identical_to_the_frozen_pipeline`
+(0/300 mismatches) is the invariant that lets the other rules exist.
+Nothing in `paper/`, `report/`, `slides/` or `reference/` changed.
+
 ### RUN 2026-08-09: Pixtral-12B replicates the perception result
 
 `pilot/16_pixtral_perception.ipynb`, same n=300 balanced sample, bf16.
