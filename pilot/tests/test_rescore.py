@@ -692,3 +692,115 @@ def test_format_trace_marks_truncation_rather_than_cutting_silently(run):
     samples = ast.literal_eval(row["all_transcription_samples_raw"])
     tr = rescore.trace_item(samples, row["pert_a"], "strict_v1")
     assert "…[+" in rescore.format_trace(tr, raw_chars=40)
+
+
+# --- 7. what the unanimous-and-wrong audit actually found -----------------
+#
+# Read 2026-08-11 from the contact sheets. "Unanimous and wrong" was described
+# as the population entropy cannot help with by construction. It is mostly the
+# population where the models were RIGHT and the scoring rule was wrong, which
+# is a different statement and a better one for the method.
+
+
+def _unanimous_wrong(df):
+    c = rescore.classify_scoring_outcome(df)
+    gw = c.index[c["category"] == "genuinely_wrong"]
+    return sorted(i for i in gw if c.loc[i, "entropy"] < 1e-9)
+
+
+def test_the_unanimous_and_wrong_sets(run):
+    """Small, stable, and the highest-value pages in the audit. Item 218 is
+    unanimous and wrong on BOTH models -- 10/10 samples at zero entropy."""
+    assert _unanimous_wrong(run) == [176, 208, 218]
+
+
+@pytest.mark.parametrize("idx,note", [
+    (218, "Option $\\text{A}$ -- _OPTION_RE needs a BARE letter after 'option'"),
+    (208, "3x^2 = -4y vs x^2 = -4y/3, the same parabola"),
+    (176, "eq(x,4) vs a bare 4"),
+])
+def test_every_qwen_unanimous_wrong_item_is_a_scoring_failure(run, idx, note):
+    """None of the three is a misread. The model's answer is right in each and
+    the comparison is what fails, so 'entropy cannot flag these' understates
+    the case -- entropy was silent because there was nothing to flag."""
+    row = run.iloc[idx]
+    samples = ast.literal_eval(row["all_transcription_samples_raw"])
+    scored = rescore.score_item(samples, row["pert_a"], "final_term_v4")
+    assert scored["transcription_correct"] is False, note
+    assert scored["perception_entropy"] == pytest.approx(0.0, abs=1e-9)
+
+
+def _equation_parts(label):
+    """Split a lowercased `eq(a,b)` label. normalize_string lowercases, so the
+    label is NOT SymPy's Eq -- an isinstance check silently never fires and a
+    scan built on one under-reports. This cost a wrong first count (1 vs 3)."""
+    import re
+    m = re.match(r"^eq\((.*)\)$", label[len("sympy:"):], re.S)
+    if not m:
+        return None
+    body, depth = m.group(1), 0
+    for i, ch in enumerate(body):
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        elif ch == "," and depth == 0:
+            return body[:i], body[i + 1:]
+    return None
+
+
+def test_normalize_string_lowercases_eq_so_isinstance_checks_never_fire():
+    """Pins the gotcha above, because it is invisible and produces a plausible
+    wrong number rather than an error."""
+    import sympy
+    label = rescore.answer_label("x = 1", "fixed_v2")
+    assert label == "sympy:eq(x, 1)"
+    assert not isinstance(sympy.sympify(label[len("sympy:"):]), sympy.Eq)
+    assert _equation_parts(label) is not None
+
+
+def test_mathematically_equivalent_labels_are_scored_wrong(run):
+    """A fifth scoring issue, distinct from the four extractor bugs: SymPy's
+    canonical form does not normalise an equation scaled by a constant, so
+    3x^2 = -4y and x^2 = -4y/3 compare unequal. Three items on Qwen, and none
+    on Pixtral -- small, but it inflates genuinely_wrong."""
+    import sympy
+
+    def equivalent(a, b):
+        pa, pb = _equation_parts(a), _equation_parts(b)
+        if not (pa and pb):
+            return False
+        da = sympy.simplify(sympy.sympify(pa[0]) - sympy.sympify(pa[1]))
+        db = sympy.simplify(sympy.sympify(pb[0]) - sympy.sympify(pb[1]))
+        if da == 0 or db == 0:
+            return da == db
+        ratio = sympy.simplify(da / db)
+        return bool(ratio.is_number and ratio != 0)
+
+    scored = rescore.rescore_run(run, "final_term_v4")
+    classified = rescore.classify_scoring_outcome(run)
+    hits = [
+        i for i in classified.index[classified["category"] == "genuinely_wrong"]
+        if str(scored.loc[i, "majority_label"]).startswith("sympy:eq(")
+        and str(scored.loc[i, "gt_label"]).startswith("sympy:eq(")
+        and scored.loc[i, "majority_label"] != scored.loc[i, "gt_label"]
+        and equivalent(str(scored.loc[i, "majority_label"]),
+                       str(scored.loc[i, "gt_label"]))
+    ]
+    assert hits == [99, 151, 208]
+
+
+def test_item_273_is_the_second_auto_correction_case(run):
+    """The mechanism worth pre-registering. FERMAT's injected error is the red
+    2 in P(E) = 2/4, while the page's own working says three outcomes are
+    favourable. Pixtral transcribed 3/4 -- the correct value, not the one on
+    the page. Item 55 is the same mechanism on both models.
+
+    NOT a measured effect: the genuinely_wrong rate on has_error=1 vs clean
+    items is +6.7% [-4.0%, +17.3%] on both families, spanning zero."""
+    assert bool(run.loc[273, "has_error"]) is True
+    assert r"\frac{\textcolor{red}{2}}{4}" in str(run.loc[273, "pert_a"])
+    assert "favourable to E is 3" in str(run.loc[273, "pert_a"])
+
+    assert bool(run.loc[55, "has_error"]) is True
+    assert r"{1 + \tan x \tan y}" in str(run.loc[55, "pert_a"])

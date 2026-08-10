@@ -8,6 +8,50 @@ working context for future sessions, not a repeat of that.
 
 ## Current findings
 
+### 2026-08-11: Math-Verify — a better checker, and still not the scorer
+
+`pilot/mathverify.py`, `pilot/18_mathverify_audit.ipynb`,
+`pilot/tests/test_mathverify.py` (21 tests), `pilot/dryruns/dryrun_nb18.py`.
+Offline, no GPU. `math-verify` is an OPTIONAL dependency; the tests skip
+without it.
+
+**LIMITATIONS SENTENCE, agreed with the user:** *symbolic equivalence tools
+are valuable for audit but unsafe as automatic scoring on this benchmark,
+because the injected errors are often units, coefficients, or notation
+details that an equivalence checker is designed to erase.*
+
+- **On isolated `$`-wrapped pairs it is excellent.** Passes all 10 sanity
+  cases: resolves the string rule's false negatives (`2^3=8` vs `2^{3}=8`,
+  `3x^2=-4y` vs `x^2=-4y/3`, `11130 cm` vs `11130 \, cm`) **and rejects both
+  confirmed injected errors** (items 55, 273). That rejection is the property
+  that makes it usable for triage at all — re-run
+  `test_the_injected_errors_are_rejected` before trusting any new version.
+- **As a scorer it is not safe here.** Driving the score with it: Qwen
+  63.3% → 71.0%, Pixtral 54.3% → 65.7% — but **~half the newly-accepted
+  items are false positives, concentrated on `has_error=1`.** Item 108
+  (`y²/(9/4)` vs `y²/(11/4)`, different coefficients, matched on the trailing
+  chain), item 71 (truth's answer is `dy/dx = 1`, matched a `π` in an aside),
+  items 30/47 (units dropped). Locked in
+  `test_math_verify_accepts_items_it_should_not`.
+- **THE GOTCHA — `parse()` must get a `$`-delimited string.** Bare input
+  silently falls back to plain-number extraction: `parse("x = 5")` → `[5,'5']`,
+  so `x = 5` and `z = 5` compare **EQUAL**. `parse("$x = 5$")` → `[Eq(x,5),…]`
+  and they compare unequal. **This produced every false positive in the first
+  three runs of the analysis and made the numbers look far better than they
+  were.** Always use `mathverify.mv_parse`, never `parse()` directly.
+- **Two more self-inflicted errors worth remembering.** (1) An early version
+  asked whether *any* of the K samples matched rather than the majority —
+  inflating 80.3% → 86.7%; `mv_score_item` mirrors `majority_cluster`.
+  (2) Running Math-Verify end-to-end (its extraction *and* comparison) scored
+  **worse** than the string rule, 17/30 vs 18/30 — its answer-extraction
+  heuristics differ from ours on multi-step derivations. Feed it *our* span.
+- **The supported use is `disagreement_queue`** — 64 rows (Qwen) / 59
+  (Pixtral), written to `Drive/figures/mathverify_audit/`. Review, never
+  apply. It has already earned its keep: it surfaced item 40, where our own
+  extractor emitted a parse failure. **`mv_majority_span` is Math-Verify's
+  majority cluster, not the string rule's** — a row whose two spans look
+  identical usually means the two picked different representative samples.
+
 ### 2026-08-10: the `genuinely_wrong` audit (offline half) — where the real errors are
 
 Decided with the user: extractor work is **done and closed**; the remaining
@@ -57,6 +101,38 @@ which nobody had read. Offline analysis on both n=300 runs, no GPU.
   **Item 218 is unanimous-and-wrong on BOTH models** — 10/10 samples, zero
   entropy — and is the single most informative page, precisely because it
   turned out to be the `_OPTION_RE` bug rather than a misread.
+- **READ 2026-08-11 via the Drive OCR of the contact sheets: the
+  unanimous-and-wrong set is MOSTLY SCORING, NOT THE MODEL.** Of the 8
+  distinct items (218 appears on both models), roughly 6 are scoring
+  failures. **All three of Qwen's are:** 176 (`eq(x,4)` vs bare `4`), 208
+  (see below), 218 (`_OPTION_RE`). Pixtral's: 14 (`Option D` — and option D
+  *is* 4.5), 218, 280 (`11130` vs `11130cm`) are scoring; 138 (read `f+g`
+  as `f∘g`) and 180 (garbled) are genuine misreads. **Entropy was silent on
+  most of these because the models were RIGHT and agreed with each other.**
+  Good for the method, bad for the label: `genuinely_wrong` is somewhat
+  inflated.
+- **A FIFTH scoring issue, from item 208: SymPy does not normalise an
+  equation scaled by a constant.** `eq(3*x**2,-4*y)` and `eq(x**2,-4*y/3)`
+  are the same parabola and compare unequal. Scanned across all
+  `genuinely_wrong` items: **Qwen 3 (99, 151, 208), Pixtral 0.** Locked in
+  `test_mathematically_equivalent_labels_are_scored_wrong`.
+  **Gotcha that cost a wrong first count:** `normalize_string` lowercases
+  labels, so a label is `eq(...)`, not SymPy's `Eq(...)`. An `isinstance(...,
+  sympy.Eq)` check silently never fires and the scan under-reports (it said
+  1). Parse the `eq(a,b)` form by hand.
+- **SECOND confirmed case of the auto-correction mechanism: item 273.**
+  Ground truth `P(E) = \frac{\textcolor{red}{2}}{4}` — the red 2 is the
+  injected error, and the page's own working says "the number of outcomes
+  favourable to E is 3". Pixtral transcribed **3/4**. So the mechanism now
+  has two independent instances on two model families (55 on both, 273 on
+  Pixtral). **Still not a resolvable aggregate effect** (+6.7% [-4.0%,
+  +17.3%]) — a better-evidenced hypothesis to pre-register, nothing more.
+- **How the images were finally read, since inline rendering is lost:**
+  `mcp__claude_ai_Google_Drive__search_files` returns an OCR
+  `contentSnippet` for each contact sheet, which carries the transcribed
+  handwriting and every caption. That is enough to audit without
+  downloading. **Do NOT download the sheets** — at 0.5–1.2 MB the base64
+  runs to ~180K+ tokens.
 - **Still unmet: nobody has looked at a handwritten page.** Every conclusion
   above is from strings. See the image-sync note below.
 
