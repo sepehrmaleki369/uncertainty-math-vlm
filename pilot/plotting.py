@@ -1458,3 +1458,68 @@ def plot_scoring_categories(
     ax.spines["bottom"].set_color(BASELINE)
     ax.tick_params(colors=INK_MUTED, labelsize=9, length=0)
     return ax
+
+
+def contact_sheet(
+    images,
+    captions,
+    ncols: int = 3,
+    per_page: int = 12,
+    title: str = "",
+    cell_height: float = 3.6,
+    caption_fontsize: float = 7.0,
+):
+    """A grid of handwritten pages with captions, paged. Returns a list of figures.
+
+    Exists because inline rendering cannot be trusted to carry evidence out of
+    Colab. On the 2026-08-10 notebook-17 run every `plt.show()` produced
+    nothing in the synced copy -- zero `image/png` outputs, no cell error, and
+    no repo-side cause (no .gitattributes, no git filters, and no commit of
+    that notebook has ever held an image). Whatever drops them, a saved PNG
+    file is immune, and one sheet holding a dozen pages is far easier to
+    review later than a dozen separate files.
+
+    `images` are PIL images (FERMAT is gated, so they only exist in Colab);
+    `captions` is a same-length sequence of short strings drawn under each
+    cell. Pages are filled row-major and the final page is padded with blank
+    axes so cell sizes stay constant across pages.
+    """
+    if len(images) != len(captions):
+        raise ValueError(
+            f"{len(images)} images vs {len(captions)} captions -- a caption "
+            "drifting off its image would mislabel the evidence")
+    if not images:
+        return []
+
+    figures = []
+    n_pages = math.ceil(len(images) / per_page)
+    for page in range(n_pages):
+        chunk = list(zip(images, captions))[page * per_page:(page + 1) * per_page]
+        # Rows come from per_page, NOT from this chunk's length: sizing the
+        # final short page to its own contents would enlarge its cells and
+        # make the last few pages look like a different figure.
+        nrows = math.ceil(per_page / ncols)
+        fig, axes = plt.subplots(
+            nrows, ncols, figsize=(ncols * 3.2, nrows * cell_height))
+        fig.patch.set_facecolor(SURFACE)
+        flat = np.atleast_1d(axes).ravel()
+
+        for ax, (img, caption) in zip(flat, chunk):
+            ax.imshow(img)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            for side in ("top", "right", "bottom", "left"):
+                ax.spines[side].set_color(GRIDLINE)
+            ax.set_title(caption, fontsize=caption_fontsize, color=INK_SECONDARY,
+                         loc="left", wrap=True)
+        # Pad the last page rather than resizing its cells.
+        for ax in flat[len(chunk):]:
+            ax.axis("off")
+
+        if title:
+            suffix = f"  ({page + 1}/{n_pages})" if n_pages > 1 else ""
+            fig.suptitle(title + suffix, fontsize=11, color=INK_SECONDARY,
+                         x=0.01, ha="left")
+        fig.tight_layout(rect=(0, 0, 1, 0.97 if title else 1))
+        figures.append(fig)
+    return figures

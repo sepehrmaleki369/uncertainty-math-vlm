@@ -41,6 +41,22 @@ which nobody had read. Offline analysis on both n=300 runs, no GPU.
   suggestive, but per this project's standing rule that is a hypothesis to
   pre-register, not a measured effect. Do not write "the model systematically
   auto-corrects injected errors."
+- **A FOURTH extractor bug, found by the audit and NOT fixed: `_OPTION_RE`
+  misses LaTeX-wrapped option letters.** It needs `option` then a *bare*
+  letter, so `Option $\text{A}$` (item 218) and `Option \textbf{D}` (item 14)
+  do not match, the ground truth falls through to a later tier, and item
+  218's truth becomes `sympy:a` while both models correctly answered
+  `option a`. **Only 2/300 items — but both sit in the unanimous-and-wrong
+  set, i.e. 2 of the 9 highest-value pages in the audit.** Small in
+  aggregate, large in the population we most wanted to understand. Left
+  unfixed by decision (extractor work is closed); recorded so the two items
+  are not mistaken for model failures.
+- **Contact sheets** (`pilot.plotting.contact_sheet`, notebook 17 §6) write
+  17 PNG pages to `Drive/uncertainty-math-vlm/figures/genuinely_wrong/`:
+  `unanimous_wrong_*` (1 page each), `wrong_on_both` (7), `only_*` (3 + 5).
+  **Item 218 is unanimous-and-wrong on BOTH models** — 10/10 samples, zero
+  entropy — and is the single most informative page, precisely because it
+  turned out to be the `_OPTION_RE` bug rather than a misread.
 - **Still unmet: nobody has looked at a handwritten page.** Every conclusion
   above is from strings. See the image-sync note below.
 

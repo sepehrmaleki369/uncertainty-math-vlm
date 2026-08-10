@@ -1190,3 +1190,49 @@ def test_plot_scoring_categories_omits_categories_absent_from_the_data():
         pd.DataFrame({"category": ["correct_robust", "genuinely_wrong"], "n": [3, 4]}))
     assert [t.get_text() for t in ax.get_yticklabels()] == \
         ["correct_robust", "genuinely_wrong"]
+
+
+# --- contact_sheet -------------------------------------------------------
+#
+# Built because inline rendering does not survive the Colab -> local sync:
+# the 2026-08-10 notebook-17 run has zero image/png outputs despite calling
+# plt.show() and erroring nowhere. Evidence has to be written to a file.
+
+
+def _stub_images(n, size=(60, 40)):
+    from PIL import Image
+    return [Image.new("RGB", size, "white") for _ in range(n)]
+
+
+def test_contact_sheet_pages_and_pads_the_last_page():
+    from pilot.plotting import contact_sheet
+    figs = contact_sheet(_stub_images(7), [f"i{i}" for i in range(7)],
+                         ncols=3, per_page=4)
+    assert len(figs) == 2
+    # Cell size must stay constant across pages, so the short final page is
+    # padded with blank axes rather than laid out smaller.
+    assert len(figs[0].axes) == len(figs[1].axes)
+    # get_title() reads the CENTER title; captions are set with loc="left".
+    titled = [ax for ax in figs[1].axes if ax.get_title(loc="left")]
+    assert len(titled) == 3          # 7 items = 4 + 3
+
+
+def test_contact_sheet_rejects_mismatched_captions():
+    """A caption drifting off its image would mislabel the evidence, which is
+    worse than no sheet at all."""
+    from pilot.plotting import contact_sheet
+    with pytest.raises(ValueError, match="captions"):
+        contact_sheet(_stub_images(3), ["only", "two"])
+
+
+def test_contact_sheet_of_nothing_is_empty_not_a_blank_page():
+    from pilot.plotting import contact_sheet
+    assert contact_sheet([], []) == []
+
+
+def test_contact_sheet_captions_land_on_their_own_cells():
+    from pilot.plotting import contact_sheet
+    captions = ["alpha", "beta", "gamma"]
+    fig = contact_sheet(_stub_images(3), captions, ncols=3, per_page=3)[0]
+    assert [ax.get_title(loc="left") for ax in fig.axes
+            if ax.get_title(loc="left")] == captions
