@@ -8,6 +8,51 @@ working context for future sessions, not a repeat of that.
 
 ## Current findings
 
+### 2026-08-10: the `genuinely_wrong` audit (offline half) — where the real errors are
+
+Decided with the user: extractor work is **done and closed**; the remaining
+explanatory mass is the `genuinely_wrong` bucket (Qwen 104, Pixtral 130),
+which nobody had read. Offline analysis on both n=300 runs, no GPU.
+
+- **73 items (24% of the sample) are wrong on BOTH models.** 31 Qwen-only,
+  57 Pixtral-only, 139 wrong on neither. The 73 are the high-value set: two
+  architecturally independent models failing the same page is either genuinely
+  hard handwriting or a scoring problem that survived all four rules.
+- **On those 73, the two models agree with each other on only 22.** So they
+  mostly misread the same page in *different* ways — that is a genuine
+  perception failure, not a shared scoring artifact. Ground-truth length is
+  the same for pages both models fail (median 439 chars) and pages neither
+  fails (426), so it is **not** simply "longer answers are harder".
+- **Confidently wrong items exist and are the ones to read: 3 (Qwen) and 6
+  (Pixtral) are unanimous across all 5 samples AND wrong.** Plus 20/24 at
+  entropy < 0.7. These are the cases entropy cannot help with by construction.
+- **NEW MECHANISM, confirmed on a specific case: the model silently
+  "corrects" the injected error while transcribing.** Item 55's `pert_a` is
+  `\textcolor{red}{\frac{\tan x + \tan y}{1 + \tan x \tan y}}` — FERMAT's
+  injected error is the sign flip. Both models transcribed
+  `1 - \tan x \tan y`, the textbook-correct identity. **The model's prior over
+  a familiar formula overrode what is actually on the page.** This is the
+  perception-arm analogue of the reasoning arm's documented
+  "pattern-match the procedure instead of recomputing" failure.
+- **But the aggregate version is NOT resolved, and must not be reported as a
+  finding.** `genuinely_wrong` rate on has_error=1 vs clean items: Qwen 38.0%
+  vs 31.3%, Pixtral 46.7% vs 40.0% — **both +6.7% [-4.0%, +17.3%], spanning
+  zero.** Direction is consistent across two model families, which is
+  suggestive, but per this project's standing rule that is a hypothesis to
+  pre-register, not a measured effect. Do not write "the model systematically
+  auto-corrects injected errors."
+- **Still unmet: nobody has looked at a handwritten page.** Every conclusion
+  above is from strings. See the image-sync note below.
+
+**Colab image outputs do not survive the sync to the local checkout.** The
+2026-08-10 notebook-17 run has zero `image/png` outputs in the file — every
+`display_data` is a tqdm/HF widget view — even though `plt.show()` is called
+and no cell errored. Verified not a repo cause: no `.gitattributes`, no git
+filters, and no commit of that notebook has ever contained an image. So
+**never rely on inline rendering to carry evidence out of Colab** — write
+PNGs to Drive (`show_item` already saves per item) and prefer a single
+contact-sheet file for anything meant to be reviewed later.
+
 ### 2026-08-10: every item classified by WHY it scored — and bug 3's real damage
 
 `pilot.rescore.classify_scoring_outcome` + `scoring_category_summary`,
@@ -29,9 +74,14 @@ what the population is made of. Seven mutually exclusive categories, total:
 | `false_pass_removed` | **6** | **6** |
 | `broken_by_relaxation` | 1 | 1 |
 
-- **The categories replicate across model families** — comparable
-  `scope_mismatch` and an *identical* 6-item `false_pass_removed`. These are
-  properties of the **scoring pipeline**, not of one model.
+- **What replicates across model families, stated precisely.**
+  `scope_mismatch` is comparable (27 vs 25) and is the real cross-family
+  result — a property of the **scoring pipeline**, not of one model.
+  `false_pass_removed` is 6 on both models but **only 2 items overlap**
+  (Qwen `[2, 31, 37, 117, 239, 294]`, Pixtral `[2, 17, 106, 107, 117, 200]`),
+  so the matching count is mostly coincidence. **An earlier version of this
+  file called it an "identical 6-item" category, which reads as the same six
+  items and is wrong.** Do not cite the count as replication evidence.
 - **`false_pass_removed` is the cell to read first, and it shows bug 3 was
   worse than the two example strings suggested.** Qwen items are
   `[2, 31, 37, 117, 239, 294]`. Item 31's model text is about the rectangle's
@@ -57,6 +107,15 @@ what the population is made of. Seven mutually exclusive categories, total:
   confuse: 41.8% vs 66.7% grouping by the loosest rule's verdict, 41.1% vs
   59.8% grouping by the frozen rule's.** Quoting one against the other
   denominator is the specific mistake to avoid.
+- **The tier-instability confound does NOT fully replicate on Pixtral, which
+  weakens it as a Limitation.** Multi-tier share among items that end
+  correct vs wrong: Qwen **42% vs 67%**, Pixtral **33% vs 29%** — flat, and
+  Pixtral's 3-tier group is its *most* accurate (0.500 vs 0.417 at one tier).
+  Pixtral also has far less of it: 94/300 multi-tier vs Qwen's 153/300.
+  **What replicates is entropy rising with tier count** (Pixtral 0.822 →
+  1.023 → 1.130); what does not is the coupling to *correctness*. Say
+  "extractor instability appears in Qwen and does not fully replicate in
+  Pixtral", not "part of the perception signal is extractor noise".
 - `format_trace` names every stage and adds the missing line: **the column
   where the two labels first diverge**, with both characters by `repr`. On a
   cosmetic mismatch the labels look identical on screen otherwise.
@@ -122,6 +181,25 @@ touched.
   0.70. A signal that existed only because of a strict string comparison
   would not decay this gracefully. **This is the reviewer answer to "isn't
   your accuracy just a scoring artifact?"**
+- **FRAMING, decided with the user 2026-08-10. The extractor is NOT the
+  story.** Write it as *"strict scoring underestimates accuracy, but the
+  AUROC result survives every scoring rule"* — never *"the main problem was
+  the extractor"*. The numbers force this: cosmetic + scope + bug-recovered
+  is ~18% of items, while `genuinely_wrong` is **34.7% (Qwen) / 43.3%
+  (Pixtral)**, the largest category after correct. The model really is
+  wrong that often and no rule touches it.
+- **ONE main accuracy number: `strict_v1`, 47.0%** — the frozen rule every
+  other locked result already uses. Quote the relaxed rules as *sensitivity*
+  ("relaxed scoring raises accuracy to 63.3%; AUROC stays 0.80–0.85"), not
+  as a 47–63% range presented as the finding. A 16-point range offered as
+  the headline invites the sharpest available attack: *"your correctness
+  labels are rule-dependent, so the AUROC is measured against a noisy
+  target."* The sensitivity table is the answer to that, but only if a
+  single number leads.
+- **Do not explain `fixed_v2` moving up on Pixtral (0.828 → 0.851) and down
+  on Qwen (0.850 → 0.838).** The intervals overlap heavily; this is noise,
+  and the project's standing rule is to check resolvability before
+  reaching for a mechanism.
 - **Report transcription accuracy as a RANGE, 47–63%, never 63.3%.** 9 of
   the 30 items `final_term_v4` newly scores correct rest on a ≤2-character
   match (`1`, `5`, `24`), where a wrong answer can coincide. The other 21
@@ -165,10 +243,15 @@ touched.
   false pass, not a recovered read. Before trusting any relaxed number,
   check the extractor feeding it. Regression test:
   `test_item_101_is_a_false_pass_that_the_decimal_fix_removes`.
-- **Open confound, worth a Limitations sentence: entropy partly measures the
-  extractor.** `extract_final_answer` has 4 tiers and on **153/300 items it
-  fires a different tier across the 5 samples**; mean entropy rises
-  monotonically with the count (0.685 → 1.031 → 1.243 at 1/2/3 tiers).
+- **Open confound, SOFTENED 2026-08-10 — it does not fully replicate.** On
+  Qwen, `extract_final_answer` fires a different tier on **153/300 items**
+  and mean entropy rises monotonically with the count (0.685 → 1.031 →
+  1.243 at 1/2/3 tiers), with multi-tier concentrated on wrong items (42%
+  correct vs 67% wrong). **On Pixtral the entropy relationship replicates
+  but the correctness coupling vanishes** (33% vs 29%; 94/300 multi-tier).
+  So the Limitations sentence is *"extractor instability appears in Qwen and
+  does not fully replicate in Pixtral"* — not "the perception signal is
+  partly extractor noise".
   **153 is a lower bound** — item 9 has all five samples in the same
   `display_math` tier, three returning the conclusion and two an
   intermediate step, entropy 1.332 from samples that agree mathematically.
