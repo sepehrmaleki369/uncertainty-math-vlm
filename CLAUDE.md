@@ -8,6 +8,44 @@ working context for future sessions, not a repeat of that.
 
 ## Current findings
 
+### 2026-08-10: E-AURC + Coverage@Risk — the deferral comparison, offline
+
+Added `oracle_aurc`, `e_aurc`/`e_aurc_on_grid` (inside `aurc()`'s dict) and
+`coverage_at_risk` to `pilot/plotting.py`. No GPU, no new run — scored on
+`results/confidence_k10_...20260804T203938Z.csv`. Suite 385 → 411.
+
+**Why E-AURC:** raw AURC is dominated by the base error rate (0.493 here), so
+it cannot compare models with different accuracies. E-AURC subtracts what a
+perfect ranking would score at that same error rate (`r + (1-r)ln(1-r)`).
+
+| score | AUROC | AURC | E-AURC | E-AURC (on grid) | op pts |
+|---|---|---|---|---|---|
+| perception entropy K=10 | 0.806 | 0.242 | **0.093** | 0.106 | 34 |
+| perception entropy K=5 | 0.761 | 0.329 | 0.180 | 0.114 | 7 |
+| −mean token logprob | 0.521 | 0.510 | 0.361 | 0.360 | 299 |
+| −min token logprob | 0.423 | 0.576 | 0.427 | 0.426 | 300 |
+
+- **Deferring by token confidence is worse than deferring at random** —
+  `improvement` (base error − AURC) is *negative* for both logprob scores
+  (−0.017, −0.083). Entropy is +0.251. Sharpest form of that negative result.
+- **Coverage@Risk is the practitioner-facing version.** Entropy hits every
+  target: risk≤10% → 21.3% coverage (64 items, actual 9.4%); ≤20% → 43.7%
+  (131); ≤30% → 57.0% (171); ≤40% → 74.7% (224). **`-mean-logprob` cannot
+  hold error under 40% at ANY coverage.**
+- **New nuance, and the reason `e_aurc_on_grid` exists: K=10's gain over K=5
+  is resolution, not a better ordering.** Against the *continuous* oracle
+  E-AURC halves (0.180 → 0.093), but against an oracle held to each score's
+  own coverage grid the two are nearly identical (0.114 vs 0.106). More
+  samples buy operating points (7 → 34), not discrimination. Consistent with
+  the AUROC result, since ties mechanically cap AUROC too. **Don't describe
+  K=10 as ranking better — describe it as offering finer control.**
+- Validation: a perfect ranker scores `e_aurc_on_grid` **exactly 0**; the
+  n=300 perception AURC reproduces the report's 0.410 / 0.607 unchanged.
+- `coverage_at_risk` scans *all* operating points, not the first crossing —
+  `risk_kept` is not monotone in coverage on a coarse grid. Returns
+  `achievable=False` rather than the nearest point, which is a real and
+  common K=5 outcome, not an error.
+
 ### RUN 2026-08-10: the scoring rule undercounts correct reads — two real extractor bugs
 
 Prompted by the user asking to see the 4-stage pipeline (model output →

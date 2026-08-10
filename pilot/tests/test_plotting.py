@@ -10,6 +10,8 @@ from pilot.plotting import (
     classify_scaleup_result,
     aurc,
     auroc_sensitivity,
+    coverage_at_risk,
+    oracle_aurc,
     bootstrap_auroc_ci,
     bootstrap_auroc_difference_ci,
     check_parse_failure_rate,
@@ -996,3 +998,126 @@ def test_classify_stratum_threshold_boundary_is_exact():
     assert classify_stratum_result(_stratum_ci(0.80, 0.72, 0.88, 30)) == "confirmed"
     assert classify_stratum_result(_stratum_ci(0.80, 0.72, 0.88, 29)) == \
         "inconclusive_underpowered"
+
+
+# --- oracle_aurc / E-AURC (Geifman & El-Yaniv) ---------------------------
+#
+# Raw AURC is dominated by the base error rate, so it cannot compare two
+# models with different accuracies -- a model that is wrong 60% of the time
+# cannot have a good AURC however well it ranks. E-AURC subtracts what a
+# perfect ranking would score at that same error rate, which is what makes
+# the deferral numbers comparable across models and across datasets.
+
+
+@pytest.mark.parametrize("rate,expected", [
+    (0.0, 0.0),          # never wrong: perfect deferral is free
+    (1.0, 1.0),          # always wrong: no ordering can help
+    (0.5, 0.5 + 0.5 * math.log(0.5)),
+])
+def test_oracle_aurc_closed_form_endpoints(rate, expected):
+    assert oracle_aurc(rate) == pytest.approx(expected, abs=1e-12)
+
+
+def test_oracle_aurc_is_below_the_random_baseline_and_rises_with_error():
+    """Sanity on the shape: a perfect ranker always beats random deferral
+    (whose AURC is just the error rate), and both get worse as the model does."""
+    prev = -1.0
+    for r in (0.05, 0.2, 0.4, 0.6, 0.8, 0.95):
+        o = oracle_aurc(r)
+        assert 0.0 < o < r, f"oracle {o} should sit strictly between 0 and {r}"
+        assert o > prev
+        prev = o
+
+
+@pytest.mark.parametrize("rate", [-0.01, 1.01])
+def test_oracle_aurc_rejects_impossible_error_rates(rate):
+    with pytest.raises(ValueError, match="error_rate"):
+        oracle_aurc(rate)
+
+
+@pytest.mark.parametrize("n,n_err", [(300, 150), (100, 40), (1000, 10), (50, 1)])
+def test_a_perfect_ranker_scores_exactly_zero_e_aurc_on_its_own_grid(n, n_err):
+    """The defining invariant. A score that puts every correct item ahead of
+    every wrong one has nothing left to improve, so e_aurc_on_grid must be 0
+    exactly. (e_aurc against the CONTINUOUS oracle is only approximately 0 --
+    the closed form integrates a continuum while the data is n discrete
+    steps -- which is precisely why both are reported.)"""
+    df = pd.DataFrame({"s": range(n), "ok": [True] * (n - n_err) + [False] * n_err})
+    out = aurc(df, "s", "ok")
+    assert out["e_aurc_on_grid"] == pytest.approx(0.0, abs=1e-12)
+    assert out["e_aurc"] == pytest.approx(0.0, abs=0.005)
+    assert out["aurc"] < out["baseline_aurc"]
+
+
+def test_e_aurc_on_grid_does_not_charge_a_coarse_score_for_its_ties():
+    """Why the on-grid variant exists. Cluster entropy at K=5 offers 7
+    operating points; the continuous oracle assumes one at every coverage.
+    Subtracting the continuous oracle blames the score for its GRID as well as
+    its RANKING. Here the ranking is perfect and only the grid is coarse, so
+    the on-grid gap is zero while the continuous gap is not."""
+    df = pd.DataFrame({"entropy": [0.0] * 50 + [1.0] * 50,
+                       "correct": [True] * 50 + [False] * 50})
+    out = aurc(df, "entropy", "correct")
+    assert out["n_operating_points"] == 2
+    assert out["e_aurc_on_grid"] == pytest.approx(0.0, abs=1e-12)
+    assert out["e_aurc"] > 0.05, "the continuous oracle should penalise the grid"
+
+
+def test_e_aurc_is_worse_for_a_signal_free_score():
+    uninformative = pd.DataFrame({"entropy": [0.5] * 40,
+                                  "correct": [True, False] * 20})
+    ranked = pd.DataFrame({"entropy": list(range(40)),
+                           "correct": [True] * 20 + [False] * 20})
+    assert aurc(uninformative, "entropy", "correct")["e_aurc"] > \
+        aurc(ranked, "entropy", "correct")["e_aurc"]
+
+
+# --- coverage_at_risk ----------------------------------------------------
+
+
+def test_coverage_at_risk_finds_the_largest_qualifying_operating_point():
+    df = pd.DataFrame({"entropy": [0.0] * 10 + [1.0] * 10 + [2.0] * 10,
+                       "correct": [True] * 10 + [True] * 8 + [False] * 2
+                                  + [False] * 10})
+    at_10 = coverage_at_risk(df, "entropy", "correct", 0.10)
+    assert at_10["achievable"] is True
+    assert at_10["n_kept"] == 20 and at_10["risk_kept"] == pytest.approx(0.10)
+
+    at_0 = coverage_at_risk(df, "entropy", "correct", 0.0)
+    assert at_0["n_kept"] == 10 and at_0["risk_kept"] == 0.0
+
+
+def test_coverage_at_risk_reports_unachievable_rather_than_guessing():
+    """A common, real outcome at K=5, not an error condition: every operating
+    point can sit above the target. Returning the closest one anyway would
+    silently violate the risk guarantee the caller asked for."""
+    df = pd.DataFrame({"entropy": [0.0] * 10, "correct": [False] * 10})
+    out = coverage_at_risk(df, "entropy", "correct", 0.10)
+    assert out["achievable"] is False
+    assert out["coverage"] == 0.0 and out["n_kept"] == 0
+
+
+def test_coverage_at_risk_scans_all_points_not_just_the_first_crossing():
+    """risk_kept is not monotone in coverage. Here the 2-item point is above
+    target and the 4-item point is below it, so an implementation that stopped
+    at the first threshold to exceed the target would report unachievable."""
+    df = pd.DataFrame({"entropy": [0.0, 0.0, 1.0, 1.0],
+                       "correct": [True, False, True, True]})
+    out = coverage_at_risk(df, "entropy", "correct", 0.30)
+    assert out["achievable"] is True
+    assert out["n_kept"] == 4 and out["risk_kept"] == pytest.approx(0.25)
+
+
+def test_coverage_at_risk_is_monotone_in_the_target():
+    df = pd.DataFrame({"entropy": list(range(30)),
+                       "correct": [True] * 20 + [False] * 10})
+    coverages = [coverage_at_risk(df, "entropy", "correct", t)["coverage"]
+                 for t in (0.0, 0.1, 0.2, 0.3, 0.5)]
+    assert coverages == sorted(coverages)
+
+
+@pytest.mark.parametrize("target", [-0.1, 1.5])
+def test_coverage_at_risk_rejects_an_impossible_target(target):
+    df = pd.DataFrame({"entropy": [0.0], "correct": [True]})
+    with pytest.raises(ValueError, match="target_risk"):
+        coverage_at_risk(df, "entropy", "correct", target)

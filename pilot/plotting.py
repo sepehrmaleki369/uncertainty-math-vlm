@@ -511,12 +511,115 @@ def aurc(df: pd.DataFrame, entropy_col: str, correctness_col: str) -> dict:
         prev_coverage = row.coverage
 
     base = float(is_error.mean())
+    oracle_continuous = oracle_aurc(base)
+    oracle_grid = _oracle_aurc_on_grid(curve, len(entropy), int(is_error.sum()))
     return {
         "aurc": float(value),
         "baseline_aurc": base,
         "improvement": base - float(value),
         "n_items": int(len(entropy)),
         "n_operating_points": int(len(curve)),
+        # E-AURC (Geifman et al.): AURC minus what a perfect ranking would
+        # score. Raw AURC is dominated by the base error rate, so it cannot
+        # compare two models with different accuracies -- this can.
+        "oracle_aurc": oracle_continuous,
+        "e_aurc": float(value) - oracle_continuous,
+        # The same subtraction against an oracle restricted to THIS score's
+        # coverage grid. See _oracle_aurc_on_grid for why both are reported.
+        "oracle_aurc_on_grid": oracle_grid,
+        "e_aurc_on_grid": float(value) - oracle_grid,
+    }
+
+
+def oracle_aurc(error_rate: float) -> float:
+    """AURC of a perfect ranking at a given error rate: r + (1-r)ln(1-r).
+
+    The closed form of integrating the risk-coverage curve of a score that
+    puts every correct item ahead of every incorrect one. A perfect ranker
+    still has AURC > 0 whenever the model makes mistakes, because at full
+    coverage it must answer the wrong items too -- which is exactly why raw
+    AURC cannot be compared across models with different accuracies, and why
+    E-AURC exists.
+    """
+    r = float(error_rate)
+    if not 0.0 <= r <= 1.0:
+        raise ValueError(f"error_rate must be in [0, 1], got {r}")
+    if r == 0.0:
+        return 0.0
+    if r == 1.0:
+        return 1.0
+    return r + (1.0 - r) * math.log(1.0 - r)
+
+
+def _oracle_aurc_on_grid(curve: pd.DataFrame, n_items: int, n_errors: int) -> float:
+    """Best AURC achievable at the coverage levels this score actually offers.
+
+    `oracle_aurc` assumes a continuous score with an operating point at every
+    coverage. Cluster entropy does not have that: at K=5 it takes 7 distinct
+    values across 300 items, so the achievable coverages are a coarse grid.
+    Subtracting the continuous oracle therefore charges the score for its
+    GRID as well as for its RANKING, and those are different deficiencies --
+    the grid is fixed by K and closes as K grows (7 points at K=5, 34 at
+    K=10), while the ranking is the thing being evaluated.
+
+    This subtracts an oracle held to the same grid, isolating ranking quality.
+    Report both: e_aurc for comparability with the literature, e_aurc_on_grid
+    when the question is how well the ordering itself does.
+    """
+    n_correct = n_items - n_errors
+    prev_coverage = 0.0
+    value = 0.0
+    for row in curve.itertuples():
+        # A perfect ranker keeping row.n_kept items keeps correct ones first.
+        errors_kept = max(0, row.n_kept - n_correct)
+        value += (row.coverage - prev_coverage) * (errors_kept / row.n_kept)
+        prev_coverage = row.coverage
+    return float(value)
+
+
+def coverage_at_risk(
+    df: pd.DataFrame,
+    entropy_col: str,
+    correctness_col: str,
+    target_risk: float,
+) -> dict:
+    """Most items answerable while keeping the error rate on them <= target.
+
+    The number a deployment is specified by: "answer as much as you can, but
+    stay under 30% error." Complements AUROC (ranking quality) and AURC
+    (average over all operating points) with a single actionable point.
+
+    Scans EVERY operating point and takes the maximum qualifying coverage
+    rather than stopping at the first threshold that crosses the target --
+    risk_kept is not guaranteed monotone in coverage, and on a coarse entropy
+    grid a later, larger-coverage point can satisfy a target that an earlier
+    one misses. Returns achievable=False when no operating point qualifies,
+    which is a real and common outcome at K=5, not an error.
+    """
+    if not 0.0 <= target_risk <= 1.0:
+        raise ValueError(f"target_risk must be in [0, 1], got {target_risk}")
+    curve = risk_coverage_curve(df, entropy_col, correctness_col)
+    if curve.empty:
+        return {"achievable": False, "target_risk": float(target_risk),
+                "coverage": 0.0, "n_kept": 0, "threshold": float("nan"),
+                "risk_kept": float("nan"), "accuracy_kept": float("nan")}
+
+    ok = curve[curve["risk_kept"] <= target_risk + 1e-12]
+    if ok.empty:
+        return {"achievable": False, "target_risk": float(target_risk),
+                "coverage": 0.0, "n_kept": 0, "threshold": float("nan"),
+                "risk_kept": float("nan"), "accuracy_kept": float("nan")}
+
+    best = ok.loc[ok["coverage"].idxmax()]
+    return {
+        "achievable": True,
+        "target_risk": float(target_risk),
+        "coverage": float(best["coverage"]),
+        "n_kept": int(best["n_kept"]),
+        "n_deferred": int(best["n_deferred"]),
+        "threshold": float(best["threshold"]),
+        "risk_kept": float(best["risk_kept"]),
+        "accuracy_kept": float(best["accuracy_kept"]),
     }
 
 
