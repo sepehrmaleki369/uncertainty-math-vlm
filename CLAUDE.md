@@ -8,6 +8,51 @@ working context for future sessions, not a repeat of that.
 
 ## Current findings
 
+### 2026-08-11: two offline controls — one useful, one that stays a hypothesis
+
+Both free, no GPU, on the existing n=300 runs for Qwen-3B and Pixtral-12B.
+
+**#1 `image_quality` is a CONTROL, and it passes.** FERMAT's field is
+documented (arXiv 2501.07244) as *True if good, False if illumination,
+shadow, blurring or contrast issues*. The flags are identical across both
+runs and near-independent of `has_error` (r = 0.02, 0.06), so stratifying is
+not confounded.
+
+| | acc (Qwen / Pixtral) | AUROC Qwen | AUROC Pixtral |
+|---|---|---|---|
+| `image_quality=True` (n=205) | 39.0% / 42.0% | 0.843 [0.785, 0.894] | 0.803 [0.743, 0.859] |
+| `image_quality=False` (n=95) | 40.0% / 41.1% | 0.818 [0.729, 0.896] | 0.883 [0.813, 0.943] |
+
+**Degraded images are transcribed just as accurately as clean ones, and
+entropy works equally well on both.** Every interval overlaps; the two models
+even lean in opposite directions. `handwriting_style` is the same story
+(266/34 split, nothing resolves) but its semantics are vaguer, so lean on
+`image_quality`. **Use this to foreclose "is your signal just detecting
+blurry images?" — it is not.** That is worth more than the "entropy helps
+most when the input is hard" story we went looking for, which is simply not
+there.
+
+**#2 The auto-correction hypothesis is NOT established. Do not report it.**
+Direct test: for `has_error=1` items, pull the `\textcolor{red}{}` payloads
+(brace-balanced) and ask whether the model reproduces the *injected* numeric
+token as faithfully as a non-red control token from the same page.
+
+- **A first version scored 97.5% and was meaningless** — searching for a
+  1-character token like `2` as a substring hits almost any transcription by
+  chance. Restrict to distinctive tokens.
+- ≥3 characters: Qwen **−8.5% [−17.0%, −2.1%], resolved**; Pixtral −1.6%
+  [−9.5%, +6.0%], not resolved.
+- ≥4 characters: neither resolves (n falls to 28 vs 20).
+
+So one of four analyses resolves, on one model, **at a length threshold
+chosen after seeing that ≥1 was contaminated**. That is the
+multiple-comparisons trap this project keeps guarding against. Combined with
+the earlier aggregate null (+6.7% [-4.0%, +17.3%] on both models), the honest
+status is unchanged: **items 55 and 273 are real anecdotes, not a
+demonstrated mechanism.** What is new is a sharp instrument — red-span token
+reproduction with a matched control — for a *pre-registered* test on a future
+run, at ≥3 characters, fixed in advance.
+
 ### 2026-08-11: Math-Verify — a better checker, and still not the scorer
 
 `pilot/mathverify.py`, `pilot/18_mathverify_audit.ipynb`,

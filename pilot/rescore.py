@@ -627,3 +627,67 @@ def format_trace(
         field("  truth around it:", diff["context_truth"])
     out.append("")
     return "\n".join(out)
+
+
+# --- The \boxed{} experiment ---------------------------------------------
+#
+# Registered BEFORE the run, per this project's standing rule that a bar
+# decided after seeing the numbers is not a bar. See
+# prompts.TRANSCRIPTION_USER_PROMPT_BOXED for why the run exists.
+
+BOXED_PREREGISTRATION = {
+    # Below this the run measures instruction-following, not uncertainty.
+    "min_boxed_compliance": 0.80,
+    # The perception AUROC under deterministic extraction.
+    "auroc_confirms_signal": 0.75,
+    # Extraction must actually have become deterministic, or the manipulation
+    # did not work and the comparison is meaningless either way.
+    "max_multi_tier_frac": 0.10,
+}
+
+
+def boxed_compliance(raw_samples: Sequence[str]) -> dict:
+    """How often the model actually emitted \\boxed{} in its Answer field.
+
+    The gate for the whole experiment. If the model ignores the instruction
+    there is nothing to compare: a low-compliance run measures whether a 3B
+    model follows a formatting request, which is not the question.
+    """
+    fields = [parsing.parse_transcription(s) for s in raw_samples]
+    boxed = [f is not None and bool(canonicalize._BOXED_RE.search(f)) for f in fields]
+    return {
+        "n_samples": len(raw_samples),
+        "n_boxed": sum(boxed),
+        "frac_boxed": sum(boxed) / len(raw_samples) if raw_samples else 0.0,
+        "all_boxed": all(boxed) if boxed else False,
+    }
+
+
+def classify_boxed_result(
+    compliance_frac: float,
+    auroc_ci: dict,
+    multi_tier_frac: float,
+    prereg: Optional[dict] = None,
+) -> str:
+    """The registered verdict, as a pure function so the reported label is the
+    tested one rather than a post-hoc reading.
+
+    gated_low_compliance    the model ignored \\boxed{}; nothing to conclude
+    manipulation_failed     it complied but extraction still varies, so the
+                            experiment did not do what it claims
+    signal_is_not_extractor the AUROC holds under deterministic extraction --
+                            the perception result is the model's uncertainty
+    signal_was_extractor    it collapses to chance -- a substantial part of
+                            the original signal was extractor instability
+    inconclusive            between the two, at this n
+    """
+    p = prereg or BOXED_PREREGISTRATION
+    if compliance_frac < p["min_boxed_compliance"]:
+        return "gated_low_compliance"
+    if multi_tier_frac > p["max_multi_tier_frac"]:
+        return "manipulation_failed"
+    if auroc_ci["auroc"] >= p["auroc_confirms_signal"] and auroc_ci["excludes_chance"]:
+        return "signal_is_not_extractor"
+    if not auroc_ci["excludes_chance"]:
+        return "signal_was_extractor"
+    return "inconclusive"

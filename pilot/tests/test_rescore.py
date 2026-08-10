@@ -804,3 +804,59 @@ def test_item_273_is_the_second_auto_correction_case(run):
 
     assert bool(run.loc[55, "has_error"]) is True
     assert r"{1 + \tan x \tan y}" in str(run.loc[55, "pert_a"])
+
+
+# --- 8. the \boxed{} experiment ------------------------------------------
+#
+# Registered before the run. The perception arm cannot resolve the extractor
+# confound by rescoring -- every rule reads the same ambiguous text -- so
+# notebook 19 removes it by making extraction deterministic instead.
+
+
+def test_the_boxed_prompt_is_additive_and_still_says_ocr():
+    """The confound the prompt is written to avoid is the model switching from
+    transcribing the page to SOLVING it, which would change what is measured
+    while still producing plausible numbers."""
+    import pilot.prompts as prompts
+    boxed = prompts.TRANSCRIPTION_USER_PROMPT_BOXED
+    assert boxed.startswith(prompts.TRANSCRIPTION_USER_PROMPT)
+    assert r"\boxed{" in boxed
+    for phrase in ("Do not solve", "do not correct",
+                   "do not add anything that is not written"):
+        assert phrase in boxed, phrase
+    # An answer with no single final result must not be forced into a box.
+    assert "no single final result" in boxed
+
+
+def test_boxed_compliance_counts_the_answer_field_only():
+    """A \\boxed{} in the Question field would not make extraction
+    deterministic, so compliance is measured on the parsed Answer."""
+    assert rescore.boxed_compliance([r"**Answer:** so \boxed{42}"])["frac_boxed"] == 1.0
+    assert rescore.boxed_compliance(["**Answer:** so 42"])["frac_boxed"] == 0.0
+    assert rescore.boxed_compliance(
+        [r"**Question:** \boxed{q}" + "\n**Answer:** 42"])["frac_boxed"] == 0.0
+
+    mixed = rescore.boxed_compliance([r"**Answer:** \boxed{1}", "**Answer:** 2"])
+    assert mixed["frac_boxed"] == 0.5 and mixed["all_boxed"] is False
+
+
+@pytest.mark.parametrize("compliance,auroc,excl,multi,expected", [
+    (0.50, 0.90, True,  0.00, "gated_low_compliance"),
+    (0.95, 0.90, True,  0.40, "manipulation_failed"),
+    (0.95, 0.80, True,  0.02, "signal_is_not_extractor"),
+    (0.95, 0.55, False, 0.02, "signal_was_extractor"),
+    (0.95, 0.72, True,  0.02, "inconclusive"),
+    # boundaries, so the registered bars are the tested ones
+    (0.80, 0.75, True,  0.10, "signal_is_not_extractor"),
+    (0.79, 0.75, True,  0.10, "gated_low_compliance"),
+])
+def test_classify_boxed_result(compliance, auroc, excl, multi, expected):
+    ci = {"auroc": auroc, "excludes_chance": excl}
+    assert rescore.classify_boxed_result(compliance, ci, multi) == expected
+
+
+def test_signal_was_extractor_is_reachable():
+    """The outcome the experiment exists to be ABLE to report. A registered
+    bar that cannot produce its own negative is not a bar."""
+    ci = {"auroc": 0.52, "excludes_chance": False}
+    assert rescore.classify_boxed_result(0.95, ci, 0.01) == "signal_was_extractor"

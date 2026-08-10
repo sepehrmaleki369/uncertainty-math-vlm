@@ -91,6 +91,40 @@ def build_grading_messages(image: Any) -> list[dict]:
     return build_messages(GRADING_SYSTEM_PROMPT, GRADING_USER_PROMPT, image)
 
 
+# --- Transcription variant: force a deterministic answer marker -----------
+#
+# The open confound the perception arm cannot resolve by rescoring:
+# extract_final_answer has four tiers, and on 153/300 items it fires a
+# DIFFERENT tier across the five samples. Mean entropy rises monotonically
+# with that count (0.685 -> 1.031 -> 1.243), so an unknown share of what the
+# arm scores as model uncertainty is the extractor changing its mind about
+# which line of an unchanged derivation is the answer.
+#
+# No rescoring can separate the two, because every rule reads the same
+# ambiguous text. Requiring \boxed{} makes extraction deterministic --
+# extract_final_answer's boxed tier fires first and cannot vary -- so the
+# entropy that remains is the model's.
+#
+# The instruction is deliberately additive and repeats that the task is still
+# OCR. The confound to avoid is the model switching from transcribing the
+# page to SOLVING it, which would silently change what is being measured.
+TRANSCRIPTION_USER_PROMPT_BOXED = (
+    TRANSCRIPTION_USER_PROMPT
+    + "\n\nAdditionally, in the **Answer:** field, wrap the single final "
+      "answer in \\boxed{...}. Everything else must be transcribed exactly as "
+      "before: \\boxed{} only marks which part of the handwritten answer is "
+      "the final result. Do not solve the problem, do not correct the work, "
+      "and do not add anything that is not written in the image. If the "
+      "handwritten answer has no single final result, transcribe it as it is "
+      "and do not use \\boxed{}."
+)
+
+
+def build_transcription_messages_boxed(image: Any) -> list[dict]:
+    return build_messages(
+        TRANSCRIPTION_SYSTEM_PROMPT, TRANSCRIPTION_USER_PROMPT_BOXED, image)
+
+
 # --- Grading prompt variants (ours, not FERMAT's) -------------------------
 #
 # Each keeps the **Reasoning:** / **Error:** output format so existing parsing
