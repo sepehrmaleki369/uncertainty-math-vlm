@@ -319,3 +319,31 @@ def build_scratchmath_grading_prompt(question: str) -> str:
             "unanswerable rather than merely harder."
         )
     return SCRATCHMATH_GRADING_USER_PROMPT.format(question=str(question).strip())
+
+# --- Transcription variant: elicit a verbalized confidence ----------------
+#
+# The canonical baseline from the confidence-elicitation literature (Xiong et
+# al., ICLR 2024): instead of inferring uncertainty from repeated samples,
+# just ask the model how sure it is. This project has it for the GRADING arm
+# only (prompts.GRADING_USER_PROMPT_CONFIDENCE, notebook 04, AUROC 0.547
+# [0.432, 0.661] -- no signal); the perception arm has never been tested,
+# and "why not just ask the model?" is the first question a reviewer asks of
+# any sampling-based uncertainty method.
+#
+# The confidence is requested AFTER the transcription so the model commits to
+# a reading before rating it. Asking first invites the rating to drive the
+# answer, which would measure something else.
+TRANSCRIPTION_USER_PROMPT_CONFIDENCE = (
+    TRANSCRIPTION_USER_PROMPT
+    + "\n\nAfter the **Answer:** field, add a third field:\n"
+      "**Confidence:**<an integer from 0 to 100>\n\n"
+      "It must state how confident you are that your transcription of the "
+      "Answer exactly matches what is written in the image -- 0 meaning a "
+      "pure guess, 100 meaning certain. Judge only your own reading of the "
+      "handwriting. Do not judge whether the mathematics is correct."
+)
+
+
+def build_transcription_messages_confidence(image: Any) -> list[dict]:
+    return build_messages(
+        TRANSCRIPTION_SYSTEM_PROMPT, TRANSCRIPTION_USER_PROMPT_CONFIDENCE, image)

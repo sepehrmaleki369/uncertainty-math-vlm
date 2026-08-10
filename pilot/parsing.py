@@ -120,3 +120,13 @@ def parse_grading_confidence(response_text: Optional[str]) -> Optional[int]:
         return None
     value = int(match.group(1))
     return value if 0 <= value <= 100 else None
+
+
+def parse_confidence(response_text: Optional[str]) -> Optional[int]:
+    """The 0-100 self-reported confidence, from either arm.
+
+    parse_grading_confidence is the original name and still works; the field
+    is identical in the transcription variant, so this alias exists to stop a
+    caller on the perception arm importing something called "grading".
+    """
+    return parse_grading_confidence(response_text)
