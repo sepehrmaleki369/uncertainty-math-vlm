@@ -1151,7 +1151,30 @@ def test_plot_scoring_categories_groups_multiple_models():
     ax = plot_scoring_categories(_category_summary(models=("A", "B")))
     assert len(ax.patches) == 2 * len(CATEGORIES)
     assert ax.get_legend() is not None
-    assert [t.get_text() for t in ax.get_legend().get_texts()] == ["A", "B"]
+    labels = [t.get_text() for t in ax.get_legend().get_texts()]
+    assert labels[:2] == ["A", "B"]
+    # Third key explains the hatch. Model swatches must use a real bar colour:
+    # a neutral grey matched neither encoding channel and made readers stop to
+    # work out that the key referred to opacity alone.
+    handles = ax.get_legend().legend_handles
+    assert handles[0].get_facecolor()[:3] == handles[1].get_facecolor()[:3]
+    assert handles[0].get_alpha() != handles[1].get_alpha()
+
+
+def test_scoring_regression_categories_are_hatched_apart_from_model_failures():
+    """false_pass_removed items were scored CORRECT by the frozen rule; they
+    are scoring failures, not model failures. Sharing the plain orange of
+    genuinely_wrong reads as "the model got this wrong", the opposite of what
+    they show, so they carry a hatch and a legend key of their own."""
+    from pilot.rescore import CATEGORIES
+    ax = plot_scoring_categories(_category_summary())
+
+    hatched = {cat for cat, patch in zip(CATEGORIES, ax.patches)
+               if patch.get_hatch()}
+    assert hatched == {"false_pass_removed", "broken_by_relaxation"}
+
+    labels = [t.get_text() for t in ax.get_legend().get_texts()]
+    assert any("not a model failure" in t for t in labels)
 
 
 def test_plot_scoring_categories_rejects_an_unknown_category():

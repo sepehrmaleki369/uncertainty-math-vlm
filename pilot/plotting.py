@@ -1369,6 +1369,14 @@ def plot_scoring_categories(
 
     Colour carries one bit only: whether the item ends up correct under the
     loosest rule. Six shades for seven categories would encode nothing.
+
+    Hatching carries a second, orthogonal bit: whether the category is a
+    SCORING failure rather than a model failure. `false_pass_removed` items
+    were scored *correct* by the frozen rule and only became wrong once the
+    extractor bugs were fixed, and `broken_by_relaxation` items go the other
+    way. Both are places the rules are non-monotone. Without the hatch they
+    sit in the same orange as `genuinely_wrong` and read as "the model got
+    this wrong", which is the opposite of what they show.
     """
     from pilot.rescore import CATEGORIES
 
@@ -1380,6 +1388,9 @@ def plot_scoring_categories(
     # Categories whose items are correct under the loosest rule.
     ENDS_CORRECT = {"correct_robust", "bug_fix_recovered",
                     "cosmetic_mismatch", "scope_mismatch"}
+    # Categories where the SCORING RULE changed its mind, not the model.
+    SCORING_REGRESSION = {"false_pass_removed", "broken_by_relaxation"}
+    HATCH = "////"
 
     models = ([None] if model_col not in summary.columns
               else list(dict.fromkeys(summary[model_col])))
@@ -1401,8 +1412,15 @@ def plot_scoring_categories(
                   for c in present]
         # Second and later models are drawn lighter so the grouping reads.
         alpha = 1.0 if m_i == 0 else 0.55
-        ax.barh(y + offset, counts, height=height * 0.92, color=colors,
-                alpha=alpha, zorder=3)
+        bars = ax.barh(y + offset, counts, height=height * 0.92, color=colors,
+                       alpha=alpha, zorder=3)
+        # Hatch per bar: barh takes a single hatch for the whole container,
+        # so the per-category pattern has to be set on the patches.
+        for patch, cat in zip(bars.patches, present):
+            if cat in SCORING_REGRESSION:
+                patch.set_hatch(HATCH)
+                patch.set_edgecolor(SURFACE)
+                patch.set_linewidth(0.0)
         for yi, count in zip(y + offset, counts):
             if count:
                 ax.text(count + total * 0.008, yi, f"{count}  ({count / total:.0%})",
@@ -1414,16 +1432,24 @@ def plot_scoring_categories(
     ax.invert_yaxis()
     ax.set_xlabel("items", fontsize=10, color=INK_SECONDARY)
     ax.set_xlim(0, max(summary[count_col]) * 1.34)
+    from matplotlib.patches import Patch
+    handles = []
     if len(models) > 1 and models[0] is not None:
-        # Neutral proxy swatches: hue already encodes ends-correct vs
-        # ends-wrong, so a coloured legend key would imply a second meaning
-        # it does not have. Opacity is what separates the models.
-        from matplotlib.patches import Patch
-        handles = [Patch(facecolor=INK_SECONDARY, alpha=1.0 if i == 0 else 0.45,
-                         label=str(m)) for i, m in enumerate(models)]
+        # Swatches use a REAL bar colour, not a neutral grey. Grey matched
+        # neither channel and forced the reader to work out that the key
+        # referred to opacity alone -- the one place the chart made someone
+        # stop.
+        handles += [Patch(facecolor=COLOR_CORRECT, alpha=1.0 if i == 0 else 0.55,
+                          label=str(m)) for i, m in enumerate(models)]
+    if any(c in SCORING_REGRESSION for c in present):
+        handles.append(Patch(facecolor=COLOR_INCORRECT, hatch=HATCH,
+                             edgecolor=SURFACE, linewidth=0.0,
+                             label="scoring-rule failure,\nnot a model failure"))
+    if handles:
         ax.legend(handles=handles, frameon=False, fontsize=9,
-                  loc="center left", bbox_to_anchor=(0.62, 0.5),
-                  title="opacity = model", title_fontsize=8)
+                  loc="center left", bbox_to_anchor=(0.55, 0.52),
+                  title="shade = model", title_fontsize=8,
+                  labelspacing=0.9, handlelength=1.9)
 
     ax.grid(axis="x", color=GRIDLINE, linewidth=1, zorder=0)
     ax.set_axisbelow(True)
