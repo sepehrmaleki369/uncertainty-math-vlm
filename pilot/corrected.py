@@ -388,3 +388,86 @@ def weighted_auroc(frame: pd.DataFrame, entropy_col: str = "perception_entropy",
     return {"auroc": point, "ci_low": float(lo), "ci_high": float(hi),
             "n": len(frame), "excludes_chance": bool(lo > 0.5),
             "n_boot_ok": len(draws)}
+
+
+def correct_item_spot_check_extension(run: pd.DataFrame, existing: pd.DataFrame,
+                                      n: int = 60, rule: str = "strict_v1",
+                                      seed: int = 20260812) -> pd.DataFrame:
+    """A further random draw of CORRECT items, disjoint from `existing`.
+
+    Drawing 40 at random and then 60 at random from the remaining 101 leaves
+    the UNION a uniform random subset of size 100, so the combined false-pass
+    rate stays an unbiased estimate -- it is not two samples that have to be
+    reconciled. The n=40 Wilson interval was [26.3%, 55.4%], far too wide to
+    separate the two readings of the corrected AUROC (0.57 vs 0.73); n=100
+    is what tightens it.
+    """
+    scored = rescore.rescore_run(run, rule=rule)
+    correct = set(scored.index[scored["transcription_correct"].astype(bool)])
+    already = set(existing["item"].astype(int))
+    missing = already - correct
+    if missing:
+        raise ValueError(f"existing sheet holds non-correct items: {sorted(missing)}")
+    pool = sorted(correct - already)
+    cls = rescore.classify_scoring_outcome(run)
+    known = set(cls.index[cls["category"] == "false_pass_removed"])
+    rng = np.random.default_rng(seed)
+    picked = sorted(rng.choice(np.asarray(pool), size=min(n, len(pool)),
+                               replace=False).tolist())
+    return pd.DataFrame({
+        "item": picked,
+        "perception_entropy": run.loc[picked, "perception_entropy"].values,
+        "known_false_pass": [i in known for i in picked],
+        "final_label": "",
+        "confidence": "",
+        "note": "",
+    })
+
+
+def label_views(run: pd.DataFrame, item: int, rule: str = "strict_v1",
+                samples_col: str = "all_transcription_samples_raw",
+                gt_col: str = "pert_a") -> dict:
+    """BOTH automatic views of one item: the extracted SPAN and the comparison LABEL.
+
+    A false pass can be manufactured at either of two stages, and the two are
+    not distinguishable from the comparison label alone:
+
+      * **extraction picked the wrong span** -- the label faithfully encodes a
+        piece of the page that is not the final answer (item 31: the span is
+        `2 cm` where the page's answer is 19.2 cm);
+      * **normalization collapsed a good span** -- the span is right and long,
+        and SymPy reduces it to a single symbol (item 239: a 76-character
+        `L.H.S = 9e^{-3x} + ...` becomes `sympy:l`), after which two collapsed
+        labels MATCH for no reason.
+
+    Measured on the 16 false passes, and it corrected an earlier claim: only
+    **2** are SymPy collapse. **6** are a one-character SPAN the extractor
+    chose (item 84's span is literally `c` -- SymPy encoded it faithfully) and
+    **8** are a partial span (item 27 keeps `4x = 3` and drops `y = 33/4`).
+    So the fix is in `extract_final_answer`, not in the normalizer.
+
+    Showing the span next to the label separates them by eye. The model side
+    is the sample that PRODUCED the majority label, not sample 0, so the span
+    and the label always describe the same generation.
+    """
+    import ast
+
+    trace = rescore.trace_item(
+        ast.literal_eval(run.loc[item, samples_col]), run.loc[item, gt_col], rule)
+    maj = trace["majority_label"]
+    rep = next((s for s in trace["samples"] if s["label"] == maj),
+               trace["samples"][0])
+    return {
+        "item": int(item),
+        "entropy": trace["perception_entropy"],
+        "correct": trace["correct"],
+        "model_span": rep["final_answer"],
+        "model_label": rep["label"],
+        "model_tier": rep["tier"],
+        "truth_span": trace["ground_truth"]["final_answer"],
+        "truth_label": trace["ground_truth"]["label"],
+        "truth_tier": trace["ground_truth"]["tier"],
+        "collapsed": (
+            len(str(rep["label"]).split(":", 1)[-1]) <= 3
+            and len(str(rep["final_answer"] or "")) > 12),
+    }

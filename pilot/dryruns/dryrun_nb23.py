@@ -32,8 +32,10 @@ CSV = (ROOT / "results"
        / "scaleup_n300_bal50_qwen25-vl-3b-instruct_20260802T163202Z.csv")
 SPOT = (ROOT / "reference" / "audit"
         / "spotcheck_40_qwen_strict_v1_correct_20260811.csv")
+SPOT60 = (ROOT / "reference" / "audit"
+          / "spotcheck_extra60_qwen_strict_v1_correct_20260812.csv")
 
-for p in (CSV, SPOT):
+for p in (CSV, SPOT, SPOT60):
     if not p.exists():
         sys.exit(f"SKIP: not present: {p}")
 
@@ -130,29 +132,43 @@ print("=" * 74)
 # --- post-conditions -------------------------------------------------------
 import os as _os  # noqa: E402
 
-sheet_dir = ns["SHEET_DIR"]
 written = ns["written"]
-assert sheet_dir.endswith("/figures/spotcheck_strict_v1_correct"), sheet_dir
-assert len(written) == 4, f"40 items at 12/page should be 4 pages, got {len(written)}"
-for p in written:
-    assert _os.path.exists(p) and _os.path.getsize(p) > 10_000, p
-    assert _os.path.basename(p).startswith("spotcheck_correct_p"), p
-assert _os.path.exists(f"{sheet_dir}/coding_sheet.csv")
+sheets = ns["sheets"]
+assert set(written) == {"first40", "extra60"}, written
+EXPECT = {"first40": ("spotcheck_strict_v1_correct", "spotcheck_correct_p", 40, 4),
+          "extra60": ("spotcheck_strict_v1_correct_extra60",
+                      "spotcheck_correct_extra_p", 60, 0)}
+for name, (subdir, stem, n_items, n_cal) in EXPECT.items():
+    df, sub, _ = sheets[name]
+    assert sub == subdir, f"{name}: {sub}"
+    assert len(df) == n_items and df["item"].is_unique
+    assert int(df["known_false_pass"].sum()) == n_cal
+    paths = written[name]
+    assert len(paths) == -(-n_items // 9), f"{name}: {len(paths)} pages"
+    for p in paths:
+        assert _os.path.exists(p) and _os.path.getsize(p) > 10_000, p
+        assert _os.path.basename(p).startswith(stem), p
+        assert f"/figures/{subdir}/" in p, p
+    assert _os.path.exists(_os.path.join(_os.path.dirname(paths[0]),
+                                         "coding_sheet.csv"))
 
-spot = ns["spot"]
-assert len(spot) == 40 and spot["item"].is_unique
-assert int(spot["known_false_pass"].sum()) == 4, "the 4 calibration items must survive"
+# Separate folders, or the second draw would overwrite the first draw's pages.
+d1 = _os.path.dirname(written["first40"][0])
+d2 = _os.path.dirname(written["extra60"][0])
+assert d1 != d2, "both draws wrote to the same Drive folder"
 
-# The captions are the whole point of the sheet: every one must name its item,
-# both labels and the entropy, and the 4 calibration items must be marked.
-caps = [ns["caption_for"](r) for _, r in spot.iterrows()]
-assert len(caps) == 40
-for (_, r), cap in zip(spot.iterrows(), caps):
-    assert f"item {int(r['item'])}" in cap and "H=" in cap
-    assert "model:" in cap and "truth:" in cap
-    assert ("KNOWN FALSE PASS" in cap) == bool(r["known_false_pass"]), cap
-print(f"post-conditions OK: {len(written)} pages, 40 items, "
-      f"{int(spot['known_false_pass'].sum())} flagged calibration items")
-print("sample caption:\n" + caps[0])
+# The captions are the whole point of the sheet.
+for name, (df, _, _) in sheets.items():
+    for _, r in df.iterrows():
+        cap = ns["caption_for"](r)
+        assert f"item {int(r['item'])}" in cap and "H=" in cap
+        # BOTH automatic views must be present: the extracted span and the
+        # comparison label, for model and truth alike.
+        assert "span  M" in cap and "span  T" in cap, cap
+        assert "label M" in cap and "label T" in cap, cap
+        assert ("KNOWN FALSE PASS" in cap) == bool(r["known_false_pass"]), cap
+print(f"post-conditions OK: {sum(len(v) for v in written.values())} pages across "
+      f"2 folders, {sum(len(s[0]) for s in sheets.values())} items")
+print("sample caption:\n" + ns["caption_for"](sheets["extra60"][0].iloc[0]))
 
 shutil.rmtree(ROOT / ".dryrun_scratch", ignore_errors=True)

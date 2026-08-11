@@ -285,3 +285,96 @@ def test_the_corrected_auroc_is_interpretation_dependent_and_not_resolved(
     assert undecidable["auroc"] - wrong["auroc"] > 0.10, (
         "the swing across an unsettled interpretive choice is large; report "
         "the RANGE 0.57-0.73, never one endpoint")
+
+
+SPOT60 = (ROOT / "reference" / "audit"
+          / "spotcheck_extra60_qwen_strict_v1_correct_20260812.csv")
+
+
+def test_the_extension_draw_is_disjoint_and_pools_with_the_first(run, spot):
+    """Drawing 40 then 60 from the remaining 101 leaves the UNION a uniform
+    random sample of 100 of the 141 correct items, so the two sheets pool
+    directly. An overlap would double-count and break that."""
+    ext = pd.read_csv(SPOT60)
+    assert len(ext) == 60
+    assert ext["item"].is_unique
+    assert not (set(ext["item"]) & set(spot["item"])), "draws must be disjoint"
+    assert ext["final_label"].fillna("").eq("").all(), "ships uncoded"
+
+    rebuilt = C.correct_item_spot_check_extension(run, spot, n=60)
+    assert rebuilt["item"].tolist() == ext["item"].tolist(), "seeded, reproducible"
+
+    scored = C.rescore.rescore_run(run, rule="strict_v1")
+    ok = set(scored.index[scored["transcription_correct"].astype(bool)])
+    assert set(ext["item"]) <= ok
+    assert len(set(ext["item"]) | set(spot["item"])) == 100
+
+
+def test_the_extension_carries_no_calibration_items(run, spot):
+    """Worth knowing before coding it: all 6 known false_pass_removed items
+    fall outside this draw, so unlike the first 40 it has no built-in check
+    on the coder. Not a defect of the sampling -- a property to state."""
+    ext = pd.read_csv(SPOT60)
+    assert int(ext["known_false_pass"].sum()) == 0
+
+
+def test_n100_would_meaningfully_tighten_the_false_pass_interval(spot):
+    """The reason to spend the effort. At the observed 40% rate, n=40 gives a
+    29-point Wilson interval and n=100 gives 19 -- the difference that could
+    separate the 0.57 and 0.73 readings of the corrected AUROC."""
+    lo40, hi40 = C._wilson(16, 40)
+    lo100, hi100 = C._wilson(40, 100)
+    assert (hi40 - lo40) == pytest.approx(0.291, abs=0.01)
+    assert (hi100 - lo100) == pytest.approx(0.189, abs=0.01)
+    assert (hi100 - lo100) < (hi40 - lo40)
+
+
+def test_extension_rejects_a_mismatched_existing_sheet(run):
+    """Guards the pooling invariant: if the sheet handed in holds items that
+    are not strict_v1-correct, the pool it excludes is wrong and the union
+    stops being a random sample of the correct items."""
+    bogus = pd.DataFrame({"item": [0, 1, 2]})
+    with pytest.raises(ValueError, match="non-correct"):
+        C.correct_item_spot_check_extension(run, bogus, n=5)
+
+
+def test_label_views_shows_both_stages(run):
+    """The span and the label describe the SAME generation -- the model side
+    is the sample that produced the majority label, not sample 0. Getting that
+    wrong would show a span from one sample beside a label from another."""
+    v = C.label_views(run, 4)
+    assert v["item"] == 4
+    for k in ("model_span", "model_label", "truth_span", "truth_label",
+              "model_tier", "truth_tier", "entropy", "collapsed"):
+        assert k in v
+    assert str(v["model_label"]).startswith(("sympy:", "text:", "<"))
+
+
+def test_most_false_passes_are_span_choice_not_sympy_collapse(run, spot):
+    """CORRECTS an earlier claim in CLAUDE.md that blamed SymPy. Only 2 of the
+    16 false passes are a long span collapsing to one symbol; 6 are a
+    one-character SPAN the extractor chose (SymPy encoded it faithfully) and
+    8 are a partial span. The fix belongs in extract_final_answer."""
+    fp = spot.loc[spot["final_label"] == "extraction_issue", "item"].astype(int)
+    short_span = collapse = 0
+    for i in fp:
+        v = C.label_views(run, int(i))
+        lab = str(v["model_label"]).split(":", 1)[-1]
+        span = str(v["model_span"] or "")
+        if len(lab) <= 3 and len(span) > 12:
+            collapse += 1
+        elif len(span) <= 12:
+            short_span += 1
+    assert collapse == 2, "SymPy collapse is the minority mechanism"
+    assert short_span == 6
+    assert collapse < short_span
+
+    # item 84 was cited as a SymPy collapse; its span is literally "c".
+    v84 = C.label_views(run, 84)
+    assert str(v84["model_span"]).strip() == "c"
+    assert v84["collapsed"] is False
+    # item 239 is a genuine collapse: a long span reduced to one symbol.
+    v239 = C.label_views(run, 239)
+    assert len(str(v239["model_span"])) > 40
+    assert v239["model_label"] == "sympy:l"
+    assert v239["collapsed"] is True

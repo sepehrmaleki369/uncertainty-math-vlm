@@ -164,25 +164,66 @@ pass detects what it was built to detect.
   the wrong class are themselves low-entropy, so both classes shift together.
   The weighting is still the correct estimator; it just is not what moves this
   number.
-- **The generalisable lesson, and it is a Limitations sentence: SymPy labels
-  are unsafe as the final judge for long or multi-part answers.** They are
-  fine for a simple numeric or algebraic final answer, and they fail when the
-  answer is a sentence or proof, has several parts, is a matrix/vector/set, or
-  is multiple-choice plus a worked value — the parser collapses the whole
-  thing to one symbol (`c`, `p`, `r`, `i`, `f`), and **two collapsed labels
-  then MATCH, scoring the item correct for no reason at all.** That is the
-  same collapse as bug 3, now shown to manufacture false positives as well as
-  false negatives.
+- **The generalisable lesson, and it is a Limitations sentence: the automatic
+  labels are unsafe as the final judge for long or multi-part answers.** They
+  are fine for a simple numeric or algebraic final answer, and they fail when
+  the answer is a sentence or proof, has several parts, is a
+  matrix/vector/set, or is multiple-choice plus a worked value. The whole
+  thing reduces to one symbol (`c`, `p`, `r`, `l`, `f`), and **two reduced
+  labels then MATCH, scoring the item correct for no reason at all.**
+- **CORRECTION (2026-08-12) — an earlier version of this entry blamed SymPy,
+  and the data says otherwise.** `corrected.label_views` shows the extracted
+  SPAN next to the comparison LABEL. Across the 16 false passes:
+
+  | where it goes wrong | n | example |
+  |---|---|---|
+  | extractor picked a **1-character span** | **6** | item 84's span is literally `c`; 127 `f`; 250 `R`. SymPy encoded it faithfully. |
+  | extractor picked a **partial span** | **8** | item 27 keeps `4x = 3` and drops `y = 33/4`; 215 keeps one of three direction cosines |
+  | **SymPy collapse** (long span → one symbol) | **2** | 117 (118 chars → `sympy:p`), 239 (76 chars → `sympy:l`) |
+
+  **So 14 of 16 are `extract_final_answer` choosing the wrong or partial
+  span, not the normalizer.** Fixing SymPy would not touch them. Say
+  *"final-answer extraction is the weak link"*, not *"SymPy is unsafe"* —
+  though 117 and 239 show the collapse is real too, and the symptom (a
+  vacuous match) is identical either way, which is why the two were confused
+  in the first place. **Both views are now on the contact sheets so the
+  distinction is visible while coding.**
 - **What this does NOT overturn.** The distinct-answers table (92.1% → 6.6%)
   and the cross-family replication are untouched — they rest on the stored
   columns of the frozen rule, which is unchanged. What is now in question is
   how well the *frozen rule's labels* track truth, which is a Limitations
   matter, not a retraction. **Do not withdraw the perception claim on this;
   do state the corrected range.**
-- **Next, if pursued:** the 40-item sample is what makes both intervals wide.
-  Auditing another ~60 correct items would tighten the false-pass rate and
-  could separate 0.57 from 0.73. That is the highest-value remaining audit
-  work, ahead of Pixtral.
+- **THE THREE SENTENCES TO USE, agreed with the user 2026-08-12. Copy these
+  rather than re-deriving phrasing:**
+  1. *"Human audit shows the frozen scorer has substantial label noise in
+     both directions; corrected accuracy is uncertain, roughly 44–61%, with a
+     point estimate about 51%."*
+  2. *"Corrected AUROC ranges from 0.57 to 0.73 depending on how false passes
+     are treated."*
+  3. *"The automatic scorer is noisy, especially for long and multi-part
+     answers. Entropy predicts frozen-scorer failures; human truth is
+     harder."*
+  **Do not present corrected accuracy as a clean improvement, and do not
+  claim the corrected AUROC.**
+- **IN FLIGHT: the n=60 extension, and it is the highest-value open work —
+  ahead of the Pixtral audit and ahead of any new GPU.** The n=40 sample is
+  what makes both intervals wide. `correct_item_spot_check_extension` draws
+  **60 more correct items, disjoint from the first 40**
+  (`reference/audit/spotcheck_extra60_qwen_strict_v1_correct_20260812.csv`,
+  seed 20260812), taking coverage to **100 of the 141** correct items.
+  Drawing 40 then 60 from the remaining 101 leaves the union a uniform random
+  sample of 100, so the two draws pool directly rather than needing
+  reconciliation. At the same 40% rate the Wilson interval tightens from
+  **[26.3%, 55.4%] to [30.9%, 49.8%]** — width 29.1 → 18.9 points, which is
+  what could separate the 0.57 and 0.73 readings of the AUROC. Sheets:
+  notebook 23 writes both draws to **separate** Drive folders
+  (`figures/spotcheck_strict_v1_correct/` and
+  `.../_extra60/`); the dry run asserts they are separate, because a shared
+  folder would silently overwrite the first draw's pages.
+  **The new 60 contain no seeded calibration items** — all 6 known
+  `false_pass_removed` items live outside this draw, so unlike the first 40
+  it carries no built-in check on the coder.
 
 ### 2026-08-11: `wrong_on_both` COMPLETE — and Qwen's `genuinely_wrong` is now 99% coded
 
