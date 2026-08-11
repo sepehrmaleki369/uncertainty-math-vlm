@@ -22,9 +22,14 @@ the push 403'd as always.
 | −verbalized confidence | **0.528** [0.463, 0.593] |
 | **paired difference** | **+0.279 [+0.194, +0.359], resolved** |
 
-- **Headline sentence:** *the model states a median 95% confidence and is
-  right 42% of the time; entropy beats its self-report by AUROC +0.279
-  [+0.194, +0.359].*
+- **Headline sentence:** *the model states a median 95% confidence while its
+  transcription self-report carries no signal at all (AUROC 0.528); entropy
+  beats it by +0.279 [+0.194, +0.359].*
+  **CORRECTION:** an earlier version of this entry said "right 42% of the
+  time". **That 42.0% is notebook 19's accuracy, from the gated boxed run —
+  a different generation.** Notebook 20 never printed its own accuracy.
+  Fill it in from the CSV before quoting any accuracy next to this result;
+  the unconstrained reference is 47.0%.
 - **Not a degeneracy artifact** — 37 distinct values, range 68–100. The model
   varies its self-report; it just varies uninformatively. The pre-written
   "near-constant self-report" caveat does NOT apply here.
