@@ -29,3 +29,4 @@ item,final_label,confidence,note
 243,extraction_issue,high,"GT collapsed to 'sympy:r'; s0 and s3 emitted exactly that and matched, but majority (3/5) was the full sentence. User reading confirmed."
 245,extraction_issue,high,"Not merely equivalent -- identical: the model's '50y^2 - 88x^2 = 275' is literally the second half of the GT line, which states both forms. GT kept the whole line. s0 misread 50 as 59."
 264,extraction_issue,high,"GT kept only 'B = 15' from 'A = 45 and B = 15'; s3 emitted eq(b,15) and matched, majority gave both. User reading confirmed -- both sides lost A=45 differently."
+276,extraction_issue,high,"HUMAN FINAL: model correctly read the final conclusion '243 is not a perfect cube', matching the image; the ground-truth parser kept only the bare number 243, so the scorer compared the wrong thing. Near-duplicate of item 54."

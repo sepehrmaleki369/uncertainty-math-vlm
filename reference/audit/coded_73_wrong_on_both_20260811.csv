@@ -1,0 +1,74 @@
+item,final_label,confidence,note
+8,extraction_issue,medium,"Truth is Option B, model gives value 403.33 -- value-vs-option-key mismatch, same pattern as 25/93/173 in only_qwen."
+14,extraction_issue,high,"Image says Option D, final value 4.5; model label became a stray glyph. Known _OPTION_RE case (LaTeX-wrapped option letter)."
+35,extraction_issue,high,"Model gives centre (-4,-5); truth label kept only radius 7. Page answer states both, parser compared partial pieces."
+39,extraction_issue,medium,Both labels degenerate; image final answers are expressions the parser failed on.
+40,extraction_issue,high,"Model parse failure; image final answer is y = 7. Generation/parser failure, not a misread."
+45,needs_visual,medium,"Image rotated/blurry, could not be read confidently."
+55,notation_misread,high,"HUMAN FINAL: page has 1 + tan x tan y, model wrote 1 - . VERIFIED across both models: pert_a is 84 chars, plus-form once, minus-form ZERO times; the minus exists only in orig_q's derivation. Qwen 4/5 samples and Pixtral 4/5 samples wrote the minus, but Pixtral s0 wrote the PLUS faithfully -- proving the page's plus is legible. So copied_wrong_line (coded_31) is factually wrong: there is no minus line on the page to copy. Label kept as notation_misread; mechanism is closer to a prior overriding the image."
+56,extraction_issue,high,"Model 95F, truth 95F -- same value, scorer formatting mismatch."
+59,notation_misread,medium,Vector/conjugate notation misread; not a clean extraction match.
+60,notation_misread,high,"Model says 776, truth 7776 -- a dropped digit, a real misread."
+67,extraction_issue,high,"Model captured d = -2, truth key is a = 3/2. Verified both sit on the SAME page line ('Here, a = 3/2, quad d = ... = -2'), so the extractor split one line rather than the model picking a different one -- incomplete answer, not copied_wrong_line. Supersedes coded_31."
+71,extraction_issue,high,Model grabbed pi ~ 3.14159 from an aside; truth final derivative is 1. Parser picked the wrong span.
+75,extraction_issue,high,"Model extracted p, truth r; page conclusion is about collinearity and both labels are bare symbols from prose."
+81,extraction_issue,high,Image final answer is 40pi cm^2/s and the model says 40pi cm^2/s -- model correct. The GROUND-TRUTH parser selected the intermediate r = 10 cm instead.
+82,extraction_issue,high,"Model 0.488, truth 0.488000... -- same value, float formatting."
+83,needs_visual,medium,"Bad handwriting, could not be read."
+94,notation_misread,high,Model 5^n + 6^n vs truth 5*n + 6**n -- exponent vs product misread.
+95,needs_visual,medium,"Bad handwriting, could not be read."
+103,notation_misread,medium,Model output does not match the set/equation answer.
+108,notation_misread,medium,Model equation coefficients do not match truth. (Also the item Math-Verify wrongly accepts -- y^2/(9/4) vs y^2/(11/4).)
+126,needs_visual,medium,"Model failed to parse/give an answer. No parse_failure label exists, so recorded as needs_visual. Supersedes coded_31's extraction_issue. Note: s3 did emit eq(y/4-7,3), matching truth, while s0 and s2 parse-failed."
+136,extraction_issue,high,"Model 90000, truth 90000 -- same value, formatting."
+142,extraction_issue,medium,Model parse failed; page final expression is present. Recorded as extraction_issue since no parse_failure label exists.
+144,extraction_issue,high,"Model says the mode is 2, truth is 2 -- scorer compared surrounding prose."
+145,extraction_issue,high,Both mean 10pi; units/format differ.
+148,extraction_issue,high,"Model says '301 is not a term', which is correct; truth parser kept only n."
+149,notation_misread,high,Model says 1 degree where image/truth says 0 for the x-axis direction cosine -- real value mismatch.
+151,extraction_issue,medium,"HUMAN FINAL: equivalent equation forms leading to q = 7. CONTRADICTS coded_31's copied_wrong_line. String evidence favours the older label -- the majority sample eq(15/2,(q+8)/2) is verbatim an earlier line of pert_a, while s0 and s3 gave q=7 correctly. Flagged for re-check."
+152,notation_misread,high,"User-corrected from extraction_issue: image final is 10/sqrt(59), model gave sqrt(59) -- missed the factor 10."
+156,extraction_issue,medium,Model and truth compare different parts of the proof; parser grabbed a distance term rather than the conclusion.
+160,notation_misread,high,Model wrote x = 5 where image says z = 5.
+161,notation_misread,high,"Model wrote (x,y,z) where the page repeats x as (x,y,x). The model normalised FERMAT's own internal inconsistency."
+162,extraction_issue,high,Both represent x e^x - e^x + C; formatting only.
+166,extraction_issue,high,Model parser produced a*b; truth is the final matrix. Parser failed to capture matrix output.
+167,extraction_issue,medium,Model 'i' vs a truth fragment around a complex number; both labels degenerate.
+170,extraction_issue,high,Model says (iv) matches (b); truth parser kept only b. Same meaning.
+175,notation_misread,high,Matrix entries differ / model matrix malformed.
+177,extraction_issue,high,"Model says 5^2, truth 25 -- equivalent."
+184,extraction_issue,high,Model matched the final amount 13000; the ground-truth parser selected the interest 1500 instead.
+185,notation_misread,medium,Expanded algebraic terms differ -- 24c^2 on the page read as 25c^2.
+187,extraction_issue,high,Same set of names; brace/comma formatting only.
+188,extraction_issue,medium,Truth and image both appear to give beta_2 = 5/2 i + 1/2 j - 3k; the model label is parser-mangled/truncated. Not confidently a notation error.
+199,extraction_issue,high,"Model 7, truth 7 -- same answer, label mismatch."
+203,extraction_issue,high,Model gives roots 8 and 5; truth parser kept r = 8 only. Partial extraction.
+208,extraction_issue,high,3x^2 = -4y and x^2 = -4y/3 are equivalent forms; SymPy does not normalise an equation scaled by a constant.
+211,extraction_issue,high,"Same vector; i,j formatting differs."
+212,notation_misread,medium,Model expression differs from the truth identity -- likely exponent/subscript/term error.
+217,extraction_issue,high,"Model b = 33/4, truth 33/4 -- same value, variable included in the span."
+218,extraction_issue,high,"Model says Option A, truth parser mangled the key to bare 'a' via the _OPTION_RE bug. Same answer."
+220,extraction_issue,high,"Both describe {(x,y,z): x,y,z in R}; verified s1 differs from truth only by \mathbb{r} vs r. Supersedes coded_31's notation_misread."
+222,notation_misread,high,"Model says 18; image/truth final lists multiple orders {1x8, 8x1, 2x4, 4x2}. Incomplete answer."
+224,extraction_issue,medium,Model label 'beta'; truth is prose about primes. Parser grabbed the wrong fragment/symbol.
+230,notation_misread,high,Model says x^2 = 4z^2 but image/truth final is x^2 = 8z. Not equivalent -- a real misread.
+236,extraction_issue,medium,Model parse failed; truth parser grabbed formula/prose rather than a clean final answer. User noted needs_visual would also be acceptable.
+237,extraction_issue,medium,Model says x = 3; truth parser kept only b. Parser compared wrong fragments of a matching problem.
+238,extraction_issue,medium,"Model 57, truth -8<0; page conclusion is 'no real roots'. Parser/model grabbed intermediate values. User note: if the model's actual final answer were only 57 this would be notation_misread, but the page reads as a parser-side intermediate."
+241,extraction_issue,medium,"Model n = -4/3, truth r = -4/3 -- same value, variable-symbol mismatch from the parser."
+246,extraction_issue,high,Model parser kept only x; truth is the equation 3x + 5 = 44. Parser grabbed the wrong fragment.
+249,extraction_issue,medium,Same derivative idea on both sides; parser compared different expressions.
+251,notation_misread,high,"Model says {1, -2}, truth/image says {y, -2} -- symbol mismatch."
+253,extraction_issue,high,"Same expression, different LaTeX formatting around sqrt(3)."
+255,notation_misread,high,Model gives the range 86 < f < 95; image/truth final is 91F < F < 94F. Real number mismatch.
+262,notation_misread,high,"Model says 442, image/truth says 91. Real value mismatch."
+263,extraction_issue,medium,"Both compare different variable equalities; page final includes x = x2, y = 2, z = k1. Parser grabbed partial pieces."
+265,extraction_issue,high,"Model y = 13, truth 13 -- same answer with the variable included in the span."
+269,extraction_issue,high,Model x = 49/29; truth parser kept only x. The model gives the actual value.
+273,extraction_issue,high,"QWEN-SCOPED, and it does NOT retract the Pixtral auto-correction observation. Verified: page says 'outcomes favourable to E is 3' then P(E) = 2/4 (red 2 = injected error); GT label sympy:2/4. On Qwen the majority label is the bare '}' with s4 giving a faithful 2/4 and s1 giving 3/4 -- so extraction_issue is right for Qwen. On PIXTRAL all five samples give 3/4 unanimously, which is the auto-correction anecdote CLAUDE.md records; that is a different model and is untouched by this reading."
+274,extraction_issue,high,Model gives the full probability formula/answer; truth parser kept only f. Parser grabbed different parts.
+277,extraction_issue,high,"Model 3sqrt(3), truth 3sqrt(3) units -- same value, unit formatting."
+296,extraction_issue,medium,Same integral idea; parser compared variable/form differences.
+297,extraction_issue,medium,Model formula is messy but page/truth final is 3/20; parser likely grabbed too much of the expression.
+298,extraction_issue,medium,"Model says '2 and ...'; truth says '2 and y = 3'. Partly matching, parser compared incomplete text."
+299,extraction_issue,high,"Model label Z, truth label R; image conclusion is that R is an equivalence relation on Z. Parser compared isolated symbols instead of the conclusion."

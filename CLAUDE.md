@@ -20,10 +20,18 @@ entropy, correct/wrong."*
 - **The `only_qwen` stratum is now human-read and coded — 30 of its 31
   items, by the user, from the images.** That is the first genuine human
   pass in this project and it satisfies the *"30–50 real examples"* ask on
-  its own terms. See the dated entry below. **The other three strata
-  (`wrong_on_both` 73, `only_pixtral` 57, and the balance) are still
-  unread**, and they are the ones that would support a population rate,
-  which this stratum by construction cannot.
+  its own terms. See the dated entry below.
+- **`wrong_on_both` is COMPLETE — all 73 read** (2026-08-11, same human
+  pass), coded in `reference/audit/coded_73_wrong_on_both_20260811.csv`.
+  Together that is **all 104 Qwen `genuinely_wrong` items (100%)**,
+  so this is effectively a census of that bucket rather than a sample. The
+  binding caveats are now single-coder reliability and Qwen-only scope, not
+  sampling — see the dated entry.
+- **Qwen's `genuinely_wrong` bucket is CLOSED at 104/104. Still unread: all
+  57 `only_pixtral` items.**
+  `only_pixtral` is the untouched stratum and is the natural next pass, since
+  every conclusion so far is Qwen-side and Pixtral's 130 `genuinely_wrong`
+  items have never been read.
 
 - **Built:** notebook 17 §6 writes **17 contact-sheet PNGs** to
   `Drive/uncertainty-math-vlm/figures/genuinely_wrong/` — `unanimous_wrong_*`
@@ -97,11 +105,120 @@ one) is still Drive-only, and nothing may be quoted from it anyway.
 
 ## Current findings
 
+### 2026-08-11: `wrong_on_both` COMPLETE — and Qwen's `genuinely_wrong` is now 99% coded
+
+The user read the images for **all 73 `wrong_on_both` items** (Qwen and
+Pixtral both `genuinely_wrong` on the same page). Coded in
+`reference/audit/coded_73_wrong_on_both_20260811.csv`, 47 high / 26 medium
+confidence. `pilot.failures.LABELS` has no `parse_failure`, so item 126 →
+`needs_visual` and items 142/236 → `extraction_issue`.
+
+| final label | n | share of the 73 |
+|---|---|---|
+| `extraction_issue` | 51 | 69.9% |
+| `notation_misread` | 18 | 24.7% |
+| `needs_visual` | 4 | 5.5% |
+| `copied_wrong_line` | 0 | 0% |
+| **`hallucination`** | **0** | **0%** |
+
+**Pooled with the `only_qwen` pass: ALL 104 of Qwen's `genuinely_wrong`
+items are human-coded (100%). This is a complete census of the bucket, not
+a sample.**
+
+| pooled, 104 items | n | share |
+|---|---|---|
+| `extraction_issue` | 77 | **74.0%** |
+| `notation_misread` | 22 | 21.2% |
+| `needs_visual` | 4 | 3.8% |
+| `copied_wrong_line` | 1 | 1.0% |
+| `hallucination` | 0 | 0% |
+
+- **THE CAVEAT HAS CHANGED SHAPE, AND THIS MATTERS.** At **100% coverage
+  sampling is not a limitation at all** — this is a complete census of Qwen's
+  `genuinely_wrong` bucket, not a targeted sample, so the earlier "targeted
+  audit, not a population rate" wording no longer describes the binding
+  weakness. **The real limitations now are: (1) a SINGLE CODER with
+  no second rater and no inter-rater reliability measured; (2) it is
+  Qwen-only — Pixtral's 130 `genuinely_wrong` items are entirely uncoded;
+  (3) `genuinely_wrong` itself comes from a LOCAL rescore, which relabels
+  43/300 items vs the stored columns.** State those three, not a sampling
+  caveat.
+- **`extraction_issue` does NOT mean "the model was right".** It means the
+  failure is attributable to the scoring pipeline. Several items (39, 40,
+  126, 142, 166, 188, 236) are parse failures or mangled labels where the
+  model produced nothing usable. **Never convert 74.0% into recovered
+  accuracy 1:1.**
+- **`extraction_issue` does NOT mean "the model was right".** It means the
+  failure is attributable to the scoring pipeline. Six of the 33 (39, 40,
+  126, 142, 166, 188) are parse failures or mangled labels where the model
+  produced nothing usable. **Never convert this share 1:1 into recovered
+  accuracy.**
+- **The mechanism here is DIFFERENT from `only_qwen`, and worse.** In
+  `only_qwen` the key was reachable — Pixtral hit it on 21 of 30. In
+  `wrong_on_both` **the ground-truth label itself is often broken, so no
+  model can pass.** Verified on five: item 81 key is `eq(r, 10*cm)` (the
+  radius) where the answer is `40π cm²/s`, which Qwen gave correctly; 148 key
+  is bare `sympy:n`; 184 key is the interest step `15/100 × 10000 = ₹1500`
+  rather than the final ₹13000, which Pixtral gave; 203 key is `eq(r,8)`, one
+  root of two; 35 key is bare `sympy:7`, the radius only.
+- **Item 35 is the cleanest demonstration in the whole audit:** both models
+  independently emitted the *identical* answer `(-4, -5)` and both are scored
+  wrong, because the key kept only `7`. Item 203 shows bug 3 firing on both
+  models at once (`sympy:h*(e*(n*(c*e)))` — "Hence").
+  **Consequence: a broken key biases every model equally, so it corrupts
+  cross-model comparisons, not just Qwen's accuracy.** That is a stronger
+  reason to care than the `only_qwen` span-selection story.
+- **Real misreads roughly double vs `only_qwen`** (13.3% → 27.5%), which is
+  what two architecturally independent models failing the same page should
+  look like. That direction is the sanity check that the coding is tracking
+  something real.
+- **`hallucination` is 0 for the fourth independent time.**
+- **`copied_wrong_line` has nearly vanished — 1 item across all 81 coded.**
+  Items 55, 67 and 151 all moved out of it under the human read.
+- **OPEN, and it bears on the auto-correction status: item 55.** The user's
+  image read makes it `notation_misread` (page has `1 + tan x tan y`, model
+  wrote `1 -`), contradicting the `copied_wrong_line` correction recorded
+  below. **Verified against the data: `pert_a` is 84 chars and contains the
+  plus form once and the minus form zero times; the minus form appears only
+  in `orig_q`'s derivation.** So the claim "the page carries both lines" is
+  false of `pert_a`. Whether the rendered page shows `orig_q`'s derivation
+  decides it. **If it does not, item 55 returns as an auto-correction
+  candidate and the "rests on 273 alone" sentence below needs revisiting.**
+- **Item 151 is flagged the other way:** coded `extraction_issue` by the
+  human read, but the majority sample `eq(15/2,(q+8)/2)` is verbatim an
+  earlier line of `pert_a` while s0/s3 gave `q=7` correctly — the string
+  evidence favours the older `copied_wrong_line`.
+- **AUTO-CORRECTION: the "unsupported" verdict below rests on a FACTUAL
+  ERROR about item 55, and both anecdotes survive verification.** Checked on
+  both runs this session:
+  - **Item 55.** `pert_a` is **84 characters**, containing `1 + \tan x \tan y`
+    **once** and `1 - \tan x \tan y` **zero times**. The minus form exists
+    only in `orig_q`'s derivation. So the recorded correction — *"the page's
+    derivation ends `1 -` while its Answer line carries `1 +`"* — **is not
+    true of `pert_a`, and `copied_wrong_line` has no line to point at.**
+    Qwen wrote the minus in 4/5 samples, Pixtral in 4/5, **and Pixtral's s0
+    wrote the PLUS faithfully — proving the page's plus is legible.**
+  - **Item 273 is NOT retracted by the human pass.** The user coded it
+    `extraction_issue` with the note "not auto-correction", but that reading
+    is **Qwen-scoped** and correct for Qwen (majority label is the bare `}`;
+    s4 gives a faithful 2/4, s1 gives 3/4). **The auto-correction anecdote
+    was always about PIXTRAL, where all five samples give `3/4` unanimously
+    against the page's `2/4`** — and the page's own prose says "the number of
+    outcomes favourable to E is 3", so the model followed the page's
+    reasoning over its stated answer.
+  - **Honest status: back to two well-evidenced anecdotes on two model
+    families with a NULL aggregate** (+6.7% [−4.0%, +17.3%]) — i.e. *real
+    anecdotes, not a demonstrated mechanism*, which is the pre-correction
+    position. **Do NOT write "unsupported".** Do not write "demonstrated"
+    either.
+- **The whole stratum is read — nothing outstanding here.** Remaining audit
+  work is the 57 `only_pixtral` items; Qwen is complete.
+
 ### 2026-08-11: the `only_qwen` stratum, HUMAN-READ — and the rate is stratum-bound
 
 The user read the contact-sheet images for **30 of the 31 `only_qwen` items**
 (all but 276) and ruled on every label. Coded in
-`reference/audit/coded_30_qwen_only_qwen_20260811.csv` (item, final_label,
+`reference/audit/coded_31_qwen_only_qwen_20260811.csv` (item, final_label,
 confidence, note), 23 high confidence / 7 medium. **This is a human reading of
 the images, not an OCR reading of the sheets** — unlike the 31-item audit
 above, which is my reading of the Drive OCR.
@@ -279,15 +396,27 @@ reading of the images — 22/31 high confidence, 7 medium, 2 low.**
   guessed wrong. That is the designed behaviour and the reason
   `proposed_label` and `final_label` are separate columns.
 
-**CORRECTION, and it retracts a claim made twice: item 55 is NOT
-auto-correction.** The page's *derivation* ends `1 - tan x tan y` (correct)
-while its *Answer line* carries FERMAT's injected `1 + tan x tan y`. The
-model transcribed the derivation. That is **`copied_wrong_line`** — it copied
-a real line of the page, the wrong one — **not a prior overriding the image**.
-The auto-correction mechanism therefore rests on item 273 alone, which is
-much weaker than "two independent instances on two model families" as
-previously written. Combined with the two aggregate nulls, **treat
-auto-correction as unsupported, not merely unresolved.**
+**THIS CORRECTION IS ITSELF WITHDRAWN (2026-08-11) — it was factually
+wrong.** It read: *"item 55 is NOT auto-correction — the page's derivation
+ends `1 - tan x tan y` while its Answer line carries the injected
+`1 + tan x tan y`, so the model copied a real line of the page, the wrong
+one"*, and concluded that auto-correction rests on item 273 alone and should
+be treated as **unsupported**.
+
+**Verified against the run data: `pert_a` for item 55 is 84 characters and
+contains `1 + \tan x \tan y` ONCE and `1 - \tan x \tan y` ZERO times.** The
+minus form exists only in `orig_q`'s derivation. There is therefore no minus
+line on the page for the model to have copied, and `copied_wrong_line` is not
+available as an explanation. **Pixtral's s0 transcribed the plus faithfully,
+so the page's plus is legible**; Qwen wrote the minus in 4/5 samples and
+Pixtral in 4/5. **Item 273 also stands** — the human pass coded it
+`extraction_issue`, but that reading is Qwen-scoped, and the anecdote was
+always about Pixtral, where 5/5 samples give `3/4` against the page's `2/4`.
+
+**Honest status: two well-evidenced anecdotes on two model families, with the
+aggregate still null (+6.7% [−4.0%, +17.3%]) — real anecdotes, not a
+demonstrated mechanism.** Do not write "unsupported"; do not write
+"demonstrated". See the 2026-08-11 `wrong_on_both` entry for the full check.
 
 **Item 161 is the nearest thing to a real auto-correction:** the page's
 condition repeats `x` (`{(x,y,x)}`) and the model wrote `z`, normalising
