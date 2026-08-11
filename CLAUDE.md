@@ -1483,6 +1483,23 @@ Two kinds, for two failure modes. **Read `reference/README.md` first.**
 
 ## Repo-specific conventions
 
+- **Reported numbers come from the STORED scored columns of the original run;
+  local rescoring is for sensitivity and audit ONLY.** Parser availability
+  changes labels — the 2026-08-02 Qwen run was scored in a Colab session
+  without SymPy's LaTeX parser, and recomputing locally relabels **43/300
+  items** (118 vs 141 correct). So anything quoted next to a locked figure
+  must be derived from the same CSV columns that produced it, or the paper
+  contradicts itself. This is why `plotting.distinct_from_entropy` exists:
+  it inverts the stored entropy rather than re-deriving labels, and using a
+  recompute instead moves the headline cell of the distinct-answers table
+  from 92% to 80%.
+  **The transparent phrasing if asked:** *we use the stored scored columns
+  from the original run for all locked reported numbers; local rescoring is
+  used only for sensitivity and audit analyses, because parser availability
+  can change labels.*
+  **Pixtral is unaffected** (its recompute matches exactly), so a
+  one-model check will not reveal the problem — verify on the Qwen run.
+
 - **Don't touch `report/` unless explicitly asked.** As of 2026-08-02 the user
   updates the report on request only. Run the analysis, write and test the
   code, report findings in chat — then say a finding would change the report
