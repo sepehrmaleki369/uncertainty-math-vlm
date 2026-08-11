@@ -1,0 +1,98 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\@writefile{toc}{\contentsline {section}{Retraction}{2}{section*.1}\protected@file@percent }
+\newlabel{sec:retraction}{{}{2}{Retraction (2026-08-09)}{section*.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Goal}{3}{section.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2}Setup}{4}{section.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Phase 1: Perception Entropy -- Two Failures, One Fix}{5}{section.3}\protected@file@percent }
+\newlabel{sec:perception}{{3}{5}{Phase 1: Perception Entropy -- Two Failures, One Fix}{section.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Attempt 1: exact-string clustering \textcolor {darkred}{\textbf  {(failed)}}}{5}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Attempt 2: naive semantic clustering \textcolor {darkred}{\textbf  {(failed)}}}{5}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Attempt 3: final-answer extraction \textcolor {darkgreen}{\textbf  {(worked)}}}{5}{subsection.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Sensitivity: is 0.788 an artifact?}{6}{subsection.3.4}\protected@file@percent }
+\newlabel{sec:perception-sensitivity}{{3.4}{6}{Sensitivity: is 0.788 an artifact?}{subsection.3.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Phase 1: Reasoning Entropy -- Clean Pipeline, Unresolved Signal}{6}{section.4}\protected@file@percent }
+\newlabel{sec:reasoning-pilot}{{4}{6}{Phase 1: Reasoning Entropy -- Clean Pipeline, Unresolved Signal}{section.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}$K=5$ baseline}{7}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}$K=15$ follow-up: is the weak signal a real ceiling, or under-sampling?}{7}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Reasoning-text clustering: a promising readout, an unproven improvement \textcolor {darkamber}{\textbf  {(unresolved)}}}{8}{subsection.4.3}\protected@file@percent }
+\newlabel{sec:reasoning-text-k5}{{4.3}{8}{Reasoning-text clustering: a promising readout, an unproven improvement \unresolved {(unresolved)}}{subsection.4.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}$K=15$ GPU confirmation: the $K=5$ result does not generalize \textcolor {darkred}{\textbf  {(failed)}}}{9}{subsection.4.4}\protected@file@percent }
+\newlabel{sec:k15-cascade-failure}{{4.4}{9}{$K=15$ GPU confirmation: the $K=5$ result does not generalize \failed {(failed)}}{subsection.4.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Manual inspection: why the reasoning arm underperforms}{10}{subsection.4.5}\protected@file@percent }
+\newlabel{sec:reasoning-diagnosis}{{4.5}{10}{Manual inspection: why the reasoning arm underperforms}{subsection.4.5}{}}
+\@writefile{toc}{\contentsline {paragraph}{The grading task is close to degenerate.}{10}{section*.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{The dominant failure is confident wrongness, not clustering.}{10}{section*.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Pooling hides a signal that works.}{10}{section*.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{This is a hypothesis, not a result.}{11}{section*.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Consequence for the study design.}{11}{section*.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Phase 2: The $n=300$ Balanced Run}{11}{section.5}\protected@file@percent }
+\newlabel{sec:scaleup}{{5}{11}{Phase 2: The $n=300$ Balanced Run}{section.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Design}{11}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Perception: replicated and tightened \textcolor {darkgreen}{\textbf  {(worked)}}}{11}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Reasoning: the model cannot do the task \textcolor {darkred}{\textbf  {(failed)}}}{12}{subsection.5.3}\protected@file@percent }
+\newlabel{sec:reasoning-dead}{{5.3}{12}{Reasoning: the model cannot do the task \failed {(failed)}}{subsection.5.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}The pre-registered stratified hypothesis was untestable}{12}{subsection.5.4}\protected@file@percent }
+\newlabel{sec:phase1-stratified-untestable}{{5.4}{12}{The pre-registered stratified hypothesis was untestable}{subsection.5.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Replications and integrity}{13}{subsection.5.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.6}The deferral rule: risk-coverage, AURC, and a conformal guarantee}{13}{subsection.5.6}\protected@file@percent }
+\newlabel{sec:deferral}{{5.6}{13}{The deferral rule: risk-coverage, AURC, and a conformal guarantee}{subsection.5.6}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Risk-coverage curve for perception entropy, $n=300$. A step plot, not a smooth curve, because $K=5$ entropy has only 7 achievable operating points -- the curve is genuinely flat between them and jumps at each one. Coverage 1.0 (answer everything) recovers the overall error rate, 0.607.}}{14}{figure.caption.7}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{fig:risk-coverage}{{1}{14}{Risk-coverage curve for perception entropy, $n=300$. A step plot, not a smooth curve, because $K=5$ entropy has only 7 achievable operating points -- the curve is genuinely flat between them and jumps at each one. Coverage 1.0 (answer everything) recovers the overall error rate, 0.607}{figure.caption.7}{}}
+\@writefile{toc}{\contentsline {paragraph}{Does the guarantee hold on data it has not seen?}{14}{section*.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6}Phase 3: Closing the Baseline Gap and Testing Prompt Fixes}{15}{section.6}\protected@file@percent }
+\newlabel{sec:phase3}{{6}{15}{Phase 3: Closing the Baseline Gap and Testing Prompt Fixes}{section.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Entropy vs. token confidence: entropy wins decisively \textcolor {darkgreen}{\textbf  {(resolved)}}}{15}{subsection.6.1}\protected@file@percent }
+\newlabel{sec:token-confidence}{{6.1}{15}{Entropy vs. token confidence: entropy wins decisively \worked {(resolved)}}{subsection.6.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}$K=10$ modestly sharpens perception, as predicted \textcolor {darkgreen}{\textbf  {(resolved)}}}{16}{subsection.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}No grading prompt variant fixes the yes-bias \textcolor {darkred}{\textbf  {(screened out)}}}{16}{subsection.6.3}\protected@file@percent }
+\newlabel{sec:prompt-variants}{{6.3}{16}{No grading prompt variant fixes the yes-bias \failed {(screened out)}}{subsection.6.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7}Phase 4: A Larger Model, and the Reasoning Arm's Stratified Resolution}{16}{section.7}\protected@file@percent }
+\newlabel{sec:phase4}{{7}{16}{Phase 4: A Larger Model, and the Reasoning Arm's Stratified Resolution}{section.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}The capability gate: marginal, not resolved either way}{17}{subsection.7.1}\protected@file@percent }
+\newlabel{sec:phase4-gate}{{7.1}{17}{The capability gate: marginal, not resolved either way}{subsection.7.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.2}The stratified pattern replicates, initially still underpowered}{17}{subsection.7.2}\protected@file@percent }
+\newlabel{sec:phase4-stratified}{{7.2}{17}{The stratified pattern replicates, initially still underpowered}{subsection.7.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.3}Manual inspection: four mechanisms, no label noise}{17}{subsection.7.3}\protected@file@percent }
+\newlabel{sec:phase4-inspection}{{7.3}{17}{Manual inspection: four mechanisms, no label noise}{subsection.7.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.4}Closing the power gap: \texttt  {has\_error}=1 confirmed}{18}{subsection.7.4}\protected@file@percent }
+\newlabel{sec:phase4-confirmed}{{7.4}{18}{Closing the power gap: \texttt {has\_error}=1 confirmed}{subsection.7.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.5}3B confirms the same result: the effect is model-size-independent}{19}{subsection.7.5}\protected@file@percent }
+\newlabel{sec:phase4-3b}{{7.5}{19}{3B confirms the same result: the effect is model-size-independent}{subsection.7.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.6}Matching 7B to the same 650 items: still confirmed, a somewhat wider gap}{20}{subsection.7.6}\protected@file@percent }
+\newlabel{sec:phase4-matched}{{7.6}{20}{Matching 7B to the same 650 items: still confirmed, a somewhat wider gap}{subsection.7.6}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {8}Phase 5: A Second Model Family (LLaVA-NeXT)}{20}{section.8}\protected@file@percent }
+\newlabel{sec:phase5}{{8}{20}{Phase 5: A Second Model Family (LLaVA-NeXT)}{section.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.1}Perception: gated by a real capability gap, not usable}{20}{subsection.8.1}\protected@file@percent }
+\newlabel{sec:phase5-perception-gate}{{8.1}{20}{Perception: gated by a real capability gap, not usable}{subsection.8.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.2}Reasoning: confirmed, the first cross-model-family replication in this project}{21}{subsection.8.2}\protected@file@percent }
+\newlabel{sec:phase5-reasoning}{{8.2}{21}{Reasoning: confirmed, the first cross-model-family replication in this project}{subsection.8.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {9}Phase 6: A Third Model Family (InternVL3), and a Sensitivity-Cut Failure}{21}{section.9}\protected@file@percent }
+\newlabel{sec:phase6}{{9}{21}{Phase 6: A Third Model Family (InternVL3), and a Sensitivity-Cut Failure}{section.9}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.1}Perception: clears the accuracy bar, fails the sensitivity cut}{22}{subsection.9.1}\protected@file@percent }
+\newlabel{sec:phase6-perception}{{9.1}{22}{Perception: clears the accuracy bar, fails the sensitivity cut}{subsection.9.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.2}Reasoning: powered, resolved above chance, still short of confirmation}{23}{subsection.9.2}\protected@file@percent }
+\newlabel{sec:phase6-reasoning}{{9.2}{23}{Reasoning: powered, resolved above chance, still short of confirmation}{subsection.9.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.3}A pre-registered screen of three fixes: none resolves}{23}{subsection.9.3}\protected@file@percent }
+\newlabel{sec:phase6-screen}{{9.3}{23}{A pre-registered screen of three fixes: none resolves}{subsection.9.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {10}Phase 7: A Second Dataset (ScratchMath) --- Gated}{24}{section.10}\protected@file@percent }
+\newlabel{sec:phase7}{{10}{24}{Phase 7: A Second Dataset (ScratchMath) --- Gated}{section.10}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.1}What the candidate datasets could and could not test}{24}{subsection.10.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.2}Result: gated, and not merely underpowered}{24}{subsection.10.2}\protected@file@percent }
+\newlabel{sec:phase7-gate}{{10.2}{24}{Result: gated, and not merely underpowered}{subsection.10.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {11}Integrity Checks}{25}{section.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {12}Summary}{25}{section.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {12.1}Final conclusions (Phase 2--5)}{25}{subsection.12.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {12.2}Phase 1 exploratory results (superseded)}{27}{subsection.12.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {13}Limitations}{27}{section.13}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Final result for both arms, $n=100$. Left: perception entropy by transcription correctness (AUROC 0.788, 95\% CI $[0.697, 0.869]$). Right: reasoning entropy by grading correctness at $K=5$ (AUROC 0.618, 95\% CI $[0.489, 0.741]$ -- includes chance).}}{28}{figure.caption.9}\protected@file@percent }
+\newlabel{fig:both-arms}{{2}{28}{Final result for both arms, $n=100$. Left: perception entropy by transcription correctness (AUROC 0.788, 95\% CI $[0.697, 0.869]$). Right: reasoning entropy by grading correctness at $K=5$ (AUROC 0.618, 95\% CI $[0.489, 0.741]$ -- includes chance)}{figure.caption.9}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Reasoning entropy before ($K=5$) and after ($K=15$) resampling, same 100 items. The exact median tie at $K=5$ breaks at $K=15$ -- a structural consequence of 13 reachable entropy values instead of 5 -- but the paired AUROC difference is $-0.047$, 95\% CI $[-0.178, +0.090]$: no measurable gain in discrimination.}}{28}{figure.caption.10}\protected@file@percent }
+\newlabel{fig:k-comparison}{{3}{28}{Reasoning entropy before ($K=5$) and after ($K=15$) resampling, same 100 items. The exact median tie at $K=5$ breaks at $K=15$ -- a structural consequence of 13 reachable entropy values instead of 5 -- but the paired AUROC difference is $-0.047$, 95\% CI $[-0.178, +0.090]$: no measurable gain in discrimination}{figure.caption.10}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Reasoning entropy at $K=5$: clustering the model's reasoning text (left, AUROC 0.702) vs. the digit-only baseline (right, AUROC 0.618), same 100 items. The reasoning-text approach separates the incorrect group's median above the correct group's; the digit-only approach ties them exactly. The visible gap is not statistically resolved, however: the paired difference is $+0.083$, 95\% CI $[-0.064, +0.233]$ (\S  \ref {sec:reasoning-text-k5}).}}{29}{figure.caption.11}\protected@file@percent }
+\newlabel{fig:reasoning-text}{{4}{29}{Reasoning entropy at $K=5$: clustering the model's reasoning text (left, AUROC 0.702) vs. the digit-only baseline (right, AUROC 0.618), same 100 items. The reasoning-text approach separates the incorrect group's median above the correct group's; the digit-only approach ties them exactly. The visible gap is not statistically resolved, however: the paired difference is $+0.083$, 95\% CI $[-0.064, +0.233]$ (\S \ref {sec:reasoning-text-k5})}{figure.caption.11}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {14}Recommended Next Steps}{31}{section.14}\protected@file@percent }
+\gdef \@abspage@last{32}

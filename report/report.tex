@@ -36,9 +36,11 @@ fourth phase testing Qwen2.5-VL-7B on the reasoning arm specifically, a
 fifth phase testing a second model family (LLaVA-NeXT), and a sixth phase
 testing a third model family (InternVL3). Perception is unambiguous on
 Qwen; reasoning is more specific than either a clean positive or a clean
-negative, and resolving that took Phase 4. Phase 5 confirms the reasoning
-result generalizes across model families and finds a real limit on how far
-the perception result can currently be tested. Phase 6 adds a cautionary
+negative. \textbf{The Phase 4--5 stratified reasoning result was subsequently
+withdrawn as an evaluation artifact --- see the Retraction below, which
+supersedes every reasoning claim in this abstract and in
+\S\ref{sec:phase4}--\S\ref{sec:phase5}.} Phase 5 also finds a real limit on
+how far the perception result can currently be tested. Phase 6 adds a cautionary
 methodological finding: a third model's perception AUROC can look like the
 best result in the study and not survive the same robustness check every
 other perception number here is held to.
@@ -77,33 +79,26 @@ from 94\% ``error'' to 38\% while leaving accuracy essentially unchanged,
 evidence that the ceiling is a capability limit rather than a promptable
 default.
 
-\textbf{A larger model refines, rather than overturns, the reasoning result --
-and the refinement turns out to be model-size-independent.}
-Qwen2.5-VL-7B's grading accuracy (59.0\% vs.\ a 50.0\% baseline) clears a
-pre-registered capability gate only marginally, and its pooled AUROC (0.520)
-is statistically identical to 3B's. But stratifying by whether the graded
-answer actually contains an error -- the design Phase 2 could not test,
-because the model's bias left only 8 misgraded error items -- and then
-drawing 200 more error items specifically to power that stratum, produces a
-\textbf{confirmed AUROC of 0.834} $[0.768, 0.891]$ on 38 misgraded items. The
-clean stratum, powered for the first time because 7B is simply more accurate
-on clean items, confirms the predicted inversion at 0.280 $[0.200, 0.366]$.
-Repeating the same 500-item extension on 3B (its own error rate on this
-stratum is about half 7B's, so it needed more items to reach the same power)
-confirms the effect there too: \textbf{0.854 $[0.796, 0.902]$ on 42
-misgraded items} -- close to 7B's number at first (\S\ref{sec:phase4-3b}),
-and, once 7B was extended to the identical 650-item set for a direct
-matched-$n$ comparison, confirmed again at 0.801 $[0.751, 0.846]$
-(\S\ref{sec:phase4-matched}) -- overlapping CIs, not resolvably different,
-though not as numerically close as the first comparison suggested. The
-\texttt{has\_error}=1 stratified effect is not a property of the larger
-model; both sizes had it, they simply needed enough misgraded items to
-measure it (\S\ref{sec:phase4-3b}, \S\ref{sec:phase4-matched}). For the
-first time in this project, both
-grading strata are simultaneously powered and resolved, in opposite
-directions (\S\ref{sec:phase4}) -- Phase 2's ``the model grades at chance so
-entropy measures nothing'' is correct about pooling an error-biased model's
-output, not about reasoning entropy in general.
+\textbf{A larger model does not rescue the reasoning arm, and the analysis
+that appeared to show it did was invalid.} Qwen2.5-VL-7B's grading accuracy
+(59.0\% vs.\ a 50.0\% baseline) clears a pre-registered capability gate only
+marginally, and its pooled AUROC (0.520) is statistically identical to 3B's.
+Stratifying by whether the graded answer actually contains an error appeared
+to produce confirmed AUROCs of 0.834 $[0.768, 0.891]$ at 7B and 0.854
+$[0.796, 0.902]$ at 3B, replicated at 0.775 $[0.694, 0.848]$ on a second
+model family. \textbf{Those numbers are arithmetically correct and their
+interpretation was wrong.} Within a stratum where every item carries the same
+true label, ``was the model correct'' is the same column as ``what did the
+model answer'' --- they agree on 100\% of items at 7B --- and the entropy is
+computed from the very votes that produce that answer, so the measurement is
+near-circular. A signal-free biased coin reaches a \emph{higher} AUROC than
+any model here (null medians 0.901, 0.868, 0.831 against observed 0.854,
+0.801, 0.775). The apparent sign reversal between strata is the same identity
+with its sign flipped: in the clean stratum correctness is the exact
+complement of the verdict, so the two stratum AUROCs sum to one. \textbf{The
+honest reasoning result is the pooled one on a balanced sample: $\sim$0.52,
+no signal.} Perception is unaffected, and \S\ref{sec:retraction} explains
+why --- the difference is label cardinality, not label type.
 
 The methodological lesson is separable from any single result. Adding
 bootstrap confidence intervals late overturned several conclusions the pilot
@@ -113,18 +108,18 @@ of the evaluation set} -- and Phase 4 shows the same lesson applies a second
 time, one level up: a real effect survived being pooled away only once the
 pooling itself was diagnosed and undone.
 
-\textbf{A second, architecturally different model family (Phase 5) confirms
-the reasoning result and exposes a real limit on the perception result.}
+\textbf{A second, architecturally different model family (Phase 5) exposes a
+real limit on the perception result --- and reproduced the reasoning artifact
+rather than confirming a reasoning effect.}
 LLaVA-NeXT (\texttt{llava-v1.6-mistral-7b-hf}) cannot be used to test
 perception entropy at all: its free-response transcription accuracy is
 0.8\% (2/243 items) against Qwen's $\sim$42\%, a capability gate of the
 same kind Phase 4 applied to reasoning, now applied to perception for the
 first time. Its reasoning arm is unaffected by that gate and, once powered
-the same way as Phase 4, confirms: \textbf{AUROC 0.775 $[0.694, 0.848]$ on
-34 misgraded items}, a CI overlapping Qwen-7B's confirmed
-$[0.751, 0.846]$ almost entirely. This is the first confirmed replication
-across model families in this project -- every earlier confirmation
-compared model sizes within Qwen2.5-VL.
+the same way as Phase 4, reached AUROC 0.775 $[0.694, 0.848]$ on 34 misgraded
+items. That was read at the time as the project's first cross-family
+replication; it is better understood as the same degeneracy reproducing on a
+third architecture, which is why replication did not catch it (Retraction).
 
 \textbf{A third model family (Phase 6, InternVL3-8B) produces this
 project's clearest case yet for why every perception result here is
@@ -149,6 +144,7 @@ in-between verdict this report has not needed before.
 
 \section*{Retraction (2026-08-09)}
 \addcontentsline{toc}{section}{Retraction}
+\label{sec:retraction}
 
 \textbf{The \texttt{has\_error}=1 stratified reasoning result reported in
 \S\ref{sec:phase4} and \S\ref{sec:phase5} --- AUROC $0.775$--$0.854$,
@@ -1075,6 +1071,17 @@ rather than further prompt engineering.
 \section{Phase 4: A Larger Model, and the Reasoning Arm's Stratified Resolution}
 \label{sec:phase4}
 
+\begin{quote}
+\textbf{\textcolor{red}{RETRACTED INTERPRETATION.}} The
+\texttt{has\_error}=1 stratified reasoning results in this section are
+arithmetically correct and their interpretation is withdrawn --- within a
+single-truth-label stratum, correctness is the same column as the model's own
+verdict, so the AUROC is near-circular and a signal-free biased coin scores
+higher. See \S\ref{sec:retraction}. The perception results in this section
+are unaffected.
+\end{quote}
+
+
 Phase 3 left model capability as the one remaining lever on the reasoning arm
 (\S\ref{sec:prompt-variants}). This phase runs that check on Qwen2.5-VL-7B,
 finds it ambiguous rather than clearly positive or negative, follows the
@@ -1350,6 +1357,17 @@ circulated before this check ran.
 
 \section{Phase 5: A Second Model Family (LLaVA-NeXT)}
 \label{sec:phase5}
+
+\begin{quote}
+\textbf{\textcolor{red}{RETRACTED INTERPRETATION.}} The
+\texttt{has\_error}=1 stratified reasoning results in this section are
+arithmetically correct and their interpretation is withdrawn --- within a
+single-truth-label stratum, correctness is the same column as the model's own
+verdict, so the AUROC is near-circular and a signal-free biased coin scores
+higher. See \S\ref{sec:retraction}. The perception results in this section
+are unaffected.
+\end{quote}
+
 
 Every result so far is one model family, Qwen2.5-VL, at two sizes. The
 single largest remaining external-validity gap is whether either result is
