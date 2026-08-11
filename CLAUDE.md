@@ -88,6 +88,53 @@ confidence tests green — that is the only claim-bearing result from
 
 ## Current findings
 
+### 2026-08-11: the failure audit is CODED — most "model errors" are scoring
+
+31-item audit sample from notebook 21, read via the Drive OCR of the four
+contact sheets. Labels in `reference/audit/coded_31_qwen_20260811.csv` with a
+per-item confidence and note. **This is my reading of the OCR, not a human
+reading of the images — 22/31 high confidence, 7 medium, 2 low.**
+
+| final label | all 31 | excluding the artifact stratum (27) |
+|---|---|---|
+| `extraction_issue` | 18 (58.1%) | **14 (51.9%)** |
+| `notation_misread` | 7 (22.6%) | 7 (25.9%) |
+| `copied_wrong_line` | 4 (12.9%) | 4 (14.8%) |
+| `needs_visual` (still) | 2 (6.5%) | 2 (7.4%) |
+| `hallucination` | **0** | **0** |
+
+- **DO NOT quote 58% as a population rate.** The sample deliberately
+  oversamples `likely_scoring_artifact` (a whole stratum by construction).
+  Excluding it gives ~52%, which is still not a clean population estimate
+  because the remaining strata are also purposive. The defensible statement
+  is a RANGE: the text-only pre-sorter says **≥15%** and the coded audit says
+  roughly **half**, so the truth is somewhere between and the honest sentence
+  is *"a substantial share — plausibly a third to a half — of what the
+  frozen rule counts as model error is the scoring pipeline."*
+- **`hallucination` stays 0** under human coding too.
+- **The pre-sorter agreed with the coding on only 42%.** It is a triage tool,
+  not a labeller — and the disagreement is almost entirely one-directional:
+  16 of 18 were `needs_visual` → a real label, i.e. it deferred rather than
+  guessed wrong. That is the designed behaviour and the reason
+  `proposed_label` and `final_label` are separate columns.
+
+**CORRECTION, and it retracts a claim made twice: item 55 is NOT
+auto-correction.** The page's *derivation* ends `1 - tan x tan y` (correct)
+while its *Answer line* carries FERMAT's injected `1 + tan x tan y`. The
+model transcribed the derivation. That is **`copied_wrong_line`** — it copied
+a real line of the page, the wrong one — **not a prior overriding the image**.
+The auto-correction mechanism therefore rests on item 273 alone, which is
+much weaker than "two independent instances on two model families" as
+previously written. Combined with the two aggregate nulls, **treat
+auto-correction as unsupported, not merely unresolved.**
+
+**Item 161 is the nearest thing to a real auto-correction:** the page's
+condition repeats `x` (`{(x,y,x)}`) and the model wrote `z`, normalising
+FERMAT's internal inconsistency. Coded `notation_misread`, medium confidence.
+
+**Still outstanding:** a human pass on the images themselves. The OCR is
+lossy and 2 items (240, 228) could not be decided from it at all.
+
 ### 2026-08-11: `genuinely_wrong` broken down — and hallucination is ZERO
 
 `pilot/failures.py`, `pilot/21_failure_audit.ipynb`,

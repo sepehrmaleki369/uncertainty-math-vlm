@@ -1,0 +1,32 @@
+item,final_label,confidence,note
+75,extraction_issue,high,both labels are bare symbols from prose (sympy:p vs sympy:r)
+126,extraction_issue,high,"model label empty; truth eq(y/4-7,3)"
+148,extraction_issue,high,truth degenerated to sympy:n from prose
+269,extraction_issue,high,truth degenerated to sympy:x
+55,copied_wrong_line,medium,"page derivation ends 1-tanx tany; the Answer LINE carries the injected 1+. Model transcribed the derivation, not the answer -- NOT prior-driven auto-correction"
+160,notation_misread,medium,"x vs z, visually similar in this hand"
+161,notation_misread,medium,"page condition repeats x ({(x,y,x)}); model wrote z. Model normalised FERMAT's internal inconsistency"
+173,extraction_issue,high,"MCQ: truth is text:optiond, model gave the equation"
+185,notation_misread,high,24c^2 on the page read as 25c^2
+265,extraction_issue,high,"model eq(y,13) vs truth 13 -- both correct"
+52,notation_misread,high,"5887.32 read as 588.732, decimal place"
+107,extraction_issue,medium,both labels are the same prose sentence; not an answer span
+274,extraction_issue,high,truth degenerated to sympy:f
+65,extraction_issue,high,model label empty
+175,notation_misread,medium,matrix elements differ
+277,extraction_issue,high,3\sqrt3 vs 3\sqrt3units -- unit dropped
+101,copied_wrong_line,high,"model transcribed the 'principal for the 1st year' line, not the conclusion"
+202,extraction_issue,high,truth degenerated to sympy:mathbb*r
+240,needs_visual,low,"model \pm3 vs truth eq(3k/2,pm*3) -- cannot tell from OCR"
+255,notation_misread,medium,page says 91-94 degF; model said 86
+14,extraction_issue,high,"MCQ; model emitted a circled glyph, truth 4.5 -- option handling"
+54,extraction_issue,high,model prose sentence vs truth sympy:243
+144,extraction_issue,high,model prose sentence vs truth sympy:2
+151,copied_wrong_line,high,model transcribed the intermediate midpoint equation
+167,extraction_issue,high,model 'i' vs truth a fragment -- both degenerate
+220,notation_misread,medium,"near-identical set-builder, small symbol difference"
+228,needs_visual,low,model -6 vs truth 4; derivation is heavily garbled in OCR
+67,copied_wrong_line,high,model gave d=-2; truth a=3/2 -- both appear on the page
+176,extraction_issue,high,"model eq(x,4) vs truth 4 -- both correct"
+208,extraction_issue,high,3x^2=-4y and x^2=-4y/3 VERIFIED mathematically identical
+218,extraction_issue,high,model 'option a' correct; truth mangled to sympy:a by _OPTION_RE
