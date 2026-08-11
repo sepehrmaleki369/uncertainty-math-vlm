@@ -8,6 +8,50 @@ working context for future sessions, not a repeat of that.
 
 ## Current findings
 
+### RUN 2026-08-11: verbalized confidence FAILS on perception; the \boxed{} control GATED
+
+Both n=300, Qwen2.5-VL-3B, same sample/seed/K as the reference run. CSVs are
+Drive-only (`confidence_perception_full_n300_...`, `boxed_perception_full_n300_...`);
+the push 403'd as always.
+
+**Notebook 20 — the result. Asking the model does not work.**
+
+| score | AUROC [95% CI] |
+|---|---|
+| perception entropy | **0.807** [0.757, 0.854] |
+| −verbalized confidence | **0.528** [0.463, 0.593] |
+| **paired difference** | **+0.279 [+0.194, +0.359], resolved** |
+
+- **Headline sentence:** *the model states a median 95% confidence and is
+  right 42% of the time; entropy beats its self-report by AUROC +0.279
+  [+0.194, +0.359].*
+- **Not a degeneracy artifact** — 37 distinct values, range 68–100. The model
+  varies its self-report; it just varies uninformatively. The pre-written
+  "near-constant self-report" caveat does NOT apply here.
+- Confidence parsed on 93.8% of samples, 295/300 items usable.
+- **Converges with the token-logprob result** (+0.297 [+0.214, +0.380]): two
+  independent cheap-confidence baselines both land at ~0.52–0.53. Together
+  they answer "why not just ask / just use logprobs?" for the arm the paper
+  leads with.
+
+**Notebook 19 — GATED, and its AUROC must not be used.**
+
+- `\boxed{}` compliance **33.5%** against the registered 80% bar →
+  `gated_low_compliance`.
+- **The manipulation backfired: multi-tier extraction rose to 72.7%**, worse
+  than the 51.0% baseline, because some samples box the answer and some do
+  not — a NEW tier switch.
+- It printed AUROC 0.810 [0.762, 0.855]. **Do not quote it.** The run is
+  gated; using a number from it is exactly what the registered bar exists to
+  prevent.
+- **A pre-flight that only prints can be ignored, and was.** The cell reported
+  `contains \boxed{}: False` and the session still ran 300 items. It now
+  probes 5 items and RAISES below 60% compliance. Fixed for 7B, which is the
+  retry.
+- If 7B also gates, write it honestly: *box-constrained extraction was
+  attempted and failed its compliance gate*, and the extractor confound stays
+  a Limitation.
+
 ### 2026-08-11: two offline controls — one useful, one that stays a hypothesis
 
 Both free, no GPU, on the existing n=300 runs for Qwen-3B and Pixtral-12B.

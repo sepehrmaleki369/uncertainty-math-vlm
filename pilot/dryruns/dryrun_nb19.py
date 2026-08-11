@@ -201,15 +201,28 @@ os.makedirs(ns["PROJECT_DIR"], exist_ok=True)
 
 # --- walk the notebook ----------------------------------------------------
 exec(compile(src(3), "<model>", "exec"), ns)
-assert ns["MODEL_ID"] == "Qwen/Qwen2.5-VL-3B-Instruct" and ns["QUANTIZED"] is False
-print("OK  model load: same model as the reference run, bf16")
+assert ns["MODEL_ID"].startswith("Qwen/Qwen2.5-VL-") and ns["QUANTIZED"] is False
+print(f"OK  model load: {ns['MODEL_ID']}, bf16")
 
 exec(compile(c(4, ("PROCESS_N = 300", "PROCESS_N = 6")), "<sample>", "exec"), ns)
 assert len(ns["full_sample"]) == 300 and len(ns["sample"]) == 6
 print("OK  sample: full 300 drawn, 6 processed (checkpoint carries over)")
 
 exec(compile(src(5), "<adapter>", "exec"), ns)
-print("OK  adapter + pre-flight: boxed instruction reaches the chat template")
+print("OK  adapter + pre-flight passes when the model complies")
+
+# The whole point of the change: a non-compliant model must STOP the run here
+# rather than print False and let 300 items be generated anyway.
+MODE["m"] = "plain"
+try:
+    exec(compile(src(5), "<preflight-noncompliant>", "exec"), dict(ns))
+except AssertionError as exc:
+    assert "STOP HERE" in str(exc), str(exc)
+    print("OK  pre-flight REFUSES a model that ignores \\boxed{} (this is the fix)")
+else:
+    raise SystemExit("pre-flight did not refuse a non-compliant model")
+finally:
+    MODE["m"] = "boxed"
 
 ckdir = os.path.join(WORKDIR, "ck")
 gen = c(6, ('f"{PROJECT_DIR}/checkpoints"', f'"{ckdir}"'))
@@ -277,7 +290,7 @@ finally:
 
 written = ns_s["csv_name"]
 assert "pixtral" not in written.lower(), f"mislabelled CSV: {written}"
-assert "qwen2.5-vl-3b-instruct" in written.lower(), written
+assert ns_s["MODEL_ID"].split("/")[-1].lower() in written.lower(), written
 assert written.startswith(ns_s["RUN_NAME"]), written
 saved = os.path.join(WORKDIR, "drive", "results", written)
 assert os.path.exists(saved), saved
@@ -287,15 +300,16 @@ print(f"OK  save cell writes {written}")
 
 # The 7B swap must change the filename, or two runs collide on Drive.
 ns_7 = dict(ns_s)
-ns_7["MODEL_ID"] = "Qwen/Qwen2.5-VL-7B-Instruct"
+ns_7["MODEL_ID"] = ("Qwen/Qwen2.5-VL-3B-Instruct"
+                    if "7B" in ns_s["MODEL_ID"] else "Qwen/Qwen2.5-VL-7B-Instruct")
 os.chdir(WORKDIR)
 try:
     exec(compile("class FakeProc:\n    returncode = 0\n    stdout = stderr = ''\n"
                  + save, "<save7b>", "exec"), ns_7)
 finally:
     os.chdir(_cwd)
-assert "7b" in ns_7["csv_name"].lower() and ns_7["csv_name"] != written
-print(f"OK  7B swap changes the filename to {ns_7['csv_name']}")
+assert ns_7["csv_name"] != written
+print(f"OK  swapping MODEL_ID changes the filename to {ns_7['csv_name']}")
 
 print("\n" + "=" * 72)
 print("DRY RUN PASSED")
