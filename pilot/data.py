@@ -324,3 +324,57 @@ def load_scratchmath_extra(
         sample = sample.remove_columns(columns_to_drop)
 
     return sample
+
+
+def sample_vs_corpus(
+    sample,
+    split: str = "train",
+    corpus=None,
+    _loader: Callable[..., datasets.Dataset] = datasets.load_dataset,
+) -> "pd.DataFrame":
+    """Compare a drawn sample against the full corpus on observable fields.
+
+    Answers the reviewer question "did you accidentally pick easy cases?".
+    The structural answer is that selection is uniform at random WITHIN each
+    has_error stratum -- load_fermat_balanced never looks at handwriting,
+    image quality, length or model accuracy -- so difficulty cannot be
+    selected on. This shows it rather than asserting it.
+
+    The one deliberate deviation is the 50/50 balance against a corpus that is
+    ~87% error, and that IS visible here. It costs about four points of
+    transcription accuracy in the flattering direction (error items are
+    harder), while leaving the AUROC untouched -- 0.830 on error items against
+    0.839 on clean ones for Qwen-3B. Report the reweighted accuracy alongside.
+
+    Pass `corpus` when the full split is already loaded, which it is inside
+    any notebook that has called load_fermat_balanced: re-loading would
+    re-download the images for no reason.
+    """
+    import pandas as pd
+
+    if corpus is None:
+        corpus = _loader("ai4bharat/FERMAT", split=split)
+
+    def stats(ds):
+        out = {"n": len(ds)}
+        for flag in ("has_error", "handwriting_style", "image_quality"):
+            if flag in ds.column_names:
+                vals = [bool(x) for x in ds[flag]]
+                out[f"frac_{flag}"] = sum(vals) / len(vals) if vals else float("nan")
+        for field, label in (("pert_a", "answer"), ("orig_q", "question")):
+            if field in ds.column_names:
+                lens = [len(str(x)) for x in ds[field]]
+                out[f"median_{label}_chars"] = float(pd.Series(lens).median())
+        return out
+
+    c, s = stats(corpus), stats(sample)
+    rows = []
+    for key in c:
+        # A "delta" on raw counts is meaningless -- the sample is smaller by
+        # construction -- and printing one invites it being read as a finding.
+        delta = None
+        if key != "n" and isinstance(s.get(key), (int, float)):
+            delta = s[key] - c[key]
+        rows.append({"field": key, "corpus": c[key], "sample": s.get(key),
+                     "delta": delta})
+    return pd.DataFrame(rows)

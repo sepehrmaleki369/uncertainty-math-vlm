@@ -7,6 +7,7 @@ from pilot.data import (
     load_fermat_balanced,
     load_fermat_extra_error_items,
     load_fermat_sample,
+    sample_vs_corpus,
 )
 
 
@@ -226,3 +227,73 @@ def test_load_fermat_extra_error_items_drops_extra_columns():
     loader = _imbalanced_loader(500, 500)
     result = load_fermat_extra_error_items(n_extra=20, seed=7, skip=150, _loader=loader)
     assert set(result.column_names) == set(FERMAT_FIELDS)
+
+
+# --- sample_vs_corpus: "did you accidentally pick easy cases?" ------------
+
+
+def _corpus_rows(n=2000, error_frac=0.87, couple_difficulty=False):
+    """A stub corpus. With couple_difficulty=True the difficulty flags are
+    made to depend on has_error, which is the situation that WOULD bias a
+    stratified draw -- so the test can show the comparison detects it."""
+    rows = []
+    for i in range(n):
+        has_error = i % 100 < int(error_frac * 100)
+        quality = (not has_error) if couple_difficulty else (i % 4 != 0)
+        rows.append({"image": None, "orig_q": "q" * (50 + i % 30),
+                     "pert_a": "a" * (100 + i % 200), "has_error": has_error,
+                     "handwriting_style": i % 3 != 0, "image_quality": quality})
+    return rows
+
+
+class _DS(list):
+    def __getitem__(self, k):
+        return [r[k] for r in self] if isinstance(k, str) else list.__getitem__(self, k)
+
+    @property
+    def column_names(self):
+        return list(self[0])
+
+
+def _balanced(rows, n=300):
+    err = [r for r in rows if r["has_error"]][: n // 2]
+    clean = [r for r in rows if not r["has_error"]][: n // 2]
+    return _DS(err + clean)
+
+
+def test_sample_vs_corpus_shows_only_the_deliberate_deviation():
+    """The structural argument, demonstrated: selection is uniform at random
+    WITHIN each has_error stratum, so nothing but the balance should move."""
+    rows = _corpus_rows()
+    table = sample_vs_corpus(
+        _balanced(rows), corpus=_DS(rows)).set_index("field")
+
+    # the one intended deviation
+    assert table.loc["frac_has_error", "delta"] == pytest.approx(-0.37, abs=0.01)
+    # everything else essentially unchanged
+    for field in ("frac_handwriting_style", "frac_image_quality",
+                  "median_answer_chars", "median_question_chars"):
+        rel = abs(table.loc[field, "delta"]) / max(abs(table.loc[field, "corpus"]), 1)
+        assert rel < 0.05, (field, table.loc[field].to_dict())
+
+
+def test_it_would_detect_difficulty_coupled_to_the_stratifier():
+    """The comparison has to be able to FAIL, or it proves nothing. When image
+    quality is made to depend on has_error, balancing drags the sample's
+    quality mix away from the corpus and the table shows it."""
+    rows = _corpus_rows(couple_difficulty=True)
+    table = sample_vs_corpus(
+        _balanced(rows), corpus=_DS(rows)).set_index("field")
+    assert abs(table.loc["frac_image_quality", "delta"]) > 0.30
+
+
+def test_no_delta_is_reported_for_raw_counts():
+    """The sample is smaller by construction; a delta on n would be read as a
+    finding."""
+    rows = _corpus_rows()
+    table = sample_vs_corpus(
+        _balanced(rows), corpus=_DS(rows)).set_index("field")
+    import pandas as pd
+    # pandas coerces the None to NaN in a numeric column; either is "absent".
+    assert pd.isna(table.loc["n", "delta"])
+    assert table.loc["n", "corpus"] == 2000 and table.loc["n", "sample"] == 300

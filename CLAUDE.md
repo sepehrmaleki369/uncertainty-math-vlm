@@ -88,6 +88,43 @@ confidence tests green — that is the only claim-bearing result from
 
 ## Current findings
 
+### 2026-08-11: "did you pick easy cases?" — answered, with one real caveat
+
+`pilot.data.sample_vs_corpus`, `pilot/22_sample_representativeness.ipynb`,
+`pilot/dryruns/dryrun_nb22.py`, 3 tests in `test_data.py`. No GPU.
+
+**The structural answer: you cannot have.** `load_fermat_balanced` shuffles
+with a fixed seed and takes the first 150 of each `has_error` stratum. It
+**never inspects handwriting, image quality, length or model output**, so
+difficulty is not selected on. Notebook 22 shows it by comparing the drawn
+300 against the full corpus on every observable field — everything ≈0 except
+the intended `frac_has_error` delta of −0.37.
+
+**The one deviation, and it does cost something.** Error items are genuinely
+harder to transcribe, so our 50/50 against a ~87/13 corpus flatters accuracy:
+
+| | error items | clean items | our 50/50 | **corpus-reweighted** |
+|---|---|---|---|---|
+| Qwen-3B acc | 34.0% | 44.7% | 39.3% | **35.4%** |
+| Pixtral acc | 34.7% | 48.7% | 41.7% | **36.5%** |
+| Qwen AUROC | 0.830 | 0.839 | 0.835 | — |
+| Pixtral AUROC | 0.840 | 0.824 | 0.828 | — |
+
+- **Accuracy is ~4 points optimistic. Report the reweighted figure too.**
+- **AUROC is flat across strata**, so the balance does not touch the headline.
+  That asymmetry is the whole answer: the design choice affects the number we
+  do not lead with, and not the one we do.
+- **The clean pool is the binding constraint on any balanced design**, not our
+  choice of 300 — `fermat_census`'s `max_balanced_n` is the ceiling.
+- **`shuffle(seed=42)` is NOT stable across dataset revisions.** Two items once
+  overlapped between draws that should have been disjoint because FERMAT's Hub
+  copy drifted. **Reproducibility needs the seed AND a pinned revision, which
+  we do not pin** — one line for Limitations.
+- The dry run runs the REAL `load_fermat_balanced` against a stub corpus whose
+  difficulty flags are independent of `has_error`, so the stratification is
+  exercised rather than faked; `test_it_would_detect_difficulty_coupled_to_the_stratifier`
+  proves the comparison can fail.
+
 ### 2026-08-11: the failure audit is CODED — most "model errors" are scoring
 
 31-item audit sample from notebook 21, read via the Drive OCR of the four
