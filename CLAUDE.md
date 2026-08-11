@@ -12,10 +12,18 @@ Scored against the seven things a reviewer would ask for, in the user's own
 priority order. **Items 3–6 are done and locked. Items 1 and 2 are not, and
 item 1 is the highest-value remaining work in the project.**
 
-### 1. Manual visual audit — TOOLED BUT UNREAD. The top priority.
+### 1. Manual visual audit — ONE STRATUM READ (2026-08-11). Still the top priority.
 
 *"Show 30–50 real examples: model output, extracted answer, ground truth,
 entropy, correct/wrong."*
+
+- **The `only_qwen` stratum is now human-read and coded — 30 of its 31
+  items, by the user, from the images.** That is the first genuine human
+  pass in this project and it satisfies the *"30–50 real examples"* ask on
+  its own terms. See the dated entry below. **The other three strata
+  (`wrong_on_both` 73, `only_pixtral` 57, and the balance) are still
+  unread**, and they are the ones that would support a population rate,
+  which this stratum by construction cannot.
 
 - **Built:** notebook 17 §6 writes **17 contact-sheet PNGs** to
   `Drive/uncertainty-math-vlm/figures/genuinely_wrong/` — `unanimous_wrong_*`
@@ -79,14 +87,77 @@ still asserts the retracted Phase 4/5 claims as findings.
 WACV Round 2: enrol Aug 21, submit Aug 28. **Two blockers to fix before any
 further analysis: Related Work, and the report's self-contradiction.**
 
-### Two CSVs still Drive-only
+### One CSV still Drive-only
 
-`confidence_perception_full_n300_*` and `boxed_perception_full_n300_*` (the
-gated one). Download into `results/` to turn the 7 skipped verbalized-
-confidence tests green — that is the only claim-bearing result from
-2026-08-11 without test protection.
+**`confidence_perception_full_n300_*` was downloaded 2026-08-11 and all 7
+verbalized-confidence tests pass** — the notebook-20 result is now test-
+protected, and the run's own accuracy (45.0%) is recorded rather than
+borrowed from notebook 19. Only `boxed_perception_full_n300_*` (the gated
+one) is still Drive-only, and nothing may be quoted from it anyway.
 
 ## Current findings
+
+### 2026-08-11: the `only_qwen` stratum, HUMAN-READ — and the rate is stratum-bound
+
+The user read the contact-sheet images for **30 of the 31 `only_qwen` items**
+(all but 276) and ruled on every label. Coded in
+`reference/audit/coded_30_qwen_only_qwen_20260811.csv` (item, final_label,
+confidence, note), 23 high confidence / 7 medium. **This is a human reading of
+the images, not an OCR reading of the sheets** — unlike the 31-item audit
+above, which is my reading of the Drive OCR.
+
+| final label | n | share of this stratum |
+|---|---|---|
+| `extraction_issue` | 25 | 83.3% |
+| `notation_misread` | 4 | 13.3% |
+| `copied_wrong_line` | 1 | 3.3% |
+| **`hallucination`** | **0** | **0%** |
+
+- **DO NOT QUOTE 83% AS A POPULATION RATE. It is not one, and this stratum
+  cannot produce one.** `only_qwen` is *by construction* the items where Qwen
+  is `genuinely_wrong` and Pixtral is **not** — i.e. the pages a second model
+  read successfully. That selects hard for "the page is legible and the key
+  is reachable, so Qwen's failure is stylistic rather than perceptual". The
+  honest population sentence is still the existing range: *a substantial
+  share — plausibly a third to a half — of what the frozen rule counts as
+  model error is the scoring pipeline.* This stratum tells you **where in
+  that range the mass concentrates**, not what the range is.
+- **The keys are reachable, which is the finding that reframes the rest.**
+  **Pixtral scored correct on 21 of these same 30 items against the identical
+  ground-truth labels.** So these are not unreachable garbage keys. Qwen is
+  systematically choosing a *different but also valid* span of the page than
+  the key does: the value instead of the option letter, the full sentence
+  instead of the fragment, the chain instead of the final term. Write it as a
+  **span-selection mismatch between model and answer key**, not as "the
+  scorer is broken".
+- **A concrete recurring sub-pattern worth its own sentence: multiple-choice
+  answer keys.** Items 25, 93 and 173 all have GT `text:option d` while the
+  model transcribes the page's derived value (10 years, 2540, 2x=10). In each
+  case **one of the five samples emitted `option d` and matched**. With 52 MCQ
+  items in the sample (17.3%), this is a systematic interaction, and it is
+  distinct from the known `_OPTION_RE` bug (items 14, 218) — here the regex
+  fired correctly and the mismatch is value-vs-letter.
+- **`hallucination` is 0 for the third independent time** — text pre-sorter,
+  OCR-coded 31, and now a human image pass. Safe to state plainly.
+- **Two named bugs were confirmed live on specific items:** bug 1 (nested
+  `\textcolor` unresolved) destroyed item 240's key into
+  `eq(textcolor*((3k/2)*(r*d*e)), pm*3)` — "red" parsed as `r*e*d` — while
+  sample s4 held the correct `eq(3k/2, pm*3)`; and bug 2 (decimal split)
+  truncated item 52's `5887.32 cm^3` to `32 cm^3`.
+- **Item 131 is a new auto-correction CANDIDATE and is not claimed.** The
+  model omitted the red injected step `cos(-1710° + 1700°)` entirely while
+  transcribing. Recorded in the note only. Per the standing status,
+  auto-correction remains **unsupported** — item 55 was retracted to
+  `copied_wrong_line`, leaving 273; this is a third anecdote, not evidence.
+- **Where the text-only reading and the image disagreed, the image won, and
+  it moved a label.** Item 193: the strings show three of five samples
+  containing `= 75.46 m^2` with 4.9 correctly, which reads as an extraction
+  failure; the image shows the model's own label using `49 * 49` where the
+  page needs `4.9 * 4.9`, so it is coded **`notation_misread`**. The
+  countervailing string evidence is preserved in the note rather than
+  deleted. **General lesson: string evidence systematically under-detects
+  notation misreads**, because a correct value elsewhere in the sample masks
+  a wrong one in the answer span.
 
 ### 2026-08-11: the distinct-answers table — the result without an AUROC
 
@@ -301,8 +372,13 @@ the push 403'd as always.
   **CORRECTION:** an earlier version of this entry said "right 42% of the
   time". **That 42.0% is notebook 19's accuracy, from the gated boxed run —
   a different generation.** Notebook 20 never printed its own accuracy.
-  Fill it in from the CSV before quoting any accuracy next to this result;
-  the unconstrained reference is 47.0%.
+  **FILLED IN 2026-08-11 from the downloaded CSV: 45.0% (135/300), and
+  45.8% (135/295) on the items the confidence comparison actually uses** —
+  all 5 unparsed-confidence items are wrong ones, so restricting to the
+  usable subset flatters accuracy slightly. Against the unconstrained
+  reference run's 47.0%: asking for a confidence number costs ~2 points of
+  transcription accuracy, well inside noise at this n and NOT a finding.
+  Pinned in `test_accuracy_is_recorded_so_it_is_never_taken_from_another_run`.
 - **Not a degeneracy artifact** — 37 distinct values, range 68–100. The model
   varies its self-report; it just varies uninformatively. The pre-written
   "near-constant self-report" caveat does NOT apply here.
