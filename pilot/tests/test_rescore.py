@@ -860,3 +860,44 @@ def test_signal_was_extractor_is_reachable():
     bar that cannot produce its own negative is not a bar."""
     ci = {"auroc": 0.52, "excludes_chance": False}
     assert rescore.classify_boxed_result(0.95, ci, 0.01) == "signal_was_extractor"
+
+
+def test_the_signal_holds_where_extraction_was_already_deterministic(run):
+    """The extractor confound, addressed WITHOUT the \\boxed{} run.
+
+    Notebook 19 tried to make extraction deterministic by prompt. Both
+    Qwen-3B (33.5% compliance) and Qwen-7B (2/5 greedy probes) refused the
+    instruction, so that manipulation is unavailable on models this size.
+
+    The conditional version is free: restrict to items where the extractor
+    fired a SINGLE tier across all five samples, so tier-switching cannot
+    contribute to the entropy by construction. If the confound were
+    generating the signal, the AUROC there would fall. It does not -- 0.845
+    against 0.835 on the full sample, and Pixtral behaves the same way.
+
+    This is a subset analysis, not a manipulation. It cannot rule out
+    WITHIN-tier variation (item 9 has all five samples in display_math and
+    still disagrees), and the subsets differ in difficulty -- accuracy is
+    46.9% here against 32.0% on the switching items. State it as evidence
+    against the confound, not as its elimination.
+    """
+    from pilot.plotting import bootstrap_auroc_ci
+
+    n_tiers = pd.Series(
+        [rescore.tier_instability(
+            ast.literal_eval(r["all_transcription_samples_raw"]))["n_distinct_tiers"]
+         for _, r in run.iterrows()], index=run.index)
+
+    stable = run[n_tiers == 1]
+    assert len(stable) == 147
+
+    full = bootstrap_auroc_ci(run, "perception_entropy",
+                              "transcription_correct", n_boot=4000, seed=0)
+    cond = bootstrap_auroc_ci(stable, "perception_entropy",
+                              "transcription_correct", n_boot=4000, seed=0)
+
+    assert full["auroc"] == pytest.approx(0.835, abs=0.01)
+    assert cond["auroc"] == pytest.approx(0.845, abs=0.015)
+    assert cond["excludes_chance"] is True
+    # The claim: not weaker where extraction could not vary.
+    assert cond["auroc"] >= full["auroc"] - 0.02

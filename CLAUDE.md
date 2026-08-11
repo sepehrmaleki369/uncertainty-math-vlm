@@ -48,9 +48,34 @@ the push 403'd as always.
   `contains \boxed{}: False` and the session still ran 300 items. It now
   probes 5 items and RAISES below 60% compliance. Fixed for 7B, which is the
   retry.
-- If 7B also gates, write it honestly: *box-constrained extraction was
-  attempted and failed its compliance gate*, and the extractor confound stays
-  a Limitation.
+- **7B ALSO GATED: 2/5 greedy probes.** The pre-flight refused and the
+  session was never spent, which is the fix working. **Box-constrained
+  extraction is unavailable on models this size** — write it exactly that
+  way: *attempted on Qwen-3B and 7B, failed its compliance gate on both*.
+
+**And then the confound was addressed for free, without the run.** Restrict
+to items where the extractor fired a SINGLE tier across all five samples, so
+tier-switching cannot contribute to the entropy by construction:
+
+| | n | AUROC [95% CI] |
+|---|---|---|
+| Qwen, all items | 300 | 0.835 [0.787, 0.879] |
+| Qwen, one tier only | 147 | **0.845** [0.778, 0.904] |
+| Pixtral, all items | 300 | 0.828 [0.782, 0.871] |
+| Pixtral, one tier only | 206 | **0.853** [0.799, 0.902] |
+
+**The signal is not weaker where extraction could not vary — it is marginally
+stronger, on both models.** If extractor instability were generating it,
+removing the switching items would degrade it. Locked in
+`test_the_signal_holds_where_extraction_was_already_deterministic`.
+
+**State it as evidence against the confound, not as its elimination.** It is
+a subset analysis rather than a manipulation: it cannot rule out WITHIN-tier
+variation (item 9 has all five samples in `display_math` and still
+disagrees), and the subsets differ in difficulty (accuracy 46.9% vs 32.0% on
+Qwen). **Lesson: the cheap conditional version of an experiment is worth
+computing BEFORE proposing the GPU version** — here it answered the question
+better than the run would have, since the run gated twice.
 
 ### 2026-08-11: two offline controls — one useful, one that stays a hypothesis
 
