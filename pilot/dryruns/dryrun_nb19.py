@@ -254,6 +254,49 @@ for expected, args in cases.items():
 print(f"OK  all {len(cases)} registered verdicts reachable, "
       "including signal_was_extractor")
 
+# --- the SAVE cell, which an earlier version of this dry run never executed --
+# It referenced `df` (the gate builds `scored_df`) and still carried notebook
+# 16's hardcoded "pixtral" filename, so it would have crashed and, had it not
+# crashed, written a CSV labelled as a Pixtral run. Both were invisible here
+# because the walk stopped at the gate.
+save = c(8,
+         ('subprocess.run(["git", "-C", "repo", *args], capture_output=True, text=True)',
+          'FakeProc()'))
+ns_s = dict(ns)
+ns_s["PROJECT_DIR"] = os.path.join(WORKDIR, "drive")
+ns_s["REPO_URL"] = "https://github.com/x/y.git"
+ns_s["GH_TOKEN"] = ""
+os.makedirs(os.path.join(WORKDIR, "repo", "results"), exist_ok=True)
+_cwd = os.getcwd()
+os.chdir(WORKDIR)
+try:
+    exec(compile("class FakeProc:\n    returncode = 0\n    stdout = stderr = ''\n"
+                 + save, "<save>", "exec"), ns_s)
+finally:
+    os.chdir(_cwd)
+
+written = ns_s["csv_name"]
+assert "pixtral" not in written.lower(), f"mislabelled CSV: {written}"
+assert "qwen2.5-vl-3b-instruct" in written.lower(), written
+assert written.startswith(ns_s["RUN_NAME"]), written
+saved = os.path.join(WORKDIR, "drive", "results", written)
+assert os.path.exists(saved), saved
+import pandas as _pd
+assert len(_pd.read_csv(saved)) == len(ns["scored_df"])
+print(f"OK  save cell writes {written}")
+
+# The 7B swap must change the filename, or two runs collide on Drive.
+ns_7 = dict(ns_s)
+ns_7["MODEL_ID"] = "Qwen/Qwen2.5-VL-7B-Instruct"
+os.chdir(WORKDIR)
+try:
+    exec(compile("class FakeProc:\n    returncode = 0\n    stdout = stderr = ''\n"
+                 + save, "<save7b>", "exec"), ns_7)
+finally:
+    os.chdir(_cwd)
+assert "7b" in ns_7["csv_name"].lower() and ns_7["csv_name"] != written
+print(f"OK  7B swap changes the filename to {ns_7['csv_name']}")
+
 print("\n" + "=" * 72)
 print("DRY RUN PASSED")
 print("=" * 72)

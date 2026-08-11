@@ -206,7 +206,7 @@ assert len(ns["full_sample"]) == 300 and len(ns["sample"]) == 6
 print("OK  sample: full 300 drawn, 6 processed (checkpoint carries over)")
 
 exec(compile(src(5), "<adapter>", "exec"), ns)
-print("OK  adapter + pre-flight: boxed instruction reaches the chat template")
+print("OK  adapter + pre-flight: confidence instruction reaches the chat template")
 
 ckdir = os.path.join(WORKDIR, "ck")
 gen = c(6, ('f"{PROJECT_DIR}/checkpoints"', f'"{ckdir}"'))
@@ -214,7 +214,7 @@ exec(compile(gen, "<gen>", "exec"), ns)
 assert len(ns["raw_results"]) == 6
 assert len(ns["raw_results"][0]["transcription_samples_raw"]) == 5
 assert "grading_samples_raw" not in ns["raw_results"][0], "this run has ONE arm"
-print(f"OK  generation: {len(ns['raw_results'])} items x K=5, transcription only")
+print(f"OK  generation: {len(ns['raw_results'])} items x K=5, with confidence")
 
 CALLS["n"] = 0
 ns2 = dict(ns)
@@ -255,6 +255,49 @@ with _cl.redirect_stdout(_buf):
     exec(compile(src(7), "<gate-noconf>", "exec"), ns_g)
 assert "GATED" in _buf.getvalue(), _buf.getvalue()
 print("OK  gate fires when the model omits the Confidence field")
+
+# --- the SAVE cell, which an earlier version of this dry run never executed --
+# It referenced `df` (the gate builds `scored_df`) and still carried notebook
+# 16's hardcoded "pixtral" filename, so it would have crashed and, had it not
+# crashed, written a CSV labelled as a Pixtral run. Both were invisible here
+# because the walk stopped at the gate.
+save = c(8,
+         ('subprocess.run(["git", "-C", "repo", *args], capture_output=True, text=True)',
+          'FakeProc()'))
+ns_s = dict(ns)
+ns_s["PROJECT_DIR"] = os.path.join(WORKDIR, "drive")
+ns_s["REPO_URL"] = "https://github.com/x/y.git"
+ns_s["GH_TOKEN"] = ""
+os.makedirs(os.path.join(WORKDIR, "repo", "results"), exist_ok=True)
+_cwd = os.getcwd()
+os.chdir(WORKDIR)
+try:
+    exec(compile("class FakeProc:\n    returncode = 0\n    stdout = stderr = ''\n"
+                 + save, "<save>", "exec"), ns_s)
+finally:
+    os.chdir(_cwd)
+
+written = ns_s["csv_name"]
+assert "pixtral" not in written.lower(), f"mislabelled CSV: {written}"
+assert "qwen2.5-vl-3b-instruct" in written.lower(), written
+assert written.startswith(ns_s["RUN_NAME"]), written
+saved = os.path.join(WORKDIR, "drive", "results", written)
+assert os.path.exists(saved), saved
+import pandas as _pd
+assert len(_pd.read_csv(saved)) == len(ns["scored_df"])
+print(f"OK  save cell writes {written}")
+
+# The 7B swap must change the filename, or two runs collide on Drive.
+ns_7 = dict(ns_s)
+ns_7["MODEL_ID"] = "Qwen/Qwen2.5-VL-7B-Instruct"
+os.chdir(WORKDIR)
+try:
+    exec(compile("class FakeProc:\n    returncode = 0\n    stdout = stderr = ''\n"
+                 + save, "<save7b>", "exec"), ns_7)
+finally:
+    os.chdir(_cwd)
+assert "7b" in ns_7["csv_name"].lower() and ns_7["csv_name"] != written
+print(f"OK  7B swap changes the filename to {ns_7['csv_name']}")
 
 print("\n" + "=" * 72)
 print("DRY RUN PASSED")

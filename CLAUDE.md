@@ -1151,6 +1151,15 @@ Two kinds, for two failure modes. **Read `reference/README.md` first.**
   outputs sync back to the file on disk. Check `git diff --stat` and scan
   for leaked tokens before committing, but don't strip legitimate output
   diffs or revert cells the user added themselves.
+- **A dry run must execute the SAVE cell too.** Found the hard way on
+  2026-08-11: notebooks 19 and 20 both failed on their last cell in Colab
+  with `NameError: name 'df' is not defined` (the gate builds `scored_df`),
+  and the same cell still carried notebook 16's hardcoded `pixtral` filename,
+  so had it not crashed it would have written a CSV labelled as a Pixtral
+  run. Both were invisible because the dry run stopped at the gate. Stub
+  `subprocess.run` with a fake process, `chdir` into a temp dir, exec the
+  cell, and assert on the filename it produces — including that swapping
+  `MODEL_ID` changes it, or two runs collide on Drive.
 - **Dry-run notebook cell logic with stubs before handoff.** Extract the
   cell source, monkeypatch GPU-dependent calls (`generate()`, image
   processing) with fakes, and exec it locally to catch bugs before the user
