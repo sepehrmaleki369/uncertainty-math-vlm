@@ -164,9 +164,14 @@ for name, (df, _, _) in sheets.items():
         assert f"item {int(r['item'])}" in cap and "H=" in cap
         # BOTH automatic views must be present: the extracted span and the
         # comparison label, for model and truth alike.
-        assert "span  M" in cap and "span  T" in cap, cap
-        assert "label M" in cap and "label T" in cap, cap
-        assert ("KNOWN FALSE PASS" in cap) == bool(r["known_false_pass"]), cap
+        # NB: the caption helper collapses runs of whitespace, so the
+        # rendered text is "span M[...]", single-spaced.
+        assert "span M[" in cap and "span T[" in cap, cap
+        assert "label M:" in cap and "label T:" in cap, cap
+        assert max(len(l) for l in cap.split(chr(10))) <= 56, (
+            "caption line overflows its cell and collides with the next one; "
+            "found by RENDERING a sheet and looking at it, not by asserts")
+        assert ("KNOWN-FALSE-PASS" in cap) == bool(r["known_false_pass"]), cap
 print(f"post-conditions OK: {sum(len(v) for v in written.values())} pages across "
       f"2 folders, {sum(len(s[0]) for s in sheets.values())} items")
 print("sample caption:\n" + ns["caption_for"](sheets["extra60"][0].iloc[0]))
