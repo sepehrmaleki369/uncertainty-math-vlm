@@ -36,7 +36,7 @@ entropy, correct/wrong."*
   handwriting and every caption. Do NOT download the PNGs (0.5–1.2 MB each →
   ~180K+ tokens).
 
-### 2. Failure-category counts for `genuinely_wrong` — NOT STARTED.
+### 2. Failure-category counts — PRE-SORTER BUILT, human pass outstanding.
 
 *"Categorize: bad handwriting / notation misread / copied wrong line /
 extraction issue / hallucination."*
@@ -87,6 +87,62 @@ confidence tests green — that is the only claim-bearing result from
 2026-08-11 without test protection.
 
 ## Current findings
+
+### 2026-08-11: `genuinely_wrong` broken down — and hallucination is ZERO
+
+`pilot/failures.py`, `pilot/21_failure_audit.ipynb`,
+`pilot/tests/test_failures.py` (8 tests), `pilot/dryruns/dryrun_nb21.py`.
+Offline. Answers the reviewer question *"are these real model mistakes or
+parser artifacts?"*
+
+| proposed label | Qwen (104) | Pixtral (130) |
+|---|---|---|
+| `extraction_issue` | 16 (15.4%) | 19 (14.6%) |
+| `copied_wrong_line` | 6 (5.8%) | 1 (0.8%) |
+| `hallucination` | **0** | **0** |
+| `notation_misread` | 23 (22.1%) | 35 (26.9%) |
+| `needs_visual` | 59 (56.7%) | 75 (57.7%) |
+
+- **`hallucination` is 0 on both models** — the model never invents content
+  unrelated to the page. State it; it is the failure a reviewer most fears
+  from a VLM asked to transcribe.
+- **~15% of `genuinely_wrong` is STILL the scoring machinery**, after all
+  four rules, and it replicates across families (15.4% vs 14.6%). **A lower
+  bound** — text signals only see what text can see.
+- **~57% `needs_visual` on both.** The honest remainder; that is what the
+  notebook's coding sheet is for.
+- **These are PROPOSALS, not verdicts.** `coding_sheet` keeps
+  `proposed_label` and `final_label` in separate columns on purpose, so the
+  pre-sorter's own error rate is measurable and reportable. Report counts
+  from `final_label`.
+
+**Two over-triggers found and fixed, both on real data — the number moved
+34% → 23% → 15% for `extraction_issue`:**
+
+1. **Short numeric ground truths.** Flagging any label ≤2 chars as degenerate
+   called `'4'`, `'25'`, `'91'` scoring failures, but a short *number* is
+   plausibly the real answer. Only a stray single *letter* is the bug-3
+   signature (`sympy:a`, `sympy:p`).
+2. **SymPy's own function names read as prose.** `eq`, `tan`, `log`,
+   `integral` are bare words, so the prose detector fired on SymPy's output
+   and labelled **item 55 — the confirmed auto-correction case, a REAL model
+   error — as a parser artifact.** That direction flatters the method, which
+   is why it matters. Fixed with a `_SYMPY_NAMES` whitelist; item 55 now
+   lands in `notation_misread` (96% similar, a sign flip).
+
+**That sensitivity is the point:** a pre-sorter that confidently mislabels is
+worse than none, because its counts get quoted. Both fixes are pinned in
+`test_failures.py`.
+
+**Also fixed by the dry run:** the final-counts cell read the empty
+`final_label` column back as `NaN`, and `str(NaN)` is `"nan"`, so every
+uncoded row counted as coded and it reported "coded 31/31" against an empty
+table. `fillna("")` before the comparison.
+
+**STILL NOT DONE: the human pass.** Notebook 21 writes a 31-item coding sheet
+and captioned contact sheets to
+`Drive/uncertainty-math-vlm/figures/failure_audit/`. Nobody has filled in
+`final_label`.
 
 ### RUN 2026-08-11: verbalized confidence FAILS on perception; the \boxed{} control GATED
 
