@@ -1,41 +1,41 @@
 item,perception_entropy,known_false_pass,final_label,confidence,note
-5,0.0,False,,,
-7,0.6730116670092565,False,,,
-15,0.9502705392332348,False,,,
-16,1.0549201679861442,False,,,
-27,0.5004024235381879,False,,,
-29,0.0,False,,,
-31,0.6730116670092565,True,,,
-36,1.0549201679861442,False,,,
-50,0.5004024235381879,False,,,
-57,0.9502705392332348,False,,,
-58,0.0,False,,,
-78,1.3321790402101223,False,,,
-84,0.9502705392332348,False,,,
-85,0.0,False,,,
-90,1.0549201679861442,False,,,
-97,0.5004024235381879,False,,,
-100,0.9502705392332348,False,,,
-104,0.0,False,,,
-105,0.5004024235381879,False,,,
-106,1.3321790402101223,False,,,
-112,1.0549201679861442,False,,,
-114,1.6094379124341005,False,,,
-117,0.9502705392332348,True,,,
-122,0.0,False,,,
-127,0.5004024235381879,False,,,
-141,0.0,False,,,
-143,0.0,False,,,
-153,0.0,False,,,
-157,0.9502705392332348,False,,,
-159,1.0549201679861442,False,,,
-171,0.5004024235381879,False,,,
-197,0.9502705392332348,False,,,
-200,0.9502705392332348,False,,,
-215,0.6730116670092565,False,,,
-219,0.0,False,,,
-239,0.5004024235381879,True,,,
-247,0.0,False,,,
-250,0.5004024235381879,False,,,
-282,0.5004024235381879,False,,,
-294,1.6094379124341005,True,,,
+5,0.0,False,needs_visual,medium,"possible false pass / key mismatch: model and truth both say Option A, but the handwritten final answer appears to be 231444 while Option A appears different. Cannot resolve from the page -- flagged, not decided."
+7,0.6730116670092565,False,extraction_issue,high,"FALSE PASS: model and truth both collapsed to 'delta', but the handwritten final answer is -6. Scored correct for the wrong reason."
+15,0.9502705392332348,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+16,1.0549201679861442,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+27,0.5004024235381879,False,extraction_issue,high,"FALSE PASS: scorer matched 4x=3, but the handwritten final answer requires BOTH x=3/4 and y=33/4. The y half is missing."
+29,0.0,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+31,0.6730116670092565,True,extraction_issue,high,"KNOWN FALSE PASS (calibration item, caught): model and truth extracted 2 cm, but the handwritten final answer is 19.2 cm."
+36,1.0549201679861442,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+50,0.5004024235381879,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+57,0.9502705392332348,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+58,0.0,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+78,1.3321790402101223,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+84,0.9502705392332348,False,extraction_issue,high,FALSE PASS: model and truth both collapsed to the constant c; the final answer is the full equation tan^-1(y) = tan^-1(x) + c.
+85,0.0,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+90,1.0549201679861442,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+97,0.5004024235381879,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+100,0.9502705392332348,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+104,0.0,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+105,0.5004024235381879,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+106,1.3321790402101223,False,extraction_issue,high,FALSE PASS: model and truth extracted a symbolic fragment that is not the final answer visible on the page.
+112,1.0549201679861442,False,extraction_issue,high,"Incomplete: the formula was captured but the condition t != -1/2 is missing, so the final answer is not fully stated."
+114,1.6094379124341005,False,extraction_issue,high,SymPy derivative labels are messy expressions and are not reliable as the full final answer.
+117,0.9502705392332348,True,extraction_issue,high,"KNOWN FALSE PASS (calibration item, caught): both sides collapsed to 'p', which is not the final answer."
+122,0.0,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+127,0.5004024235381879,False,extraction_issue,high,FALSE PASS: both collapsed to the symbol f; the handwritten answer is a full statement about the continuity of f.
+141,0.0,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+143,0.0,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+153,0.0,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+157,0.9502705392332348,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+159,1.0549201679861442,False,extraction_issue,high,Incomplete: both collapsed to a partial vector expression; the answer is the full conclusion that AB and CD are collinear.
+171,0.5004024235381879,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+197,0.9502705392332348,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+200,0.9502705392332348,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+215,0.6730116670092565,False,extraction_issue,high,"Incomplete: kept only one direction cosine 3/sqrt(77); the full answer is 3/sqrt(77), -2/sqrt(77), 8/sqrt(77)."
+219,0.0,False,extraction_issue,high,"Incomplete: kept only x=5/3; the handwritten answer includes the full result and conditions with a, b."
+239,0.5004024235381879,True,extraction_issue,high,"KNOWN FALSE PASS (calibration item, caught): collapsed to 'i', but the handwritten answer is a full differential-equation verification."
+247,0.0,False,true_correct,high,model and truth agree and the handwritten final answer matches -- a genuine correct read.
+250,0.5004024235381879,False,extraction_issue,high,FALSE PASS: collapsed to 'r'; the full answer is the collinearity conclusion.
+282,0.5004024235381879,False,extraction_issue,high,FALSE PASS: collapsed to 'c'; the full answer is a broader equation/condition.
+294,1.6094379124341005,True,extraction_issue,high,"KNOWN FALSE PASS (calibration item, caught): -5/15 alone is an incomplete/wrong target."

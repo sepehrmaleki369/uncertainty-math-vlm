@@ -212,3 +212,179 @@ def correct_item_spot_check_sample(run: pd.DataFrame, n: int = 40,
         "confidence": "",
         "note": "",
     })
+
+
+# ---------------------------------------------------------------------------
+# The OTHER side of the audit: false passes among items the rule called correct
+# ---------------------------------------------------------------------------
+
+#: Labels used by the strict_v1-CORRECT spot check. Deliberately NOT
+#: `pilot.failures.LABELS` -- that vocabulary describes why a WRONG item
+#: failed, and here the question is whether a CORRECT verdict was earned.
+SPOTCHECK_LABELS = ("true_correct", "extraction_issue", "needs_visual")
+
+
+def _wilson(k: int, n: int, z: float = 1.96) -> tuple:
+    """Wilson score interval -- correct near 0 and 1, unlike normal-approx."""
+    if n == 0:
+        return (float("nan"), float("nan"))
+    p = k / n
+    d = 1 + z * z / n
+    centre = (p + z * z / (2 * n)) / d
+    half = z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
+    return (max(0.0, centre - half), min(1.0, centre + half))
+
+
+def false_pass_rate(spot: pd.DataFrame) -> dict:
+    """Share of `strict_v1`-CORRECT items whose correct verdict was NOT earned.
+
+    `extraction_issue` here means the match was vacuous -- both sides collapsed
+    to the same fragment (`c`, `p`, `r`, `i`), or the captured span is only
+    part of a multi-part answer. It does NOT always mean the model was wrong;
+    it means the CORRECT verdict is not evidence that it was right.
+    """
+    n = len(spot)
+    fp = int((spot["final_label"] == "extraction_issue").sum())
+    tc = int((spot["final_label"] == "true_correct").sum())
+    lo, hi = _wilson(fp, n)
+    return {"n_sampled": n, "n_false_pass": fp, "n_true_correct": tc,
+            "n_undecided": n - fp - tc,
+            "false_pass_rate": fp / n, "ci_low": lo, "ci_high": hi,
+            "true_correct_rate": tc / n,
+            "true_correct_ci": _wilson(tc, n)}
+
+
+def two_sided_accuracy_bounds(run: pd.DataFrame, audit: pd.DataFrame,
+                              spot: pd.DataFrame, rule: str = "strict_v1",
+                              **kwargs) -> dict:
+    """Accuracy after correcting BOTH directions -- the honest figure.
+
+    The one-sided version could only add items, so it ran to 71-74%. Removing
+    the false passes that the spot check found pulls it most of the way back:
+    the two corrections very nearly cancel. Reporting only the one-sided
+    number would have overstated accuracy by roughly twenty points.
+
+    The false-pass count is EXTRAPOLATED from a 40-item sample to all 141
+    correct items, so its Wilson interval is carried through -- this is an
+    estimate with sampling error, not a census like the wrong-side audit.
+    """
+    base = corrected_accuracy_bounds(run, audit, rule=rule, **kwargs)
+    n_correct = base["baseline_correct"]
+    fp = false_pass_rate(spot)
+
+    recovered_lo = base["corrected_correct_low"] - n_correct    # unknown=wrong
+    recovered_hi = base["corrected_correct_high"] - n_correct   # unknown=correct
+
+    # verified-correct among the 141, from the sampled true_correct rate
+    tc_lo, tc_hi = fp["true_correct_ci"]
+    kept_point = n_correct * fp["true_correct_rate"]
+    kept_lo, kept_hi = n_correct * tc_lo, n_correct * tc_hi
+
+    n = base["n"]
+    return {
+        **{f"onesided_{k}": v for k, v in base.items() if "accuracy" in k},
+        "n": n,
+        "baseline_accuracy": base["baseline_accuracy"],
+        "false_pass_rate": fp["false_pass_rate"],
+        "false_pass_ci": (fp["ci_low"], fp["ci_high"]),
+        "n_recovered_from_wrong": (recovered_lo, recovered_hi),
+        "n_false_pass_estimated": (n_correct * fp["ci_low"],
+                                   n_correct * fp["ci_high"]),
+        "two_sided_accuracy_point": (kept_point + recovered_lo) / n,
+        "two_sided_accuracy_low": (kept_lo + recovered_lo) / n,
+        "two_sided_accuracy_high": (kept_hi + recovered_hi) / n,
+        "note": ("false passes extrapolated from a 40-item random sample of "
+                 "the 141 correct items; Wilson CI carried through"),
+    }
+
+
+def audited_subset_labels(run: pd.DataFrame, audit: pd.DataFrame,
+                          spot: pd.DataFrame, unknown_as: bool,
+                          **kwargs) -> pd.DataFrame:
+    """Every item a human actually read, with its corrected label.
+
+    104 wrong (all of them) + 40 correct (a seeded random draw), plus a
+    `weight` column that MUST be used when estimating anything from it.
+
+    **The naive unweighted AUROC on this frame is biased LOW and it is a trap.**
+    AUROC's invariance to class prevalence is real but does not apply here:
+    after correction each class is a MIXTURE of both source strata, and the
+    strata were sampled at different rates (100% of the wrong side, 28% of the
+    correct side). The corrected-correct class ends up 76% recovered
+    high-entropy items where the population would be ~47%, so the correct
+    class looks far noisier than it is, so use `weighted_auroc`.
+
+    Correcting the weighting turned out to matter much less than expected --
+    0.586 unweighted against 0.572 weighted -- because the false passes pulled
+    up into the WRONG class are themselves LOW entropy (mean 0.818 against
+    0.530 for verified-correct), so both classes shift down together. The
+    weighting is still the right estimator; it simply is not what moves this
+    number.
+    """
+    hc = human_corrected_correct(run, audit, **kwargs)
+    rows = {}
+    for item, val in hc.items():
+        rows[item] = unknown_as if val is None else bool(val)
+    for _, r in spot.iterrows():
+        lab = r["final_label"]
+        if lab == "true_correct":
+            rows[int(r["item"])] = True
+        elif lab == "extraction_issue":
+            rows[int(r["item"])] = False        # the verdict was not earned
+        else:
+            rows[int(r["item"])] = unknown_as
+    idx = sorted(rows)
+    out = run.loc[idx, ["perception_entropy"]].copy()
+    out["corrected_correct"] = [rows[i] for i in idx]
+    out["side"] = ["wrong_side" if i in audit.index else "correct_side"
+                   for i in idx]
+    # Inverse sampling probability: the wrong side is a census, the correct
+    # side is 40 drawn from `n_correct_total`.
+    n_correct_total = int(rescore.rescore_run(run, rule="strict_v1")
+                          ["transcription_correct"].astype(bool).sum())
+    w = n_correct_total / len(spot)
+    out["weight"] = [1.0 if sd == "wrong_side" else w for sd in out["side"]]
+    return out
+
+
+def weighted_auroc(frame: pd.DataFrame, entropy_col: str = "perception_entropy",
+                   correctness_col: str = "corrected_correct",
+                   weight_col: str = "weight", n_boot: int = 4000,
+                   seed: int = 0, alpha: float = 0.05) -> dict:
+    """AUROC with inverse-sampling weights, plus a STRATIFIED bootstrap CI.
+
+    Estimates P(entropy_wrong > entropy_correct) over the weighted pseudo-
+    population, so the differently-sampled strata are put back in their true
+    proportions. Ties contribute 0.5, matching the unweighted convention.
+    The bootstrap resamples WITHIN each stratum, because the wrong side is a
+    census and carries no sampling error of its own.
+    """
+    ent = frame[entropy_col].to_numpy(float)
+    ok = frame[correctness_col].to_numpy(bool)
+    wt = frame[weight_col].to_numpy(float)
+    side = frame["side"].to_numpy()
+
+    def _auroc(e, o, w):
+        ew, ww = e[~o], w[~o]
+        ec, wc = e[o], w[o]
+        if not len(ew) or not len(ec):
+            return float("nan")
+        gt = (ew[:, None] > ec[None, :]).astype(float)
+        eq = (ew[:, None] == ec[None, :]).astype(float)
+        num = (ww[:, None] * wc[None, :] * (gt + 0.5 * eq)).sum()
+        return float(num / (ww.sum() * wc.sum()))
+
+    point = _auroc(ent, ok, wt)
+    rng = np.random.default_rng(seed)
+    strata = [np.flatnonzero(side == s) for s in ("wrong_side", "correct_side")]
+    draws = []
+    for _ in range(n_boot):
+        pick = np.concatenate([rng.choice(ix, size=len(ix), replace=True)
+                               for ix in strata if len(ix)])
+        val = _auroc(ent[pick], ok[pick], wt[pick])
+        if val == val:
+            draws.append(val)
+    lo, hi = np.percentile(draws, [100 * alpha / 2, 100 * (1 - alpha / 2)])
+    return {"auroc": point, "ci_low": float(lo), "ci_high": float(hi),
+            "n": len(frame), "excludes_chance": bool(lo > 0.5),
+            "n_boot_ok": len(draws)}

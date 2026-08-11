@@ -105,6 +105,85 @@ one) is still Drive-only, and nothing may be quoted from it anyway.
 
 ## Current findings
 
+### 2026-08-12: THE FALSE-PASS CHECK — 40% of "correct" verdicts were not earned
+
+`pilot/corrected.py`, `pilot/tests/test_corrected.py` (19 tests),
+`reference/audit/spotcheck_40_qwen_strict_v1_correct_20260811.csv`,
+`pilot/23_spotcheck_contact_sheets.ipynb`. Offline.
+
+The 104-item audit could only find false NEGATIVES. A human then read a
+**seeded random sample of 40 of the 141 `strict_v1`-CORRECT items**:
+
+| | n | share |
+|---|---|---|
+| `true_correct` | 23 | 57.5% |
+| `extraction_issue` (verdict not earned) | **16** | **40.0%** [Wilson 26.3%, 55.4%] |
+| `needs_visual` | 1 | 2.5% |
+
+**All 4 seeded calibration items (31, 117, 239, 294) were caught**, so the
+pass detects what it was built to detect.
+
+- **THE ONE-SIDED NUMBER WAS WRONG BY ~20 POINTS AND MUST NOT BE USED.**
+
+  | | accuracy |
+  |---|---|
+  | `strict_v1` baseline | 47.0% |
+  | one-sided (wrong side only) | ~~71.3–74.0%~~ **retracted** |
+  | **two-sided** | **44.2–60.6%, point 51.4%** |
+
+  The two corrections very nearly cancel: ~73 items recovered from the wrong
+  side, ~37–78 false passes removed from the correct side. **The honest
+  headline is that human correction moves accuracy from 47.0% to ~51%, not to
+  74%.** The false-pass count is extrapolated from 40 items, so its Wilson
+  interval is carried through — the wrong-side audit is a census, this is not.
+- **The mechanism, and it is the worst case for the method: false passes are
+  LOW ENTROPY.** Mean 0.818 against 0.530 for verified-correct and 1.370 for a
+  real misread. **A false pass is a CONFIDENTLY wrong item, which is precisely
+  what entropy cannot flag by construction.**
+- **THE CORRECTED AUROC IS NOT RESOLVED, AND THE RANGE MUST BE REPORTED, NEVER
+  AN ENDPOINT.** On the 144 fully-audited items, weighted:
+
+  | reading of a false pass | AUROC [95% CI] | excludes chance |
+  |---|---|---|
+  | model was WRONG | **0.572** [0.456, 0.689] | **no** |
+  | undecidable (excluded) | **0.724** [0.576, 0.848] | yes |
+  | model still right | 0.728 [0.582, 0.854] | yes |
+
+  The audit did not settle which reading is right. Some are unambiguous (item
+  31: model 2 cm against a handwritten 19.2 cm); the collapsed-to-one-symbol
+  cases (84, 117, 239, 250, 282) leave the model's actual answer unknown,
+  because only the *match* was shown to be vacuous. **Say 0.57–0.73,
+  unresolved, pending a larger correct-side audit.**
+- **THE ESTIMATOR TRAP, and the naive number is the one that looks publishable
+  in the wrong direction.** After correction each class is a MIXTURE of both
+  strata, sampled at 100% (wrong) and 28% (correct), so the corrected-correct
+  class is 76% recovered high-entropy items where the population would be
+  ~47%. **Use `corrected.weighted_auroc` with inverse-sampling weights and a
+  stratified bootstrap, never a plain `bootstrap_auroc_ci` on the subset.**
+  Here it moved 0.586 → 0.572 — small, because the false passes pulled into
+  the wrong class are themselves low-entropy, so both classes shift together.
+  The weighting is still the correct estimator; it just is not what moves this
+  number.
+- **The generalisable lesson, and it is a Limitations sentence: SymPy labels
+  are unsafe as the final judge for long or multi-part answers.** They are
+  fine for a simple numeric or algebraic final answer, and they fail when the
+  answer is a sentence or proof, has several parts, is a matrix/vector/set, or
+  is multiple-choice plus a worked value — the parser collapses the whole
+  thing to one symbol (`c`, `p`, `r`, `i`, `f`), and **two collapsed labels
+  then MATCH, scoring the item correct for no reason at all.** That is the
+  same collapse as bug 3, now shown to manufacture false positives as well as
+  false negatives.
+- **What this does NOT overturn.** The distinct-answers table (92.1% → 6.6%)
+  and the cross-family replication are untouched — they rest on the stored
+  columns of the frozen rule, which is unchanged. What is now in question is
+  how well the *frozen rule's labels* track truth, which is a Limitations
+  matter, not a retraction. **Do not withdraw the perception claim on this;
+  do state the corrected range.**
+- **Next, if pursued:** the 40-item sample is what makes both intervals wide.
+  Auditing another ~60 correct items would tighten the false-pass rate and
+  could separate 0.57 from 0.73. That is the highest-value remaining audit
+  work, ahead of Pixtral.
+
 ### 2026-08-11: `wrong_on_both` COMPLETE — and Qwen's `genuinely_wrong` is now 99% coded
 
 The user read the images for **all 73 `wrong_on_both` items** (Qwen and

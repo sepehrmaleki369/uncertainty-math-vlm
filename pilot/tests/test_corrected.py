@@ -166,3 +166,122 @@ def test_spot_check_sample_is_random_seeded_and_flags_known_false_passes(run):
     ok = scored_correct.index[scored_correct["transcription_correct"].astype(bool)]
     assert set(s1["item"]) <= set(ok), "must sample only from CORRECT items"
     assert s1["final_label"].eq("").all(), "ships uncoded"
+
+
+# ---------------------------------------------------------------------------
+# The false-pass spot check (2026-08-12) -- the other side of the correction
+# ---------------------------------------------------------------------------
+
+SPOT = ROOT / "reference" / "audit" / "spotcheck_40_qwen_strict_v1_correct_20260811.csv"
+
+
+@pytest.fixture(scope="module")
+def spot():
+    return pd.read_csv(SPOT)
+
+
+def test_the_spot_check_is_coded_with_its_own_vocabulary(spot):
+    """`true_correct` is not in pilot.failures.LABELS on purpose: that
+    vocabulary says why a WRONG item failed, this one says whether a CORRECT
+    verdict was earned."""
+    assert len(spot) == 40
+    assert spot["item"].is_unique
+    assert spot.isna().sum().sum() == 0
+    assert set(spot["final_label"]) <= set(C.SPOTCHECK_LABELS)
+
+
+def test_all_four_calibration_items_were_caught(spot):
+    """31, 117, 239 and 294 are known `false_pass_removed` items seeded into
+    the sample. Missing any of them would mean the human pass cannot detect
+    the thing it was built to detect, and the rate it produces could not be
+    trusted."""
+    cal = spot[spot["known_false_pass"]]
+    assert len(cal) == 4
+    assert set(cal["item"]) == {31, 117, 239, 294}
+    assert (cal["final_label"] == "extraction_issue").all()
+
+
+def test_two_in_five_correct_verdicts_were_not_earned(spot):
+    """The headline of the second pass, and the reason the one-sided figure
+    could not stand."""
+    fp = C.false_pass_rate(spot)
+    assert fp["n_false_pass"] == 16
+    assert fp["n_true_correct"] == 23
+    assert fp["false_pass_rate"] == pytest.approx(0.40, abs=0.001)
+    assert fp["ci_low"] == pytest.approx(0.263, abs=0.01)
+    assert fp["ci_high"] == pytest.approx(0.554, abs=0.01)
+
+
+def test_the_two_corrections_very_nearly_cancel(run, audit, spot):
+    """The one-sided pass ran accuracy to 71-74%. Removing the false passes
+    pulls it back to ~51%, barely above the 47.0% baseline. Reporting only
+    the one-sided number would have overstated accuracy by ~20 points --
+    which is exactly why the one-sidedness was flagged before it was fixed."""
+    b = C.two_sided_accuracy_bounds(run, audit, spot)
+    assert b["baseline_accuracy"] == pytest.approx(0.470, abs=0.001)
+    assert b["onesided_corrected_accuracy_low"] > 0.70
+    assert b["two_sided_accuracy_point"] == pytest.approx(0.514, abs=0.02)
+    assert 0.42 < b["two_sided_accuracy_low"] < 0.47
+    assert 0.58 < b["two_sided_accuracy_high"] < 0.63
+    assert b["two_sided_accuracy_point"] < b["onesided_corrected_accuracy_low"]
+
+
+def test_false_passes_are_low_entropy_which_is_the_mechanism(run, spot):
+    """Why the corrected AUROC falls so far: a false pass is a CONFIDENTLY
+    wrong item, and confidently wrong is precisely what entropy cannot flag.
+    Mean entropy 0.818 against 0.530 for verified-correct -- higher, but far
+    below the 1.37 of a real misread."""
+    fp = spot.loc[spot["final_label"] == "extraction_issue", "item"].astype(int)
+    tc = spot.loc[spot["final_label"] == "true_correct", "item"].astype(int)
+    h_fp = run.loc[fp, "perception_entropy"].mean()
+    h_tc = run.loc[tc, "perception_entropy"].mean()
+    assert h_fp == pytest.approx(0.818, abs=0.03)
+    assert h_tc == pytest.approx(0.530, abs=0.03)
+    assert h_fp < 1.0, "well below the 1.37 of a genuine notation misread"
+
+
+def test_the_unweighted_subset_auroc_is_a_trap(run, audit, spot):
+    """After correction each class MIXES both strata, which were sampled at
+    100% and 28%. The naive unweighted estimate over-weights the recovered
+    high-entropy items and biases the AUROC low. Weighting is the fix, though
+    it moves this particular number less than expected."""
+    from pilot.plotting import bootstrap_auroc_ci
+    d = C.audited_subset_labels(run, audit, spot, unknown_as=False)
+    assert set(d["side"]) == {"wrong_side", "correct_side"}
+    assert d.loc[d["side"] == "wrong_side", "weight"].eq(1.0).all()
+    assert d.loc[d["side"] == "correct_side", "weight"].iloc[0] == pytest.approx(
+        141 / 40, abs=0.01)
+    cc = d[d["corrected_correct"]]
+    assert (cc["side"] == "wrong_side").mean() > 0.70, "the over-weighting"
+    naive = bootstrap_auroc_ci(d, "perception_entropy", "corrected_correct",
+                               n_boot=1000, seed=0)["auroc"]
+    weighted = C.weighted_auroc(d, n_boot=1000, seed=0)["auroc"]
+    assert naive == pytest.approx(0.586, abs=0.02)
+    assert weighted == pytest.approx(0.572, abs=0.02)
+
+
+def test_the_corrected_auroc_is_interpretation_dependent_and_not_resolved(
+        run, audit, spot):
+    """THE UNCOMFORTABLE RESULT, and it must not be quoted as a single number.
+
+    Whether a false pass means "the model was wrong" or "we cannot tell" is a
+    judgement the audit did not settle -- some are unambiguous (item 31: 2 cm
+    against a handwritten 19.2 cm) while the collapsed-to-one-symbol cases
+    (84, 117, 239, 250, 282) leave the model's actual answer unknown. The
+    AUROC swings from chance to resolved across that choice.
+    """
+    fp = set(spot.loc[spot["final_label"] == "extraction_issue",
+                      "item"].astype(int))
+    d = C.audited_subset_labels(run, audit, spot, unknown_as=False)
+
+    wrong = C.weighted_auroc(d, n_boot=2000, seed=0)
+    assert wrong["auroc"] == pytest.approx(0.572, abs=0.03)
+    assert wrong["excludes_chance"] is False
+
+    undecidable = C.weighted_auroc(d[~d.index.isin(fp)], n_boot=2000, seed=0)
+    assert undecidable["auroc"] == pytest.approx(0.724, abs=0.04)
+    assert undecidable["excludes_chance"] is True
+
+    assert undecidable["auroc"] - wrong["auroc"] > 0.10, (
+        "the swing across an unsettled interpretive choice is large; report "
+        "the RANGE 0.57-0.73, never one endpoint")
