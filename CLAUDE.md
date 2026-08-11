@@ -6,6 +6,86 @@ it's wrong, on FERMAT (handwritten math) with Qwen2.5-VL-3B. Two arms:
 instability). See `README.md` for setup/layout basics — this file is
 working context for future sessions, not a repeat of that.
 
+## OPEN — what is NOT done (2026-08-11)
+
+Scored against the seven things a reviewer would ask for, in the user's own
+priority order. **Items 3–6 are done and locked. Items 1 and 2 are not, and
+item 1 is the highest-value remaining work in the project.**
+
+### 1. Manual visual audit — TOOLED BUT UNREAD. The top priority.
+
+*"Show 30–50 real examples: model output, extracted answer, ground truth,
+entropy, correct/wrong."*
+
+- **Built:** notebook 17 §6 writes **17 contact-sheet PNGs** to
+  `Drive/uncertainty-math-vlm/figures/genuinely_wrong/` — `unanimous_wrong_*`
+  (9 items), `wrong_on_both` (73), `only_qwen` (31), `only_pixtral` (57).
+  Caption per cell: item index, entropy, which model(s) failed, model label,
+  truth label. `show_item` + `rescore.format_trace` give the full per-item
+  view including **raw model output** and the column where the two labels
+  first diverge.
+- **NOT done: nobody has read them and coded them.** That is a human task and
+  it is what converts "the tooling exists" into evidence.
+- **Partial exception:** the 9 unanimous-and-wrong items WERE read
+  (2026-08-11, via the Drive OCR of the sheets) and ~6 of 8 distinct items
+  turned out to be scoring failures, not misreads. That result is recorded
+  above and is the reason this audit matters — the unread 73 may contain
+  more of the same.
+- **How to read them without Colab:** `mcp__claude_ai_Google_Drive__search_files`
+  returns an OCR `contentSnippet` per sheet carrying the transcribed
+  handwriting and every caption. Do NOT download the PNGs (0.5–1.2 MB each →
+  ~180K+ tokens).
+
+### 2. Failure-category counts for `genuinely_wrong` — NOT STARTED.
+
+*"Categorize: bad handwriting / notation misread / copied wrong line /
+extraction issue / hallucination."*
+
+- `classify_scoring_outcome` categorizes every item by **why it scored**
+  (`correct_robust` … `genuinely_wrong`). **Within** `genuinely_wrong` (Qwen
+  104, Pixtral 130) there is **no breakdown at all** — `CATEGORIES` has seven
+  entries and none of them subdivides it.
+- This is what turns "it works" into "we understand why it fails", and it is
+  cheap: several categories are text-detectable offline —
+  **copied-wrong-line** (the model's answer matches a *different* line of
+  `pert_a`), **extraction issue** (already separable via the tier/label
+  machinery), **hallucination** (no token overlap with `pert_a`). Only
+  **bad handwriting** and **notation misread** need the image.
+- Suggested shape: a first-pass classifier proposing a label from text
+  signals, plus a coding sheet, so the human pass is confirm-or-correct on a
+  pre-sorted list rather than 104 items from scratch.
+
+### 3–6. Done and locked
+
+| ask | status |
+|---|---|
+| verbalized confidence baseline | notebook 20; `test_verbalized_confidence.py` (skips until the CSV is downloaded) |
+| token confidence baseline | `test_confidence_and_variants.py`, +0.297 [+0.214, +0.380] |
+| extractor-confound control | one-tier-only analysis, 0.845 vs 0.835 / 0.853 vs 0.828 |
+| second model family | Pixtral-12B, 0.828 [0.782, 0.871], robust |
+
+### 7. Reasoning — deliberately closed
+
+Null/artifact story. **No more GPU there.** See the RETRACTION section.
+
+### Not on the reviewer's list, but the actual critical path
+
+**Writing.** `paper/refs.bib` has **3 entries** and Related Work is a `\todo`
+that says "VERIFY EVERY CITATION AGAINST THE REAL PAPER". Introduction,
+Conclusion and two figures are also `\todo`. And **`report/report.tex`
+contradicts itself** — the Retraction section sits at line ~150 while the body
+still asserts the retracted Phase 4/5 claims as findings.
+
+WACV Round 2: enrol Aug 21, submit Aug 28. **Two blockers to fix before any
+further analysis: Related Work, and the report's self-contradiction.**
+
+### Two CSVs still Drive-only
+
+`confidence_perception_full_n300_*` and `boxed_perception_full_n300_*` (the
+gated one). Download into `results/` to turn the 7 skipped verbalized-
+confidence tests green — that is the only claim-bearing result from
+2026-08-11 without test protection.
+
 ## Current findings
 
 ### RUN 2026-08-11: verbalized confidence FAILS on perception; the \boxed{} control GATED
