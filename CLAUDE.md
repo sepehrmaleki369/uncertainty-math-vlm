@@ -88,6 +88,59 @@ confidence tests green — that is the only claim-bearing result from
 
 ## Current findings
 
+### 2026-08-11: the distinct-answers table — the result without an AUROC
+
+`accuracy_by_distinct_answers`, `plot_accuracy_by_distinct_answers`,
+`distinct_from_entropy` in `pilot/plotting.py`; figure at
+`report/figures/accuracy_by_distinct_answers.png`; 5 tests.
+
+**Accuracy vs. how many different answers the model gave (K=5):**
+
+| distinct answers | Qwen-3B | Pixtral-12B |
+|---|---|---|
+| 1 (unanimous) | **92.1%** (n=38) | **87.5%** (n=56) |
+| 2 | 62.9% (n=62) | 61.4% (n=57) |
+| 3 | 38.0% (n=79) | 32.9% (n=76) |
+| 4 | 16.7% (n=60) | 26.7% (n=60) |
+| 5 (all differ) | **6.6%** (n=61) | **0.0%** (n=51) |
+
+**Lead with this, not the AUROC.** A 13× accuracy range with no threshold, no
+calibration and no free parameters, monotone on two architecturally
+independent models. The AUROC is the summary statistic; this is the behaviour.
+Pixtral's 4-distinct cell sits slightly above its 3-distinct one (n=60) —
+noise, and the tests assert monotonicity only where it is claimed.
+
+**THE TRAP, and it nearly went into the figure. Derive the distinct count
+from the STORED `perception_entropy`, never by recomputing labels.** For K=5
+the seven reachable entropies map one-to-one onto the partitions of 5, so
+`distinct_from_entropy` is exact. Recomputing from raw samples gives a
+**different** table for the 2026-08-02 Qwen run — **80% instead of 92% in the
+one-distinct cell** — because that run was scored in a Colab session without
+SymPy's LaTeX parser and 43/300 items labelled differently
+(`canonicalize.latex_parser_available`). Every locked figure (AUROC 0.835,
+accuracy 39.3%) comes from the stored column, so a figure built on a
+recompute would contradict the paper's own headline. **Pixtral is unaffected
+— its recompute matches exactly — which is precisely why the discrepancy is
+easy to miss.** Locked in
+`test_recomputing_distinct_counts_would_contradict_the_reported_numbers`.
+
+### 2026-08-11: what the 300 items actually are
+
+| field | value |
+|---|---|
+| `has_error` | 150 / 150 (by design) |
+| `image_quality` | 205 good / **95 degraded (31.7%)** |
+| `handwriting_style` | 266 / 34 |
+| question type | **52 multiple-choice (17.3%)** / 248 free-response |
+| question length | median 138 chars (p25 88, p75 215) |
+| **answer length** | **median 449 chars** (p25 290, p75 611, max 1767) |
+
+- **These are multi-step derivations, not short answers** — median 449
+  characters — which is why final-answer extraction was needed at all.
+- **Entropy is well spread**: all 7 reachable K=5 values populated, 12.7% at
+  H=0 and 20.3% at ln5. **Compare InternVL3's 67% at the ceiling**, the
+  degeneracy that invalidated its 0.915.
+
 ### 2026-08-11: "did you pick easy cases?" — answered, with one real caveat
 
 `pilot.data.sample_vs_corpus`, `pilot/22_sample_representativeness.ipynb`,

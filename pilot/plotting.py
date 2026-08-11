@@ -1523,3 +1523,109 @@ def contact_sheet(
         fig.tight_layout(rect=(0, 0, 1, 0.97 if title else 1))
         figures.append(fig)
     return figures
+
+
+def accuracy_by_distinct_answers(df, distinct_col="n_distinct", correctness_col="transcription_correct"):
+    """Accuracy at each level of "how many different answers did it give".
+
+    The plainest statement of the perception result, and the one a reader
+    understands without knowing what an AUROC is: with K=5 the model gives
+    between 1 and 5 distinct answers, and accuracy falls monotonically across
+    that range -- 92% at one answer to 7% at five on Qwen-3B.
+
+    Returned rather than plotted so the numbers can be asserted; the figure is
+    plot_accuracy_by_distinct_answers.
+    """
+    correct = df[correctness_col].astype(str).str.lower().isin(["true", "1"]) \
+        if df[correctness_col].dtype == object else df[correctness_col].astype(bool)
+    out = (pd.DataFrame({"n_distinct": df[distinct_col].astype(int),
+                         "correct": correct})
+           .groupby("n_distinct")["correct"].agg(["size", "mean"])
+           .rename(columns={"size": "n", "mean": "accuracy"}))
+    return out.reset_index()
+
+
+def plot_accuracy_by_distinct_answers(
+    tables: dict,
+    ax: Optional[plt.Axes] = None,
+    k: int = 5,
+    annotate_n: bool = True,
+) -> plt.Axes:
+    """One line per model of accuracy vs. distinct answers, with counts.
+
+    `tables` maps a model name to accuracy_by_distinct_answers' output.
+
+    Drawn as lines rather than bars because the claim is the TREND -- that
+    accuracy falls monotonically as self-disagreement rises -- and bars invite
+    reading each cell on its own. The n is annotated at every point because
+    the end cells are the interesting ones and are also the smallest, so a
+    reader must be able to see how much weight each carries.
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(6.4, 4.0))
+    ax.set_facecolor(SURFACE)
+    if ax.figure is not None:
+        ax.figure.patch.set_facecolor(SURFACE)
+
+    palette = [COLOR_CORRECT, COLOR_INCORRECT, INK_SECONDARY]
+    for i, (name, table) in enumerate(tables.items()):
+        colour = palette[i % len(palette)]
+        ax.plot(table["n_distinct"], table["accuracy"] * 100, marker="o",
+                markersize=6, linewidth=2, color=colour, label=name, zorder=3)
+        if annotate_n:
+            for _, row in table.iterrows():
+                ax.annotate(f"n={int(row['n'])}",
+                            (row["n_distinct"], row["accuracy"] * 100),
+                            textcoords="offset points", xytext=(0, 9 if i == 0 else -16),
+                            ha="center", fontsize=7.5, color=colour, zorder=4)
+
+    ax.set_xticks(range(1, k + 1))
+    ax.set_xlabel(f"distinct answers across {k} samples", fontsize=10,
+                  color=INK_SECONDARY)
+    ax.set_ylabel("transcription accuracy (%)", fontsize=10, color=INK_SECONDARY)
+    ax.set_ylim(-6, 104)
+    ax.grid(axis="y", color=GRIDLINE, linewidth=1, zorder=0)
+    ax.set_axisbelow(True)
+    for side in ("top", "right", "left"):
+        ax.spines[side].set_visible(False)
+    ax.spines["bottom"].set_color(BASELINE)
+    ax.tick_params(colors=INK_MUTED, labelsize=9, length=0)
+    ax.legend(frameon=False, fontsize=9)
+    return ax
+
+
+# For K=5 the entropy value determines the number of distinct answers exactly
+# -- the seven reachable values correspond one-to-one with the partitions of 5
+# -- so this inverts the stored column without recomputing labels.
+#
+# That distinction matters. Recomputing distinct counts from the raw samples
+# gives DIFFERENT numbers for the 2026-08-02 Qwen run (92% -> 80% in the
+# one-distinct cell), because that run was scored in a Colab session where
+# SymPy's LaTeX parser was unavailable and 43/300 items labelled differently
+# (see canonicalize.latex_parser_available). Every locked figure -- AUROC
+# 0.835, accuracy 39.3% -- comes from the STORED column, so anything reported
+# beside them has to come from the same place or the paper contradicts itself.
+_K5_ENTROPY_TO_DISTINCT = {
+    0.0: 1,        # 5
+    0.5004: 2,     # 4+1
+    0.6730: 2,     # 3+2
+    0.9503: 3,     # 3+1+1
+    1.0549: 3,     # 2+2+1
+    1.3322: 4,     # 2+1+1+1
+    1.6094: 5,     # 1+1+1+1+1
+}
+
+
+def distinct_from_entropy(entropy_values, k: int = 5):
+    """Number of distinct answers implied by each K=5 cluster entropy."""
+    if k != 5:
+        raise ValueError("the exact inversion is only tabulated for k=5")
+    out = []
+    for value in entropy_values:
+        match = min(_K5_ENTROPY_TO_DISTINCT, key=lambda x: abs(x - float(value)))
+        if abs(match - float(value)) > 1e-3:
+            raise ValueError(
+                f"entropy {value} is not a reachable K=5 value; the run was "
+                "probably not K=5, so this inversion does not apply")
+        out.append(_K5_ENTROPY_TO_DISTINCT[match])
+    return out

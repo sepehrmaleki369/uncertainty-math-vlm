@@ -1,4 +1,5 @@
 import math
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -1236,3 +1237,100 @@ def test_contact_sheet_captions_land_on_their_own_cells():
     fig = contact_sheet(_stub_images(3), captions, ncols=3, per_page=3)[0]
     assert [ax.get_title(loc="left") for ax in fig.axes
             if ax.get_title(loc="left")] == captions
+
+
+# --- accuracy by distinct answers ----------------------------------------
+#
+# The plainest statement of the perception result and the one a reader
+# understands without knowing what an AUROC is. Locked because it is headed
+# for a figure, and because deriving it the obvious way gets it wrong.
+
+
+def _distinct_table(csv_name):
+    from pilot.plotting import accuracy_by_distinct_answers, distinct_from_entropy
+    path = (Path(__file__).resolve().parents[2] / "results" / csv_name)
+    if not path.exists():
+        pytest.skip(f"{csv_name} not present (download from Drive)")
+    df = pd.read_csv(path)
+    df["n_distinct"] = distinct_from_entropy(df["perception_entropy"])
+    return accuracy_by_distinct_answers(df).set_index("n_distinct")
+
+
+def test_distinct_from_entropy_inverts_the_k5_values_exactly():
+    """For K=5 the seven reachable entropies map one-to-one onto the
+    partitions of 5, so the inversion is exact rather than approximate."""
+    from pilot.plotting import distinct_from_entropy
+    values = [0.0, 0.5004024235, 0.6730116670, 0.9502705392,
+              1.0549201680, 1.3321790402, 1.6094379124]
+    assert distinct_from_entropy(values) == [1, 2, 2, 3, 3, 4, 5]
+
+
+def test_distinct_from_entropy_rejects_an_unreachable_value():
+    """A value off the K=5 grid means the run was not K=5, and silently
+    rounding it to the nearest would fabricate a distinct count."""
+    from pilot.plotting import distinct_from_entropy
+    with pytest.raises(ValueError, match="reachable"):
+        distinct_from_entropy([0.30])
+
+
+@pytest.mark.parametrize("csv_name,expected", [
+    ("scaleup_n300_bal50_qwen25-vl-3b-instruct_20260802T163202Z.csv",
+     {1: (38, 0.921), 2: (62, 0.629), 3: (79, 0.380), 4: (60, 0.167), 5: (61, 0.066)}),
+    ("pixtral_perception_full_n300_pixtral-12b_20260809T211028Z.csv",
+     {1: (56, 0.875), 2: (57, 0.614), 3: (76, 0.329), 4: (60, 0.267), 5: (51, 0.000)}),
+])
+def test_accuracy_falls_with_the_number_of_distinct_answers(csv_name, expected):
+    table = _distinct_table(csv_name)
+    for n_distinct, (n, acc) in expected.items():
+        assert int(table.loc[n_distinct, "n"]) == n
+        assert table.loc[n_distinct, "accuracy"] == pytest.approx(acc, abs=0.005)
+    assert int(table["n"].sum()) == 300
+
+
+def test_the_trend_is_monotone_at_the_ends_on_both_models():
+    """The claim is the trend, not any single cell. Pixtral's 4-distinct cell
+    sits slightly above its 3-distinct one (n=60, noise), so monotonicity is
+    asserted where it is actually claimed -- across the full range."""
+    for csv_name in ("scaleup_n300_bal50_qwen25-vl-3b-instruct_20260802T163202Z.csv",
+                     "pixtral_perception_full_n300_pixtral-12b_20260809T211028Z.csv"):
+        t = _distinct_table(csv_name)["accuracy"]
+        assert t.loc[1] > 0.85
+        assert t.loc[5] < 0.10
+        assert t.loc[1] - t.loc[5] > 0.80          # a 13x range on Qwen
+        assert t.loc[1] > t.loc[2] > t.loc[3]      # monotone where it is dense
+
+
+def test_recomputing_distinct_counts_would_contradict_the_reported_numbers():
+    """The trap this nearly fell into. Recomputing labels from the raw samples
+    gives a DIFFERENT table for the 2026-08-02 Qwen run -- 80% rather than 92%
+    in the one-distinct cell -- because that run was scored in a Colab session
+    without SymPy's LaTeX parser and 43/300 items labelled differently.
+
+    Every locked figure (AUROC 0.835, accuracy 39.3%) comes from the stored
+    column, so a figure built from a recompute would contradict the paper's
+    own headline. Pixtral is unaffected: its recompute matches the stored
+    column exactly, which is why the discrepancy is easy to miss."""
+    import ast
+
+    import pilot.canonicalize
+    import pilot.entropy
+    import pilot.parsing
+    from pilot.plotting import accuracy_by_distinct_answers
+
+    path = (Path(__file__).resolve().parents[2] / "results"
+            / "scaleup_n300_bal50_qwen25-vl-3b-instruct_20260802T163202Z.csv")
+    if not path.exists():
+        pytest.skip("Qwen CSV not present")
+    df = pd.read_csv(path)
+    df["n_distinct"] = [
+        pilot.entropy.distinct_count(
+            [pilot.canonicalize.canonical_answer_label(
+                pilot.parsing.parse_transcription(s))
+             for s in ast.literal_eval(r["all_transcription_samples_raw"])])
+        for _, r in df.iterrows()]
+    recomputed = accuracy_by_distinct_answers(df).set_index("n_distinct")
+
+    stored = _distinct_table(path.name)
+    assert recomputed.loc[1, "accuracy"] == pytest.approx(0.80, abs=0.02)
+    assert stored.loc[1, "accuracy"] == pytest.approx(0.921, abs=0.005)
+    assert abs(recomputed.loc[1, "accuracy"] - stored.loc[1, "accuracy"]) > 0.10
