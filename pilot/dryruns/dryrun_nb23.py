@@ -196,7 +196,21 @@ assert html.count('data-f="final_label"') == len(hp)
 assert html.count('data-f="confidence"') == len(hp)
 assert html.count('data-f="note"') == len(hp)
 assert "value=\"true_correct\"" in html or ">true_correct<" in html
+# The folder must be reviewable IN DRIVE, like every other figures/ folder.
+# Bare per-item PNGs are not; captioned contact sheets are.
+hp_pages = ns["hp_pages"]
+assert len(hp_pages) == -(-len(hp) // 9), f"{len(hp_pages)} pages for {len(hp)} rows"
+for pth in hp_pages:
+    assert _os.path.exists(pth) and _os.path.getsize(pth) > 10_000, pth
+    assert _os.path.basename(pth).startswith("high_priority_p"), pth
+    assert _os.path.dirname(pth) == hp_dir, "sheets must sit at the folder root"
+caps = [ns["hp_caption"](r) for _, r in hp.iterrows()]
+assert any("DISAGREE" in c for c in caps), "disagreements must be visible on the sheet"
+for c in caps:
+    assert "span M:" in c and "label T:" in c, c
+    assert max(len(l) for l in c.split(chr(10))) <= 56, "caption overflows its cell"
 print(f"high-priority sheet OK: {len(hp)} rows, {len(pngs)} images, "
-      f"{len(html)//1024} KB html, all image paths resolve")
+      f"{len(html)//1024} KB html, {len(hp_pages)} contact-sheet pages, "
+      "all image paths resolve")
 
 shutil.rmtree(ROOT / ".dryrun_scratch", ignore_errors=True)
