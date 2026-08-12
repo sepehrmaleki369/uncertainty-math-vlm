@@ -318,7 +318,65 @@ Manifest: `reference/audit/mcq_like_review_20260812.csv` (77 rows).
   `strict_v1`, H, both spans, both labels, flags and the weak-trigger match.
   Code `confirmed_mcq` = yes/no/unclear in the manifest.
 
-### 2026-08-12: BUILT, NOT RUN — notebook 27, both open judges on all 300
+### RUN 2026-08-12: notebook 27 — LiveMath n=300 VALID, Omni n=300 VOID (decoder)
+
+`pilot/27_open_judges_all300.ipynb`, all 7 cells completed, no errors.
+Evidence: `reference/audit/open_judges_all300_diagnostic_20260812.csv` +
+**`..._20260812_STATUS.md`, which is the authoritative reading — read it
+first.** No accuracy anywhere; no scorer rule touched.
+
+- **LiveMath-Judge, n=300, USABLE. 300/300 decoded, 0 parse failures**, raw
+  output takes exactly two values (`\boxed{yes}` / `\boxed{no}`).
+
+  | | |
+  |---|---|
+  | yes / no | 261 / 39 → **87.0% yes-rate** |
+  | agreement with `strict_v1` | **154/300 = 51.3%** |
+  | **always-yes baseline** | **47.0%** |
+  | judge yes / rule wrong | **133** |
+  | judge no / rule correct | **13** |
+
+  **CONFIRMS AT n=300 what notebook 25 found at n=40: it performs at the
+  trivial baseline** (51.3% against 47.0%). Disagreement is one-directional,
+  133 lenient vs 13 strict. **Two things it is NOT evidence of:** leniency is
+  *higher on clean items* (89.3%) than on `has_error=1` (84.7%), the opposite
+  of the leniency signature, so it is not forgiving the perturbation — it just
+  says yes; and `looks_like_solving`=0 is not exoneration, since all 300
+  transcripts are a bare boxed verdict with nothing to scan.
+- **Omni-Judge, n=300, VOID. 263/300 came back `unclear` and it is a DECODER
+  failure, not judge behaviour.** All 300 transcripts classified:
+  marker transposed (`Jugdement`, `Eqiuvalence`, `FALSe`) **139**, shredded
+  (`#i#f#i#c#a#t#i#o#n#T#h#e...`) **89**, stopped before the verdict **35**,
+  no marker **17**, **clean only 20 — 93.3% corrupt.**
+- **TWO FACTS THAT DECIDE IT IS UNSALVAGEABLE, not merely mis-parsed.**
+  (1) **19 of the 37 items that PARSED still carried a misspelled marker** —
+  a successful parse was never evidence of a clean decode. (2) **ALL 36
+  `omni_invented_reference` flags sit in corrupt transcripts**; item 0 was
+  flagged for citing `2.4` when the model answered `24`, which is the decoder.
+  **The invented-number rate was the one thing the run existed to measure and
+  it measured decoder noise end to end.**
+- **THE PARSER IS DELIBERATELY NOT LOOSENED, and there is a test to keep it
+  that way.** Tolerating transposition would recover ~120 verdicts from
+  transcripts whose justifications are also damaged: a biased subset (the
+  mildly corrupted ones) with untrustworthy content, **which is worse than no
+  data because it looks like data**. See
+  `test_the_parser_is_NOT_loosened_to_recover_corrupted_output`. **Omni is not
+  re-run either** — open-judge testing closed after notebook 26 and the
+  LiveMath half answers the n=300 question.
+- **THE GUARD FAILED AND THAT IS THE TRANSFERABLE LESSON.**
+  `looks_bpe_mangled` tested for ONE signature (the `Ġ` byte-BPE marker),
+  caught **0 of 300**, and the notebook printed *"decode clean on all 300"*
+  while 93% was damaged. **This is the third distinct decode corruption on
+  this model, and each time the guard written for the previous one was blind
+  to the next.** Replaced by `judge.omni_output_health` /
+  `omni_decode_report` / `assert_omni_decode_ok`, which classify every shape
+  above and fail closed — **validated against the 300 real transcripts, not
+  invented fixtures** (280/300 flagged). `dryrun_nb27.py --corrupt-decode`
+  proves it aborts. **Standing rule, now with a second instance: a judge
+  scoring `unclear` is a decoder bug until proven otherwise, and make the
+  check adversarial to the CONTENT, not only to a known marker.**
+
+### 2026-08-12: BUILT, NOT RUN — notebook 27, both open judges on all 300 (superseded above)
 
 `pilot/27_open_judges_all300.ipynb`, `pilot/judge.py` (new
 `open_judge_*` section), `pilot/dryruns/dryrun_nb27.py`, 15 new tests.

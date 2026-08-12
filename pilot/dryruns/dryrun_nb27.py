@@ -19,13 +19,25 @@ asserting are not about verdict quality:
     dry runs stopped before it.
 
     python pilot/dryruns/dryrun_nb27.py
+
+Also: `python pilot/dryruns/dryrun_nb27.py --corrupt-decode` proves the decode
+guard aborts. The 2026-08-12 run completed on garbage because the previous
+guard tested for one corruption signature and printed "decode clean on all
+300" while 93% of transcripts were damaged.
 """
+import argparse
 import json
 import re
 import shutil
 import sys
 import types
 from pathlib import Path
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--corrupt-decode", action="store_true",
+                    help="emit a shredded Omni transcript so the decode guard "
+                         "must abort the run")
+args = parser.parse_args()
 
 ROOT = Path(__file__).resolve().parents[2]
 NB = ROOT / "pilot" / "27_open_judges_all300.ipynb"
@@ -216,8 +228,17 @@ class _Model:
         n = CALLS["omni"]
         CALLS["omni"] += 1
         SEEN["omni"].append(ctx.split("ANS::", 1)[-1].strip())
+        if args.corrupt_decode and n == 3:
+            # The real 2026-08-12 shredding shape: one `#` per character.
+            return "#i#f#i#c#a#t#i#o#n#T#h#e#s#t#u#d#e#n#t#i#s#w#r#o#n#g"
         if n == 11:
-            return "## Student's Final Answer\nnothing parseable here"
+            # A CLEAN decode that still yields no verdict: the marker is
+            # intact, the verdict word is not one we accept. This path is
+            # reachable in reality (2 of the real 300 were clean-but-unclear),
+            # and it must stay distinguishable from a corrupt decode.
+            return ("## Student's Final Answer\n42\n"
+                    "## Equivalence Judgment\nUNKNOWN\n"
+                    "## Justification\ncannot decide from this answer")
         if r"\frac{2}{4}" in ctx:        # item 273: the invented reference
             return ("## Student's Final Answer\n}\n## Equivalence Judgment\n"
                     "FALSE\n## Justification\nThe student's answer of 2/4 is "
@@ -269,14 +290,37 @@ code_cells = [(i, "".join(c["source"])) for i, c in enumerate(nb["cells"])
 print(f"{len(code_cells)} code cells; EXPLORATORY all-300 diagnostic\n")
 
 ns = {"__name__": "__main__"}
+decode_guard_fired = None
 for i, src in code_cells:
     print(f"----- cell {i} " + "-" * 60)
     try:
         exec(compile(prepare(src), f"<cell {i}>", "exec"), ns)
+    except RuntimeError as e:
+        if "decode is CORRUPT" in str(e):
+            decode_guard_fired = e
+            print(f"decode guard fired: {str(e)[:160]}")
+            break
+        raise
     except Exception:
         import traceback
         traceback.print_exc()
         sys.exit(f"\nFAILED at cell {i}")
+
+if args.corrupt_decode:
+    # The 2026-08-12 run completed on garbage because the old guard tested for
+    # one signature and printed "decode clean on all 300". This proves the
+    # replacement aborts instead.
+    assert decode_guard_fired is not None, (
+        "a SHREDDED Omni transcript was accepted -- the run would complete on "
+        "corrupted output, which is exactly what happened on 2026-08-12")
+    for shape in ("shredded",):
+        assert shape in str(decode_guard_fired), str(decode_guard_fired)
+    print("\n" + "=" * 74)
+    print("GUARD PROVEN -- a shredded decode aborts before any verdict is kept")
+    print("=" * 74)
+    shutil.rmtree(SCRATCH, ignore_errors=True)
+    sys.exit(0)
+assert decode_guard_fired is None, f"unexpected decode failure: {decode_guard_fired}"
 
 # --- post-conditions -------------------------------------------------------
 import os as _os  # noqa: E402

@@ -1332,3 +1332,114 @@ def open_judges_summary_md(path: str, frame: pd.DataFrame, diag: dict,
     text = "\n".join(L)
     pathlib_write(path, text)
     return text
+
+
+# ---------------------------------------------------------------------------
+# OMNI-JUDGE DECODE HEALTH.
+#
+# `looks_bpe_mangled` checks for ONE corruption signature -- the `Ġ` byte-BPE
+# marker -- and that turned out to be far too narrow. On the 2026-08-12
+# all-300 run it reported "decode clean on all 300" while **94% of the
+# transcripts were damaged**, in three shapes it could not see:
+#
+#   * **marker transposition** -- `Jugdement`, `Eqiuvalence`, `Jusitification`,
+#     `FALSe`. The verdict is legible to a human and invisible to the parser.
+#     120 of 300.
+#   * **shredding** -- one `#` between every character:
+#     `#i#f#i#c#a#t#i#o#n#T#h#e#s#t#u#d#e#n#t`. 89 of 300.
+#   * **stopping before the verdict** -- output ends mid-marker, e.g. 33
+#     characters ending `...radians##Equivale`. 35 of 300.
+#
+# **19 of the 37 items that PARSED also carried a misspelled marker**, so a
+# successful parse was not evidence of a clean decode either.
+#
+# **THE PARSER IS DELIBERATELY NOT LOOSENED.** Making `parse_omni_text`
+# tolerate transposition would "recover" 120 verdicts from a decoder that also
+# corrupted the justification text those verdicts were supposed to explain --
+# a biased subset with untrustworthy content, which is worse than no data
+# because it looks like data. The fix belongs in the GUARD: corruption must
+# fail loudly, and a corrupt run must be discarded rather than parsed harder.
+# ---------------------------------------------------------------------------
+
+#: Correctly spelled section marker, whitespace-insensitive.
+_OMNI_MARKER_RE = re.compile(r"equivalencejudg(?:e)?ment", re.I)
+
+#: Density of `#` above which the output is shredded. A healthy transcript has
+#: about six (`## Student's Final Answer`, `## Equivalence Judgment`,
+#: `## Justification`); a shredded one has one per character.
+_SHRED_RATIO = 0.25
+_SHRED_MIN_LEN = 40
+
+OMNI_HEALTH_STATUSES = ("clean", "empty", "bpe_markers_leaked", "shredded",
+                        "marker_corrupted", "stopped_before_verdict",
+                        "no_marker")
+
+
+def omni_output_health(text: Optional[str]) -> dict:
+    """Classify one Omni-Judge transcript. `corrupt=False` only when intact.
+
+    Written against the 300 real transcripts rather than from the model card,
+    because every corruption shape here was discovered in the data and none of
+    them was anticipated.
+    """
+    s = str(text or "")
+    squashed = re.sub(r"\s+", "", s)
+    out = {"status": "clean", "corrupt": False, "n_chars": len(s),
+           "hash_ratio": (squashed.count("#") / len(squashed)) if squashed else 0.0}
+    if not s.strip():
+        out.update(status="empty", corrupt=True)
+        return out
+    if _BPE_SPACE in s:
+        out.update(status="bpe_markers_leaked", corrupt=True)
+        return out
+    if len(squashed) >= _SHRED_MIN_LEN and out["hash_ratio"] > _SHRED_RATIO:
+        out.update(status="shredded", corrupt=True)
+        return out
+    if _OMNI_MARKER_RE.search(squashed):
+        return out
+    # No intact marker. Distinguish "mangled" from "never got there", because
+    # the two call for different fixes: a decoder fix versus more tokens.
+    if re.search(r"true|false", squashed, re.I):
+        out.update(status="marker_corrupted", corrupt=True)
+    elif len(squashed) < 120:
+        out.update(status="stopped_before_verdict", corrupt=True)
+    else:
+        out.update(status="no_marker", corrupt=True)
+    return out
+
+
+def omni_decode_report(texts: Sequence[Optional[str]]) -> dict:
+    """Health across a whole run, for the notebook's pre-flight assertion."""
+    healths = [omni_output_health(t) for t in texts]
+    counts = {}
+    for h in healths:
+        counts[h["status"]] = counts.get(h["status"], 0) + 1
+    n = len(healths)
+    n_bad = sum(1 for h in healths if h["corrupt"])
+    return {
+        "n": n, "n_corrupt": n_bad,
+        "corrupt_rate": n_bad / n if n else float("nan"),
+        "counts": counts,
+        "usable": n_bad == 0,
+        "note": ("Any corruption at all voids the run. Do NOT parse harder: "
+                 "a tolerant parser recovers verdicts from transcripts whose "
+                 "CONTENT is also damaged, which looks like data and is not."),
+    }
+
+
+def assert_omni_decode_ok(texts: Sequence[Optional[str]],
+                          tolerate: float = 0.0) -> dict:
+    """Raise unless the decode is clean. Call BEFORE recording any verdict.
+
+    `tolerate` exists so a caller can state a threshold explicitly rather than
+    discover one by accident; it defaults to zero because on this model a
+    partial corruption has always meant a broken decoder rather than a few
+    unlucky items.
+    """
+    rep = omni_decode_report(texts)
+    if rep["corrupt_rate"] > tolerate:
+        raise RuntimeError(
+            f"Omni-Judge decode is CORRUPT on {rep['n_corrupt']}/{rep['n']} "
+            f"transcripts ({rep['corrupt_rate']:.1%}): {rep['counts']}. "
+            + rep["note"])
+    return rep

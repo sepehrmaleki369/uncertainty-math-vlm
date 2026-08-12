@@ -656,3 +656,85 @@ def test_the_all300_diagnostic_modifies_no_scorer_rule():
     assert strict_v2.RULE_NAME == "strict_v2_display_primary"
     src = open(J.__file__).read()
     assert "def rescore_run" not in src and "def score_item_v2" not in src
+
+
+# --- Omni-Judge decode health ----------------------------------------------
+#
+# From the 2026-08-12 all-300 run, where `looks_bpe_mangled` reported "decode
+# clean on all 300" while 93% of transcripts were damaged. Every string below
+# is taken from that run's real output, not invented.
+
+REAL_TRANSPOSED = ("2.4##EqiuvalenceJugdementFALSE##JusitificationThe student's "
+                   "answer of 2.4 is incorrect in the context of the problem")
+REAL_SHREDDED = ("#i#f#i#c#a#t#i#o#n#T#h#e#s#t#u#d#e#n#t'##s#o#l#u#t#i#o#n#i#s"
+                 "#i#n#c#o#r#r#e#c#t#i#n#t#h#e#c#o#n#t#e#x#t")
+REAL_STOPPED = r"\frac{1210}{540}radians##Equivale"
+REAL_CLEAN = ("## Student's Final Answer\n2/4\n## Equivalence Judgment\nFALSE\n"
+              "## Justification\nThe sign in the denominator differs.")
+
+
+@pytest.mark.parametrize("text,status", [
+    (REAL_CLEAN, "clean"),
+    (REAL_TRANSPOSED, "marker_corrupted"),
+    (REAL_SHREDDED, "shredded"),
+    (REAL_STOPPED, "stopped_before_verdict"),
+    ("", "empty"),
+    ("E quiv ale Ġn ce Jud gment F AL ĠS ĠE", "bpe_markers_leaked"),
+])
+def test_omni_health_recognises_every_observed_corruption(text, status):
+    h = J.omni_output_health(text)
+    assert h["status"] == status, h
+    assert h["corrupt"] is (status != "clean")
+
+
+def test_the_old_guard_would_have_missed_all_three_new_shapes():
+    """THE REGRESSION. `looks_bpe_mangled` only knows the `Ġ` signature, so it
+    waved through 300 of 300 and the notebook printed 'decode clean'."""
+    for text in (REAL_TRANSPOSED, REAL_SHREDDED, REAL_STOPPED):
+        assert not J.looks_bpe_mangled(text), "fixture must evade the old guard"
+        assert J.omni_output_health(text)["corrupt"], "the new guard must catch it"
+
+
+def test_a_parsed_verdict_is_not_evidence_of_a_clean_decode():
+    """19 of the 37 items that PARSED still carried a misspelled marker, so
+    'we got a verdict' was never a decode check."""
+    text = REAL_TRANSPOSED.replace("Jugdement", "Judgment")   # parseable now
+    assert J.parse_omni_text(text) == "incorrect"
+    assert J.omni_output_health(REAL_TRANSPOSED)["corrupt"]
+
+
+def test_the_parser_is_NOT_loosened_to_recover_corrupted_output():
+    """DELIBERATE. A tolerant parser would recover ~120 verdicts from
+    transcripts whose justification text is also damaged -- a biased subset
+    with untrustworthy content, which is worse than no data because it looks
+    like data. If this test starts failing because someone widened the regex,
+    that is the change to revert."""
+    assert J.parse_omni_text(REAL_TRANSPOSED) == "unclear"
+    assert J.parse_omni_text(REAL_SHREDDED) == "unclear"
+    assert J.parse_omni_text(REAL_STOPPED) == "unclear"
+
+
+def test_assert_omni_decode_ok_fails_closed_and_names_the_shapes():
+    texts = [REAL_CLEAN] * 5 + [REAL_SHREDDED, REAL_TRANSPOSED]
+    with pytest.raises(RuntimeError, match="decode is CORRUPT"):
+        J.assert_omni_decode_ok(texts)
+    try:
+        J.assert_omni_decode_ok(texts)
+    except RuntimeError as e:
+        assert "shredded" in str(e) and "marker_corrupted" in str(e)
+    assert J.assert_omni_decode_ok([REAL_CLEAN] * 3)["usable"] is True
+
+
+def test_decode_report_counts_every_status():
+    rep = J.omni_decode_report([REAL_CLEAN, REAL_SHREDDED, REAL_TRANSPOSED,
+                                REAL_STOPPED])
+    assert rep["n"] == 4 and rep["n_corrupt"] == 3
+    assert rep["usable"] is False
+    assert set(rep["counts"]) <= set(J.OMNI_HEALTH_STATUSES)
+
+
+def test_a_healthy_transcript_is_not_flagged_by_its_own_hash_markers():
+    """A clean transcript carries about six `#` from its three `##` headings.
+    An over-eager density threshold would call every good output shredded."""
+    h = J.omni_output_health(REAL_CLEAN)
+    assert h["hash_ratio"] < 0.25 and not h["corrupt"]
