@@ -332,3 +332,70 @@ def test_the_diagnostic_summary_reports_no_accuracy(tmp_path):
     for section in ("## Sample composition", "## Native vs fidelity prompt",
                     "## has_error=1 behaviour", "## Judge appears to solve"):
         assert section in text, section
+
+
+# --- Omni-Judge, second candidate on the SAME gate -------------------------
+
+@pytest.mark.parametrize("field,expected", [
+    ("TRUE", "correct"), ("FALSE", "incorrect"),
+    ("  true  ", "correct"), ("false.", "incorrect"),
+    (None, "unclear"), ("maybe", "unclear"), ("", "unclear"),
+])
+def test_parse_omni_judgement(field, expected):
+    """Omni-Judge answers TRUE/FALSE where LiveMath-Judge answers yes/no.
+    Anything unrecognised is `unclear` -- OUR parse failed -- so the two
+    adapters stay comparable."""
+    assert J.parse_omni_judgement(field) == expected
+
+
+def test_run_gate_with_uses_the_identical_bar(tiny_run):
+    """Comparing two judges against two different gates would prove nothing,
+    so the generic runner reuses GATE_ITEMS and the same all-must-be-incorrect
+    rule."""
+    calls = []
+
+    def rejecting(question, gold, answer):
+        calls.append((question, gold, answer))
+        return "incorrect", "justification: does not match"
+
+    g = J.run_gate_with(rejecting, tiny_run, label="Omni-Judge")
+    assert g["judge"] == "Omni-Judge"
+    assert g["passed"] is True
+    assert set(g["verdicts"]) == set(J.GATE_ITEMS)
+    assert len(calls) == len(J.GATE_ITEMS)
+    # it must be handed the MAJORITY answer, not raw samples
+    assert all(isinstance(c[2], str) for c in calls)
+
+
+def test_run_gate_with_fails_closed(tiny_run):
+    accepting = lambda q, g, a: ("correct", "justification: equivalent")
+    g = J.run_gate_with(accepting, tiny_run, label="Omni-Judge")
+    assert g["passed"] is False
+    assert g["verdict_label"] == "gated_unsafe_as_scorer"
+    assert "do not run the 300" in g["note"]
+
+    half = iter([("incorrect", "a"), ("correct", "b")])
+    g2 = J.run_gate_with(lambda q, gg, a: next(half), tiny_run)
+    assert g2["passed"] is False, "one of two is a fail"
+
+    g3 = J.run_gate_with(lambda q, gg, a: ("unclear", "?"), tiny_run)
+    assert g3["passed"] is False, "unparseable is not passing"
+
+
+def test_the_generic_gate_records_the_solving_flag(tiny_run):
+    """Omni-Judge emits a justification, unlike LiveMath-Judge's bare boxed
+    verdict, so for the first time the solving heuristic has a transcript to
+    read."""
+    def solving(question, gold, answer):
+        return "correct", "the correct answer is 3/4 so the student is right"
+
+    g = J.run_gate_with(solving, tiny_run, label="Omni-Judge")
+    assert g["passed"] is False
+    assert all(g["solving"].values()), "justification must be scanned"
+
+
+def test_the_livemath_gate_is_unchanged_by_the_refactor(tiny_run):
+    """Adding a second candidate must not move the first one's bar."""
+    g = J.run_gate(stub(r"\boxed{no}"), tiny_run)
+    assert g["passed"] is True and g["verdict_label"] == "gate_passed"
+    assert J.GATE_ITEMS == (55, 273)

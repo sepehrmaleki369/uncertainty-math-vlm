@@ -644,3 +644,87 @@ def diagnostic_summary_md(path: str, both: pd.DataFrame,
     text = "\n".join(L)
     pathlib_write(path, text)
     return text
+
+
+# ---------------------------------------------------------------------------
+# Omni-Judge -- second open-judge candidate, GATE ONLY.
+#
+# `KbsdJames/Omni-Judge`, Llama-3.1-8B-Instruct instruction-tuned on GPT-4o
+# evaluation data. Tried after LiveMath-Judge failed the same gate.
+#
+# Three differences from LiveMath-Judge that change how it is used:
+#
+# 1. **It emits a JUSTIFICATION.** Output is structured -- answer, judgement
+#    TRUE/FALSE, justification -- where LiveMath-Judge returned a bare
+#    `\boxed{yes}`. So `looks_like_solving` can actually work here, and the
+#    "does it solve the maths" question becomes answerable.
+# 2. **The prompt is BAKED INTO `tokenizer.get_context()`.** There is no
+#    supported way to insert a fidelity clause. Given that the clause did
+#    nothing for LiveMath-Judge -- 2 of 40 items, both toward LENIENCY -- the
+#    native prompt is used as-is and gated. Amending it is not worth
+#    fabricating an unsupported call path for.
+# 3. **Custom tokenizer methods mean `trust_remote_code=True`.** That is the
+#    shape that broke InternVL3 on this project: a custom `trust_remote_code`
+#    class hit `AttributeError: 'InternVLChatModel' object has no attribute
+#    'all_tied_weights_keys'` under transformers v5. The risk here is lower --
+#    custom TOKENIZER, not a custom model class -- but if loading fails that
+#    way, it is a known failure mode and not worth debugging in a paid
+#    session.
+#
+# GATE ONLY. Items 55 and 273, then stop. No 300-item run, per the standing
+# rule that a failed gate is the result.
+# ---------------------------------------------------------------------------
+
+OMNI_MODEL_ID = "KbsdJames/Omni-Judge"
+OMNI_MAX_NEW_TOKENS = 300
+
+
+def parse_omni_judgement(judgement: Optional[str]) -> str:
+    """Omni-Judge's TRUE/FALSE field -> our verdict vocabulary.
+
+    Anything unrecognised is `unclear`, i.e. OUR parse failed -- the same
+    convention as the LiveMath adapter, so the two are comparable.
+    """
+    if judgement is None:
+        return "unclear"
+    s = str(judgement).strip().upper()
+    if s.startswith("TRUE"):
+        return "correct"
+    if s.startswith("FALSE"):
+        return "incorrect"
+    return "unclear"
+
+
+def run_gate_with(judge_fn, run: pd.DataFrame,
+                  samples_col: str = "all_transcription_samples_raw",
+                  gt_col: str = "pert_a", question_col: str = "orig_q",
+                  label: str = "judge") -> dict:
+    """Gate ANY judge on `GATE_ITEMS`. `judge_fn(question, gold, answer)`
+    returns `(verdict, raw)`.
+
+    Exists so a second candidate can be gated without touching the LiveMath
+    path or its tests. The bar is identical, which is the point: comparing
+    judges across different gates would prove nothing.
+    """
+    import ast
+
+    verdicts, raws = {}, {}
+    for item in GATE_ITEMS:
+        answer = majority_answer(
+            ast.literal_eval(run.loc[item, samples_col]), run.loc[item, gt_col])
+        q = run.loc[item, question_col] if question_col in run else None
+        verdict, raw = judge_fn(q, run.loc[item, gt_col], answer)
+        verdicts[item] = verdict
+        raws[item] = raw
+    passed = all(v == "incorrect" for v in verdicts.values())
+    return {
+        "judge": label, "passed": passed, "verdicts": verdicts, "raw": raws,
+        "solving": {i: looks_like_solving(r) for i, r in raws.items()},
+        "required": "incorrect on every item in GATE_ITEMS",
+        "verdict_label": "gate_passed" if passed else "gated_unsafe_as_scorer",
+        "note": ("" if passed else
+                 f"{label} accepted an output that does not faithfully match "
+                 "the ground truth. Do NOT use it as a scorer, and do not run "
+                 "the 300 behind a failed gate -- report the gate as the "
+                 "result."),
+    }
