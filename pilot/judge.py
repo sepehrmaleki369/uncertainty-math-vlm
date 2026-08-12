@@ -728,3 +728,34 @@ def run_gate_with(judge_fn, run: pd.DataFrame,
                  "the 300 behind a failed gate -- report the gate as the "
                  "result."),
     }
+
+
+#: Byte-BPE marker that leaks when a decode goes wrong.
+_BPE_SPACE = "Ġ"
+
+
+def looks_bpe_mangled(text: Optional[str]) -> bool:
+    """Did the decode leak raw BPE tokens instead of producing text?
+
+    Signature seen on Omni-Judge's custom `OmniJudgeTokenizer` under
+    transformers v5: output arrives as space-separated tokens with the
+    byte-BPE space marker intact -- `E quiv ale Ġn ce Jud gment F AL ĠS ĠE`
+    instead of `## Equivalence Judgment FALSE`. `parse_response` then finds
+    none of its markers and returns all-None, which reads as a judge failure
+    when it is a DECODING failure. Always check before believing a verdict.
+    """
+    return bool(text) and _BPE_SPACE in str(text)
+
+
+def demangle_bpe(text: Optional[str]) -> str:
+    """Best-effort repair of the mangling above: drop the inserted spaces,
+    then turn the byte-BPE marker back into a real space.
+
+    A FALLBACK for reading a transcript that would otherwise be lost, never a
+    substitute for decoding correctly -- it cannot restore spaces the marker
+    did not record, so `Justification` can come back as `Jus tification`.
+    Decode with a plain tokenizer instead where possible.
+    """
+    if not text:
+        return ""
+    return str(text).replace(" ", "").replace(_BPE_SPACE, " ")

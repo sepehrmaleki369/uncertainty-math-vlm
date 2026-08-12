@@ -399,3 +399,29 @@ def test_the_livemath_gate_is_unchanged_by_the_refactor(tiny_run):
     g = J.run_gate(stub(r"\boxed{no}"), tiny_run)
     assert g["passed"] is True and g["verdict_label"] == "gate_passed"
     assert J.GATE_ITEMS == (55, 273)
+
+
+def test_bpe_mangling_is_detected_not_mistaken_for_a_judge_failure():
+    """The Omni-Judge run on 2026-08-12 returned all-None from
+    `parse_response`, which the adapter mapped to `unclear` and the gate read
+    as a failure. The cause was the custom tokenizer's DECODE returning
+    space-separated BPE tokens -- `F AL ĠS ĠE` for `FALSE`. A verdict read off
+    a mangled transcript is not a verdict."""
+    mangled = "E quiv ale Ġn ce Jud gment F AL ĠS ĠE # Ġ# J us Ġt ification"
+    assert J.looks_bpe_mangled(mangled) is True
+    assert J.looks_bpe_mangled("## Equivalence Judgment FALSE") is False
+    assert J.looks_bpe_mangled("") is False
+    assert J.looks_bpe_mangled(None) is False
+
+
+def test_demangle_recovers_the_judgement_but_not_perfectly():
+    """A fallback for reading a transcript that would otherwise be lost. It
+    cannot restore spaces the marker never recorded, so it is not a substitute
+    for decoding correctly -- hence the notebook decodes with a plain
+    tokenizer and only falls back to this."""
+    mangled = ("F AL ĠS ĠE # Ġ# J us Ġt ification The Ġstudent 's Ġanswer "
+               "Ġis Ġincorrect")
+    out = J.demangle_bpe(mangled)
+    assert "The student's answer is incorrect" in out
+    assert "FAL S E" in out or "FALSE" in out
+    assert J.demangle_bpe(None) == ""
