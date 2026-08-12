@@ -105,6 +105,64 @@ one) is still Drive-only, and nothing may be quoted from it anyway.
 
 ## Current findings
 
+### RUN 2026-08-12: Omni-Judge passes the VERDICT gate and fails the RATIONALE check
+
+`pilot/26_omni_judge_gate.ipynb`, gate only. `KbsdJames/Omni-Judge` —
+Llama-3.1-8B-Instruct instruction-tuned on GPT-4o evaluation data. Second
+open-judge candidate after LiveMath-Judge failed the same gate. **Open-judge
+testing STOPS here.**
+
+| probe | verdict | rationale |
+|---|---|---|
+| item 55 | `FALSE` ✅ | **correct** — cites the sign discrepancy in the denominator |
+| item 273 | `FALSE` ✅ | **WRONG REASON** — substitutes its own reference |
+
+- **THE PAPER SENTENCE, agreed with the user 2026-08-12. Copy it:**
+  *"A verdict-only gate is insufficient for open math judges. Omni-Judge
+  returned the desired FALSE verdict on both probes, but on item 273 its
+  justification showed that it reconstructed a mathematically correct
+  reference answer from the problem text rather than comparing against the
+  provided perturbed answer. Thus, even when verdicts match, the judge may
+  not be performing the intended fidelity task."*
+- **Item 273 in full.** It wrote *"The student's answer of 2/4 is incorrect …
+  The reference answer is 3/4."* **We passed `2/4` AS the reference, and the
+  student answered a bare `}`.** Verified: `3/4` appears in **none** of the
+  three inputs — question (150 chars), reference (652), model answer (614).
+  It read the reference's own prose (*"the number of outcomes favourable to E
+  is 3"*), computed `3/4`, promoted that to the reference, and attributed the
+  real reference's answer to the student. **Right verdict from a comparison
+  it never performed.**
+- **THIS IS A LIMITATION OF THE GATE I BUILT, and it generalises.** A
+  verdict-only gate cannot detect a right-answer-wrong-reason failure. On
+  **LiveMath-Judge, which emits a bare `\boxed{yes}` with no reasoning, this
+  identical failure would have been invisible and scored as a clean pass.**
+  Only a judge that explains itself makes the distinction observable. **Any
+  future judge must be gated on rationale as well as verdict.**
+- **THE STOPPING CONCLUSION:** LiveMath-Judge fails the verdict gate;
+  Omni-Judge passes it while not doing the comparison task. **Open math
+  judges are not reliable fidelity scorers for perturbed-answer
+  transcription.** The sharper reason is not that they return wrong verdicts
+  — it is that **they re-derive the answer and grade against that**, which is
+  exactly wrong when the ground truth is deliberately perturbed.
+- **TWO FALSE NEGATIVES AGAINST THE MODEL BEFORE THIS WAS READABLE, both
+  mine, both silent.** (1) The custom `OmniJudgeTokenizer` decode leaked
+  byte-BPE markers (`F AL ĠS ĠE`), so `parse_response` returned all-None and
+  the gate recorded `unclear`. Fixed by building a plain
+  `PreTrainedTokenizerFast` from the repo's own `tokenizer.json` —
+  `AutoTokenizer` cannot help here, it refuses without `trust_remote_code`
+  and returns the same broken class with it. (2) Even after that, the PROSE
+  decoded perfectly while the STRUCTURAL markers stayed space-corrupted
+  (`# #Equivale nceJudgmentFAL S E`), so its own `parse_response` still found
+  no anchors. `judge.parse_omni_text` reads the verdict whitespace-
+  insensitively as a fallback. **Lesson: a judge scoring `unclear` is a
+  decoder bug until proven otherwise — check the raw text before recording a
+  verdict.**
+- The verdicts above were derived by applying the fallback parser **offline to
+  the raw text captured in the notebook's own outputs**, not from a fresh GPU
+  run. That is legitimate here because the fallback is deterministic text
+  parsing and the rationale finding *is* that text — but it is why the
+  notebook's stored cells show `unclear` while this entry says `FALSE`.
+
 ### RUN 2026-08-12: LiveMath-Judge FAILS the fidelity gate — do not use it as the scorer
 
 `pilot/judge.py`, `pilot/24_livemath_judge.ipynb` (gated scoring path),
