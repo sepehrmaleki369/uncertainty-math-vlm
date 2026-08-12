@@ -105,6 +105,71 @@ one) is still Drive-only, and nothing may be quoted from it anyway.
 
 ## Current findings
 
+### 2026-08-12: CROSS-AUDIT DIAGNOSTICS — and why there is no pooled number
+
+`pilot/audit_diagnostics.py`, `pilot/tests/test_audit_diagnostics.py`
+(12 tests), `reference/audit/contradictions_20260812.csv`. Offline.
+Scorer reliability only — **no corrected model accuracy is computed, and none
+may be derived from this section.**
+
+| audit set | n | determinate | v1 agreement | v2 agreement | ext. issue |
+|---|---|---|---|---|---|
+| `genuinely_wrong` census | 104 | 23 | ~~100%~~ tautological | ~~100%~~ tautological | 77 (74.0%) |
+| `v1`-correct spot check | 100 | 79 | ~~100%~~ tautological | **92.4%** | 20 (20.0%) |
+| `v2` high-priority | 108 | 68 | **51.5%** | **48.5%** | 39 (36.1%) |
+
+- **TWO OF THE THREE AGREEMENTS ARE DEFINITIONS, NOT MEASUREMENTS. DO NOT
+  AVERAGE THEM.** Set 1 is items `strict_v1` called WRONG and its determinate
+  labels all mean "model wrong"; set 2 is items it called CORRECT and its
+  determinate labels all mean "model correct". Neither vocabulary contains a
+  label that could express disagreement, so 100% is forced. Pooling the three
+  gives **137/170 = 80.6%, roughly 60% tautology.** **This is the same
+  structural failure as the RETRACTED stratum result** — where a stratum's
+  label can take only one value, agreement collapses onto the verdict.
+- **DEGENERACY IS PER (SET, RULE), NOT PER SET — and one real number survives
+  because of it.** Set 2 is tautological for `strict_v1` (it was selected as
+  v1-correct) but **not** for `strict_v2`, which had no part in selecting it.
+  So v2's **92.4% with 6 false fails and 0 false passes on set 2 is a genuine
+  one-directional measurement**. A single per-set flag would have thrown it
+  away. `per_set_diagnostics` returns `v1_tautological`, `v2_tautological`
+  and `detectable_error` per rule for exactly this reason.
+- **NEITHER RULE EVER PRODUCED A FALSE PASS on any audited set.** Where a
+  human could decide, `strict_v1` and `strict_v2` never called correct
+  something the human called wrong — **0 false passes across all three sets**.
+  Every disagreement is a false FAIL (v1: 33, v2: 35+6). Note this is *not*
+  in tension with the 20 "false passes" in the spot-check entry below: those
+  are `extraction_issue`, i.e. the verdict was **unearned**, which here maps
+  to *indeterminate* rather than to *wrong*. The two are different claims and
+  must not be conflated.
+- **THE SETS OVERLAP — 78 items are double-counted.** 47 shared between the
+  census and the high-priority pass, 31 between the spot check and it. Union
+  is **234 of 300**, sum-of-parts is 312. Any count summed across sets is
+  wrong. `deduplicated_counts` resolves by precedence (later, more specific
+  pass wins) over the union: 128 `true_correct`, 82 `extraction_issue`, 16
+  `notation_misread`, 4 `needs_visual`, 3 `true_wrong`, 1 `copied_wrong_line`.
+- **FOUR HARD CONTRADICTIONS — the first intra-rater reliability measurement
+  in this project.** Items **108, 149, 222, 230** were coded
+  `notation_misread` (model wrong) in the census and `true_correct` in the
+  high-priority pass. Both determinate, opposite directions. A further **27
+  differences are soft** — one side indeterminate, because the two sheets
+  asked different questions with different vocabularies. **This replaces the
+  standing "no inter-rater reliability measured" limitation with a number:
+  4 hard contradictions among the 47 items coded determinately in both.**
+- **The four are NOT random coder noise, and the spans say why.** In at least
+  three of them the census reading was made from OCR and the SymPy label,
+  while the later pass had the display SPAN. Item 222's census note says "the
+  model says 18" — but the span is `18, 81, 42, 24`, all four orders; the
+  `18` came from the collapsed SymPy label. Item 230's census note says the
+  model gave `x^2 = 4z^2` — the span reads `x^2 = 4(z)z, i.e., x^2 = 8z`,
+  matching truth. **So the later pass had strictly better evidence, which
+  makes this a story about information available to the coder rather than
+  about the coder being unreliable.** Recorded, NOT adjudicated — settling
+  them now would mean a third reading by the same coder, which is what
+  produced the disagreement.
+- **Nothing here is a population rate.** Set 3 is the high-risk tier by
+  construction; sets 1 and 2 are one-sided by construction. Report these as
+  scorer diagnostics, never as model performance.
+
 ### 2026-08-12: THE FALSE-PASS CHECK — 40% of "correct" verdicts were not earned
 
 `pilot/corrected.py`, `pilot/tests/test_corrected.py` (19 tests),
@@ -312,7 +377,9 @@ a sample.**
   `genuinely_wrong` bucket, not a targeted sample, so the earlier "targeted
   audit, not a population rate" wording no longer describes the binding
   weakness. **The real limitations now are: (1) a SINGLE CODER with
-  no second rater and no inter-rater reliability measured; (2) it is
+  no second rater — inter-rater reliability is still unmeasured, but
+  INTRA-rater now is: 4 hard contradictions among the 47 items coded
+  determinately in two passes, see the cross-audit entry above; (2) it is
   Qwen-only — Pixtral's 130 `genuinely_wrong` items are entirely uncoded;
   (3) `genuinely_wrong` itself comes from a LOCAL rescore, which relabels
   43/300 items vs the stored columns.** State those three, not a sampling
