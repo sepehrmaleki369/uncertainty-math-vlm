@@ -206,6 +206,60 @@ pass detects what it was built to detect.
      harder."*
   **Do not present corrected accuracy as a clean improvement, and do not
   claim the corrected AUROC.**
+### 2026-08-12: THE EXTENSION BACKFIRED — the two coder passes disagree at p=0.00007
+
+`reference/audit/spotcheck_extra60_qwen_strict_v1_correct_20260812.csv`
+(60 items, all coded). Coverage is now **100 of the 141** correct items.
+
+**It did not tighten the estimate. It showed that coder variation, not
+sampling, is the dominant uncertainty — which is more useful and less
+convenient.**
+
+| pass | false passes | rate | Wilson |
+|---|---|---|---|
+| first 40 | 16/40 | **40.0%** | [26.3%, 55.4%] |
+| extra 60 | 4/60 | **6.7%** | [2.6%, 15.9%] |
+| pooled | 20/100 | 20.0% | [13.3%, 28.9%] |
+
+- **Fisher exact on the 2×2: odds ratio 9.3, p = 0.00007.** Two seeded random
+  draws from the same 141 items cannot differ this much by chance. **It
+  survives removing the 4 known `false_pass_removed` items** (33.3% vs 6.7%,
+  p = 0.0013), so those are not the explanation either.
+- **The likely cause is visible in how the passes were run:** the first 40 was
+  read item by item with reasoning recorded for each; the 60 was swept as
+  *"all are okay except the below ones"*. That is the single-coder
+  reliability limitation this file already lists, now **measured** rather
+  than hypothesised.
+- **DO NOT QUOTE THE POOLED 20% AS SETTLED.** Pooling two passes that
+  demonstrably disagree hides the disagreement inside a tighter interval.
+  What the rate does to the headline:
+
+  | rate used | two-sided accuracy |
+  |---|---|
+  | first 40 (40.0%) | 44.2–60.6%, point **51.4%** |
+  | extra 60 (6.7%) | 63.8–72.8%, point **68.2%** |
+  | pooled (20.0%) | 57.2–67.3%, point 61.5% |
+
+  **A 17-point swing on a coding choice.** Baseline is 47.0%.
+- **The AUROC is more robust to it.** Pooled: 0.628 [0.537, 0.719] if a false
+  pass means the model was wrong, 0.754 [0.656, 0.839] if undecidable — both
+  now exclude chance, where the n=40 version's first reading did not (0.572).
+  **Across both the interpretive choice and the pass choice, say 0.57–0.75.**
+- **THE CHEAP FIX, and it is the next thing to do:** re-read ~15 of the extra
+  60 at the depth the first 40 got, prioritising captions showing a
+  one-symbol span. If the rate stays near 7% the first 40 was anomalous; if
+  it climbs to 30–40% the sweep was, and the pooled figure should be built
+  from careful passes only. Either way it yields an **intra-rater agreement
+  number, which this project currently has none of.**
+- The 4 false passes found in the 60 are 4 (span `y^{(3)}`, page says the
+  degree is not defined), 180 (span `zx` against the full polynomial), 289
+  (span `B` against a set equality), 291 (span `x` against "infinitely many
+  solutions"). All four are span-selection, consistent with the 14-of-16
+  finding above. Items 132, 147 and 183 are `true_correct` but carry SymPy
+  partial-parse caveats worth keeping.
+
+- **SUPERSEDED — the n=60 extension, originally logged as the fix for the
+  wide interval. It ran, and the entry above is what it found.**
 - **IN FLIGHT: the n=60 extension, and it is the highest-value open work —
   ahead of the Pixtral audit and ahead of any new GPU.** The n=40 sample is
   what makes both intervals wide. `correct_item_spot_check_extension` draws

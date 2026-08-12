@@ -1,61 +1,61 @@
 item,perception_entropy,known_false_pass,final_label,confidence,note
-4,1.0549201679861442,False,,,
-6,0.0,False,,,
-11,0.0,False,,,
-19,1.3321790402101223,False,,,
-22,1.3321790402101223,False,,,
-28,0.9502705392332348,False,,,
-41,0.5004024235381879,False,,,
-42,0.0,False,,,
-44,0.0,False,,,
-46,0.0,False,,,
-51,0.5004024235381879,False,,,
-76,0.5004024235381879,False,,,
-79,0.0,False,,,
-86,0.5004024235381879,False,,,
-91,0.0,False,,,
-92,1.6094379124341005,False,,,
-96,0.0,False,,,
-98,0.9502705392332348,False,,,
-102,0.0,False,,,
-110,0.5004024235381879,False,,,
-113,0.5004024235381879,False,,,
-121,1.3321790402101223,False,,,
-123,0.5004024235381879,False,,,
-124,1.6094379124341005,False,,,
-132,0.6730116670092565,False,,,
-137,0.9502705392332348,False,,,
-138,0.5004024235381879,False,,,
-140,0.0,False,,,
-147,0.5004024235381879,False,,,
-150,1.3321790402101223,False,,,
-154,0.5004024235381879,False,,,
-164,0.9502705392332348,False,,,
-179,1.6094379124341005,False,,,
-180,1.3321790402101223,False,,,
-181,1.6094379124341005,False,,,
-183,0.9502705392332348,False,,,
-186,1.3321790402101223,False,,,
-194,0.6730116670092565,False,,,
-196,0.5004024235381879,False,,,
-204,1.0549201679861442,False,,,
-205,0.9502705392332348,False,,,
-207,1.0549201679861442,False,,,
-213,0.0,False,,,
-214,0.0,False,,,
-216,1.3321790402101223,False,,,
-226,0.5004024235381879,False,,,
-229,0.0,False,,,
-233,0.0,False,,,
-242,0.9502705392332348,False,,,
-248,1.0549201679861442,False,,,
-252,0.5004024235381879,False,,,
-254,0.9502705392332348,False,,,
-261,0.9502705392332348,False,,,
-266,0.6730116670092565,False,,,
-268,0.5004024235381879,False,,,
-286,0.9502705392332348,False,,,
-289,0.9502705392332348,False,,,
-291,0.0,False,,,
-293,1.3321790402101223,False,,,
-295,0.9502705392332348,False,,,
+4,1.0549201679861442,False,extraction_issue,high,"FALSE PASS: span is the fragment y^{(3)} on both sides; the page's answer is that the differential equation is not polynomial in its derivatives so its degree is NOT DEFINED. NB the polynomial working in the coder's note describes item 180; item 4 is coded on its own data, which supports the same label."
+6,0.0,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+11,0.0,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+19,1.3321790402101223,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+22,1.3321790402101223,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+28,0.9502705392332348,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+41,0.5004024235381879,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+42,0.0,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+44,0.0,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+46,0.0,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+51,0.5004024235381879,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+76,0.5004024235381879,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+79,0.0,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+86,0.5004024235381879,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+91,0.0,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+92,1.6094379124341005,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+96,0.0,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+98,0.9502705392332348,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+102,0.0,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+110,0.5004024235381879,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+113,0.5004024235381879,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+121,1.3321790402101223,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+123,0.5004024235381879,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+124,1.6094379124341005,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+132,0.6730116670092565,False,true_correct,high,"true_correct WITH A SYMPY PARTIAL-PARSE CAVEAT: both spans carry the full 'x = 3, y = 1', but SymPy encoded only eq(x, 3) and dropped y = 1. Correct here, risky in general."
+137,0.9502705392332348,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+138,0.5004024235381879,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+140,0.0,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+147,0.5004024235381879,False,true_correct,high,"true_correct WITH A SYMPY COLLAPSE CAVEAT: both spans carry the full triplet '12, 35, 37' and the page agrees, but SymPy kept only 12. Correct here, risky in general."
+150,1.3321790402101223,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+154,0.5004024235381879,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+164,0.9502705392332348,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+179,1.6094379124341005,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+180,1.3321790402101223,False,extraction_issue,high,FALSE PASS: both spans extracted only 'zx'; the handwritten final answer is the full polynomial 5xz + 9yz + 3zx + 5x - 4y. Extraction chose a tiny span and SymPy then read both as x*z.
+181,1.6094379124341005,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+183,0.9502705392332348,False,true_correct,high,"true_correct WITH A MALFORMED-PARSE CAVEAT: both spans give (1-x^2)d2y/dx2 - x dy/dx = 0 correctly. SymPy parsed dy/dx as derivative(y,x) but d2y/dx2 as the algebraic (d**2*y)/(dx**2). Identical on both sides, so the match is real. H=0.00."
+186,1.3321790402101223,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+194,0.6730116670092565,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+196,0.5004024235381879,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+204,1.0549201679861442,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+205,0.9502705392332348,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+207,1.0549201679861442,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+213,0.0,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+214,0.0,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+216,1.3321790402101223,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+226,0.5004024235381879,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+229,0.0,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+233,0.0,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+242,0.9502705392332348,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+248,1.0549201679861442,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+252,0.5004024235381879,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+254,0.9502705392332348,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+261,0.9502705392332348,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+266,0.6730116670092565,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+268,0.5004024235381879,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+286,0.9502705392332348,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+289,0.9502705392332348,False,extraction_issue,high,"FALSE PASS: both spans extracted only 'B'; the answer is set equality -- Y = {A,L,O,Y} = B for (i), and C and B are not equal for (ii). SymPy collapses to 'b', losing the equality meaning."
+291,0.0,False,extraction_issue,high,FALSE PASS: both spans extracted only 'x'; the page concludes there is NO unique cost because the equations have infinitely many solutions.
+293,1.3321790402101223,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
+295,0.9502705392332348,False,true_correct,medium,coder swept this as okay: model and truth agree and the page's final answer matches.
