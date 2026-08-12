@@ -759,3 +759,32 @@ def demangle_bpe(text: Optional[str]) -> str:
     if not text:
         return ""
     return str(text).replace(" ", "").replace(_BPE_SPACE, " ")
+
+
+_OMNI_JUDGEMENT_RE = re.compile(r"judg?e?ment\W{0,4}(true|false)", re.I)
+
+
+def parse_omni_text(text: Optional[str]) -> str:
+    """Recover Omni-Judge's verdict from its raw text, whitespace-insensitively.
+
+    Needed because `tokenizer.parse_response()` returns all-None on this
+    model's real output. The generated PROSE decodes perfectly, but the
+    structural markers come back space-corrupted --
+    `# #Equivale nceJudgmentFAL S E# #Jus tification` for
+    `## Equivalence Judgment\\nFALSE\\n## Justification` -- so its own parser
+    finds none of the anchors it looks for and reports nothing. Read as a
+    judge failure, that would be a false negative against the model: the
+    verdict is plainly there.
+
+    Stripping ALL whitespace before matching survives the corruption, since
+    the damage is entirely misplaced spaces, never reordered characters. Note
+    the pattern tolerates a dropped letter in "Equivalence"/"Judgement" --
+    item 273 came back as "Equivalece" -- but requires TRUE or FALSE intact.
+    """
+    if not text:
+        return "unclear"
+    squashed = re.sub(r"\s+", "", str(text))
+    hits = _OMNI_JUDGEMENT_RE.findall(squashed)
+    if not hits:
+        return "unclear"
+    return "correct" if hits[-1].lower() == "true" else "incorrect"

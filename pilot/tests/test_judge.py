@@ -425,3 +425,31 @@ def test_demangle_recovers_the_judgement_but_not_perfectly():
     assert "The student's answer is incorrect" in out
     assert "FAL S E" in out or "FALSE" in out
     assert J.demangle_bpe(None) == ""
+
+
+@pytest.mark.parametrize("text,expected", [
+    # the REAL outputs from the 2026-08-12 run, markers space-corrupted
+    (r"# #Equivale nceJudgmentFAL S E# #Jus tificationThe student", "incorrect"),
+    (r"##EquivaleceJudgmentFALSe##JusficationThe student's answer", "incorrect"),
+    ("## Equivalence Judgment\nTRUE\n## Justification fine", "correct"),
+    ("## Equivalence Judgment\nFALSE\n## Justification no", "incorrect"),
+    ("no verdict anywhere", "unclear"),
+    ("", "unclear"),
+    (None, "unclear"),
+])
+def test_parse_omni_text_survives_the_corrupted_markers(text, expected):
+    """`tokenizer.parse_response()` returns all-None on this model's real
+    output: the prose decodes perfectly but `## Equivalence Judgment` comes
+    back as `# #Equivale nceJudgmentFAL S E`, so its anchors are missing while
+    the verdict is plainly present. Recording `unclear` there would be a false
+    negative against the judge. Stripping whitespace before matching survives
+    it, because the damage is misplaced spaces, never reordered characters."""
+    assert J.parse_omni_text(text) == expected
+
+
+def test_parse_omni_text_tolerates_a_dropped_letter_but_not_a_missing_verdict():
+    """Item 273 came back as 'Equivalece' -- a letter short. The pattern
+    tolerates that in the anchor word but still requires TRUE or FALSE
+    intact, so it cannot invent a verdict that was never emitted."""
+    assert J.parse_omni_text("EquivaleceJudgmentFALSe") == "incorrect"
+    assert J.parse_omni_text("EquivalenceJudgment") == "unclear"
