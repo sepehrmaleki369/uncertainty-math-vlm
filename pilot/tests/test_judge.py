@@ -223,3 +223,112 @@ def test_no_scorer_rule_is_modified():
                              "final_term_v4")
     assert strict_v2.RULE_NAME == "strict_v2_display_primary"
     assert J.MODEL_ID == "jnanliu/LiveMath-Judge"
+
+
+# --- exploratory diagnostic (notebook 25) ---------------------------------
+
+def test_the_sample_is_exactly_20_20_with_both_probes_counted_in():
+    """55 and 273 are both `has_error=1`. Adding them ON TOP of the stratum
+    would make it 22 while the code claimed 20, so they are forced in and
+    counted."""
+    run = pd.DataFrame({
+        "has_error": [i % 2 == 0 for i in range(300)],
+    }, index=range(300))
+    run.loc[55, "has_error"] = True
+    run.loc[273, "has_error"] = True
+    v2 = pd.DataFrame({f: [False] * 300 for f in
+                       ("mcq_option", "tiny_valid_mcq", "derivative_equation",
+                        "set_answer", "system_answer", "multi_value_answer",
+                        "text_conclusion")}, index=range(300))
+    for i in range(0, 300, 7):
+        v2.loc[i, "set_answer"] = True
+    for i in range(1, 300, 5):
+        v2.loc[i, "mcq_option"] = True
+    s = J.diagnostic_sample(run, v2, human=None)
+    assert len(s) == 40
+    assert int(s["has_error"].sum()) == 20
+    assert int((~s["has_error"]).sum()) == 20
+    assert set(J.GATE_ITEMS) <= set(s.index)
+    assert s.loc[list(J.GATE_ITEMS), "forced"].all()
+
+
+def test_the_sample_is_seeded_and_spreads_answer_types():
+    run = pd.DataFrame({"has_error": [i % 2 == 0 for i in range(300)]},
+                       index=range(300))
+    run.loc[55, "has_error"] = True
+    run.loc[273, "has_error"] = True
+    v2 = pd.DataFrame({f: [False] * 300 for f in
+                       ("mcq_option", "tiny_valid_mcq", "derivative_equation",
+                        "set_answer", "system_answer", "multi_value_answer",
+                        "text_conclusion")}, index=range(300))
+    for n, f in enumerate(("mcq_option", "derivative_equation", "set_answer",
+                           "system_answer", "multi_value_answer",
+                           "text_conclusion")):
+        for i in range(n, 300, 6):
+            v2.loc[i, f] = True
+    a = J.diagnostic_sample(run, v2, human=None)
+    b = J.diagnostic_sample(run, v2, human=None)
+    assert a.index.tolist() == b.index.tolist(), "must be reproducible"
+    assert a["answer_type"].nunique() >= 5
+
+
+def test_human_labelled_items_are_preferred():
+    run = pd.DataFrame({"has_error": [True] * 100 + [False] * 200},
+                       index=range(300))
+    v2 = pd.DataFrame({f: [False] * 300 for f in
+                       ("mcq_option", "tiny_valid_mcq", "derivative_equation",
+                        "set_answer", "system_answer", "multi_value_answer",
+                        "text_conclusion")}, index=range(300))
+    human = pd.Series({i: "correct" for i in range(0, 300, 3)})
+    s = J.diagnostic_sample(run, v2, human)
+    picked = [i for i in s.index if i not in J.GATE_ITEMS]
+    labelled = sum(1 for i in picked if i in human.index)
+    assert labelled / len(picked) > 0.5, (
+        "the sampler should lean toward items the judge can be scored against")
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("Analysis: the answers match exactly. \\boxed{yes}", False),
+    ("The examinee wrote a different denominator. \\boxed{no}", False),
+    ("There are 3 favourable outcomes so the correct answer is 3/4. \\boxed{yes}", True),
+    ("We compute 2/4 = 0.5, so it should be 3/4. \\boxed{yes}", True),
+    ("The standard answer is wrong. \\boxed{yes}", True),
+])
+def test_looks_like_solving(text, expected):
+    """Catches the failure the gate found on item 273: the judge recalculating
+    instead of comparing. A review flag, never a verdict."""
+    assert J.looks_like_solving(text) is expected
+
+
+def test_answer_type_priority_is_stable():
+    assert J.answer_type({"mcq_option": True, "set_answer": True}) == "mcq"
+    assert J.answer_type({"set_answer": True, "system_answer": True}) == "set"
+    assert J.answer_type({"text_conclusion": True}) == "text_conclusion"
+    assert J.answer_type({}) == "numeric_or_algebra"
+
+
+def test_the_diagnostic_summary_reports_no_accuracy(tmp_path):
+    """The whole point of separating this from the scoring path. A gated
+    judge's numbers must not be presentable as accuracy."""
+    both = pd.DataFrame({
+        "has_error": [True, False], "answer_type": ["mcq", "set"],
+        "human_label": ["correct", "wrong"],
+        "ground_truth_answer": ["a", "b"], "model_answer": ["a", "c"],
+        "verdict_native": ["correct", "correct"],
+        "verdict_fidelity": ["correct", "incorrect"],
+        "raw_native": ["x", "y"], "raw_fidelity": ["x", "y"],
+        "solving_native": [False, False], "solving_fidelity": [True, False],
+    }, index=[55, 273])
+    sample = pd.DataFrame({"has_error": [True, False],
+                           "answer_type": ["mcq", "set"],
+                           "human_label": ["correct", "wrong"],
+                           "forced": [True, True]}, index=[55, 273])
+    p = tmp_path / "s.md"
+    text = J.diagnostic_summary_md(str(p), both, sample)
+    low = text.lower()
+    assert "not a scoring run" in low and "gate failed" in low
+    import re
+    assert not re.search(r"\baccuracy\b\s*[:=]", text, re.I)
+    for section in ("## Sample composition", "## Native vs fidelity prompt",
+                    "## has_error=1 behaviour", "## Judge appears to solve"):
+        assert section in text, section

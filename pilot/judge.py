@@ -410,3 +410,212 @@ def write_summary_md(path: str, diag: dict, judged: pd.DataFrame,
 def pathlib_write(path: str, text: str) -> None:
     with open(path, "w") as fh:
         fh.write(text)
+
+
+# ---------------------------------------------------------------------------
+# EXPLORATORY DIAGNOSTIC. Not a scoring path.
+#
+# Everything below runs the judge AFTER its gate has failed, to characterise
+# HOW it fails. Nothing here may produce a headline accuracy, and no function
+# returns one -- `diagnostic_summary_md` reports verdict agreement and
+# leniency signatures only. The gate in `run_gate` is deliberately not
+# consulted here, because the point is to study a judge already known unsafe.
+# ---------------------------------------------------------------------------
+
+#: Answer shapes, in priority order. Derived from `strict_v2`'s risk flags so
+#: the sample spans the kinds of answer the extractor handles differently --
+#: a judge that only ever sees short numerics tells you nothing about sets or
+#: prose conclusions.
+ANSWER_TYPE_ORDER = ("mcq", "derivative", "set", "system", "multi_value",
+                     "text_conclusion", "numeric_or_algebra")
+
+
+def answer_type(row) -> str:
+    """One shape label per item, from the `strict_v2` flags."""
+    if bool(row.get("mcq_option")) or bool(row.get("tiny_valid_mcq")):
+        return "mcq"
+    if bool(row.get("derivative_equation")):
+        return "derivative"
+    if bool(row.get("set_answer")):
+        return "set"
+    if bool(row.get("system_answer")):
+        return "system"
+    if bool(row.get("multi_value_answer")):
+        return "multi_value"
+    if bool(row.get("text_conclusion")):
+        return "text_conclusion"
+    return "numeric_or_algebra"
+
+
+def diagnostic_sample(run: pd.DataFrame, v2_scored: pd.DataFrame,
+                      human: Optional[pd.Series] = None,
+                      n_per_stratum: int = 20, seed: int = 20260812,
+                      force: Sequence[int] = GATE_ITEMS) -> pd.DataFrame:
+    """A stratified 40: 20 `has_error=1`, 20 clean, spread over answer shapes.
+
+    `force` items are included first and COUNT toward their stratum, so the
+    totals stay exactly `n_per_stratum` -- 55 and 273 are both `has_error=1`,
+    and silently adding them on top would make that stratum 22 while the code
+    claimed 20.
+
+    Within a stratum the shapes are filled round-robin so no single type
+    dominates, and inside each shape human-labelled items are preferred, since
+    those are the only ones the judge can be scored against. Selection is
+    seeded, never hand-picked.
+    """
+    import numpy as np
+
+    rng = np.random.default_rng(seed)
+    types = v2_scored.apply(answer_type, axis=1)
+    labelled = set(human.dropna().index) if human is not None else set()
+    picked = []
+
+    for flag in (True, False):
+        stratum = [i for i in run.index if bool(run.loc[i, "has_error"]) == flag]
+        chosen = [i for i in force if i in stratum]
+        by_type = {}
+        for i in stratum:
+            if i in chosen:
+                continue
+            by_type.setdefault(types.get(i, "numeric_or_algebra"), []).append(i)
+        # Human-labelled first inside each shape, then seeded shuffle.
+        for t, items in by_type.items():
+            lab = [i for i in items if i in labelled]
+            unlab = [i for i in items if i not in labelled]
+            rng.shuffle(lab)
+            rng.shuffle(unlab)
+            by_type[t] = lab + unlab
+        order = [t for t in ANSWER_TYPE_ORDER if by_type.get(t)]
+        while len(chosen) < n_per_stratum and order:
+            for t in list(order):
+                if len(chosen) >= n_per_stratum:
+                    break
+                if by_type[t]:
+                    chosen.append(by_type[t].pop(0))
+                else:
+                    order.remove(t)
+        picked.extend(chosen[:n_per_stratum])
+
+    out = pd.DataFrame({"item": sorted(picked)}).set_index("item")
+    out["has_error"] = [bool(run.loc[i, "has_error"]) for i in out.index]
+    out["answer_type"] = [types.get(i, "numeric_or_algebra") for i in out.index]
+    out["human_label"] = [human.get(i, "") if human is not None else ""
+                          for i in out.index]
+    out["forced"] = [i in force for i in out.index]
+    return out
+
+
+#: Phrases that indicate the judge RECALCULATED rather than compared. Its own
+#: criterion 3 forbids this, so a hit is direct evidence of the failure mode
+#: the gate caught on item 273.
+SOLVING_RE = re.compile(
+    r"\b(should be|actually|the correct answer|correctly comput|recomput|"
+    r"let(?:'s| us) (?:calculate|compute|solve)|we (?:calculate|compute|solve|get)|"
+    r"solving (?:this|the)|therefore the answer is|the right answer|"
+    r"is wrong|is incorrect because|standard answer (?:is|appears) (?:wrong|incorrect))\b",
+    re.I)
+
+
+def looks_like_solving(text: Optional[str]) -> bool:
+    """Heuristic: did the judge work the problem instead of comparing?
+
+    A flag for human review, never a verdict -- it over-triggers on judges
+    that merely narrate. Its value is pulling the handful of transcripts worth
+    reading out of 80.
+    """
+    return bool(text) and bool(SOLVING_RE.search(str(text)))
+
+
+def diagnostic_summary_md(path: str, both: pd.DataFrame,
+                          sample: pd.DataFrame) -> str:
+    """Summary for the exploratory run. Reports NO accuracy, by construction.
+
+    `both` carries one row per item with `verdict_native`, `verdict_fidelity`,
+    the two raw outputs and the solving flags. The header states the gate
+    failure first so the file cannot be read as a scoring result.
+    """
+    L = ["# LiveMath-Judge — EXPLORATORY DIAGNOSTIC (not a scoring run)\n"]
+    L.append("> **The gate FAILED before this ran.** On item 273 the judge "
+             "accepted `3/4` against the page's `2/4`, i.e. it recalculated. "
+             "This file characterises HOW the judge fails. **No accuracy is "
+             "reported and none may be derived from it.**\n")
+    L.append(f"Model: `{MODEL_ID}` · {len(both)} items · both prompts · "
+             "2026-08-12\n")
+
+    L.append("## Sample composition\n")
+    L.append(f"- `has_error=1`: {int(sample['has_error'].sum())} · "
+             f"clean: {int((~sample['has_error']).sum())}")
+    L.append(f"- carrying a determinate human label: "
+             f"{int((sample['human_label'] != '').sum())}")
+    L.append(f"- forced probes: {sorted(sample.index[sample['forced']].tolist())}\n")
+    L.append("| answer type | n |")
+    L.append("|---|---|")
+    for t, c in sample["answer_type"].value_counts().items():
+        L.append(f"| {t} | {c} |")
+
+    nat, fid = both["verdict_native"], both["verdict_fidelity"]
+    diff = nat != fid
+    L.append("\n## Native vs fidelity prompt\n")
+    L.append(f"The two prompts disagree on **{int(diff.sum())} of {len(both)}** items.\n")
+    L.append("| prompt | yes | no | parse failed |")
+    L.append("|---|---|---|---|")
+    for tag, v in (("native", nat), ("fidelity", fid)):
+        L.append(f"| {tag} | {int((v == 'correct').sum())} | "
+                 f"{int((v == 'incorrect').sum())} | {int((v == 'unclear').sum())} |")
+    L.append(f"\nFidelity stricter on {int((nat == 'correct').values.__and__((fid == 'incorrect').values).sum())} "
+             f"items, more lenient on "
+             f"{int((nat == 'incorrect').values.__and__((fid == 'correct').values).sum())}.\n")
+
+    L.append("## Against determinate human labels\n")
+    lab = both[both["human_label"].isin(["correct", "wrong"])]
+    if len(lab):
+        L.append(f"{len(lab)} of the {len(both)} carry one.\n")
+        L.append("| human | n | native agrees | fidelity agrees |")
+        L.append("|---|---|---|---|")
+        for cls, want in (("correct", "correct"), ("wrong", "incorrect")):
+            m = lab["human_label"] == cls
+            if not m.any():
+                continue
+            L.append(f"| {cls} | {int(m.sum())} | "
+                     f"{int((lab.loc[m, 'verdict_native'] == want).sum())} | "
+                     f"{int((lab.loc[m, 'verdict_fidelity'] == want).sum())} |")
+        L.append("\n**Per class only.** The audited pool is ~6:1 correct to "
+                 "wrong, so a judge answering yes always looks accurate "
+                 "overall while getting none of the class that matters.\n")
+    else:
+        L.append("None in this draw.\n")
+
+    L.append("## has_error=1 behaviour\n")
+    he = both[both["has_error"]]
+    L.append(f"On the {len(he)} items carrying an injected error, the fidelity "
+             f"prompt says yes on **{int((he['verdict_fidelity'] == 'correct').sum())}**.\n")
+    L.append("A faithful transcription of an injected error SHOULD be yes, so "
+             "a high rate is not by itself wrong. The signal to read is the "
+             "solving flag below: accepting because the maths was repaired is "
+             "the failure, accepting because the text matches is not.\n")
+
+    solving = both[both["solving_fidelity"] | both["solving_native"]]
+    L.append(f"## Judge appears to solve rather than compare — "
+             f"{len(solving)} of {len(both)}\n")
+    L.append("Heuristic flag over the judge's own transcript, for review "
+             "rather than as a verdict. Its criterion 3 forbids "
+             "recalculating.\n")
+    for i, r in solving.head(10).iterrows():
+        L.append(f"**item {i}** · `has_error={r['has_error']}` · "
+                 f"native `{r['verdict_native']}` · fidelity "
+                 f"`{r['verdict_fidelity']}`\n")
+        L.append(f"- truth: `{str(r['ground_truth_answer'])[:130]}`")
+        L.append(f"- model: `{str(r['model_answer'])[:130]}`")
+        L.append(f"- judge: {str(r['raw_fidelity'])[:260]}\n")
+
+    pf = both[(nat == "unclear") | (fid == "unclear")]
+    L.append(f"## Parse failures — {len(pf)}\n")
+    L.append("`unclear` means OUR parse found no verdict. The model has no "
+             "abstain option, so this is never judge uncertainty.\n")
+    for i, r in pf.head(5).iterrows():
+        L.append(f"- item {i}: native `{r['verdict_native']}`, fidelity "
+                 f"`{r['verdict_fidelity']}` — {str(r['raw_fidelity'])[:150]}")
+
+    text = "\n".join(L)
+    pathlib_write(path, text)
+    return text
