@@ -1,0 +1,225 @@
+"""Locks the LiveMath-Judge adapter. Stub backend only -- the model never runs here.
+
+`jnanliu/LiveMath-Judge` is a math-EQUIVALENCE judge being repurposed as a
+transcription-FIDELITY judge, which is the whole risk. These tests pin the
+three things that decide whether the experiment is valid:
+
+  * the prompt keeps the model's own template verbatim and only APPENDS, since
+    deviating from the format a 3B fine-tune was trained on degrades it;
+  * the verdict parser takes the LAST boxed answer, because the prompt itself
+    contains a literal `\\boxed{yes}` and taking the first would score
+    almost every item correct;
+  * the gate on items 55 and 273 fails closed.
+
+No GPU, no network, no model download.
+"""
+
+import pandas as pd
+import pytest
+
+import pilot.judge as J
+import pilot.rescore as rescore
+import pilot.strict_v2 as strict_v2
+
+
+def stub(reply):
+    """A backend that always answers the same thing."""
+    return lambda prompt: reply
+
+
+def scripted(replies):
+    """A backend answering from a list, in call order."""
+    seq = list(replies)
+
+    def backend(prompt):
+        return seq.pop(0) if seq else ""
+    return backend
+
+
+@pytest.fixture
+def tiny_run():
+    """Two rows standing in for items 55 and 273, at those exact labels."""
+    rows = {
+        55: {"all_transcription_samples_raw": repr(
+                [r"**Answer:** \tan(x+y) = \frac{\tan x + \tan y}{1 - \tan x \tan y}"] * 5),
+             "pert_a": r"\tan (x + y) = \frac{\tan x + \tan y}{1 + \tan x \tan y}",
+             "orig_q": "Prove the tangent addition formula.", "has_error": True},
+        273: {"all_transcription_samples_raw": repr([r"**Answer:** P(E) = \frac{3}{4}"] * 5),
+              "pert_a": r"P(E) = \frac{2}{4}",
+              "orig_q": "Find the probability.", "has_error": True},
+    }
+    return pd.DataFrame.from_dict(rows, orient="index")
+
+
+# --- prompt construction --------------------------------------------------
+
+def test_the_native_template_is_verbatim_and_fidelity_only_appends():
+    native = J.build_prompt("Q", "GOLD", "ANS", fidelity=False)
+    fid = J.build_prompt("Q", "GOLD", "ANS", fidelity=True)
+    for marker in ("Please act as an expert in grading mathematics exam papers",
+                   "3. You do not need to recalculate the problem answers",
+                   "Original Question: Q", "Standard Answer: GOLD",
+                   "Examinee's Answer: ANS", "Analysis:"):
+        assert marker in native, marker
+        assert marker in fid, marker
+    assert "IMPORTANT" not in native
+    assert len(fid) > len(native)
+
+
+def test_the_fidelity_clause_overrides_the_equivalence_criterion():
+    """Criterion 2 says equivalent formulas count as correct -- exactly what
+    must NOT apply when the standard answer is deliberately wrong. The clause
+    has to sit inside the criteria list and before the instruction, or the
+    model reads it as an afterthought."""
+    fid = J.build_prompt("Q", "GOLD", "ANS", fidelity=True)
+    assert "4. IMPORTANT" in fid
+    assert "overrides criterion 2" in fid
+    assert "silently corrected" in fid
+    assert fid.index("4. IMPORTANT") > fid.index("2. Some answers may be")
+    assert fid.index("4. IMPORTANT") < fid.index("Please judge whether")
+
+
+def test_the_prompt_carries_all_three_fields():
+    p = J.build_prompt("WHATQ", "WHATGOLD", "WHATANS")
+    assert "WHATQ" in p and "WHATGOLD" in p and "WHATANS" in p
+    p2 = J.build_prompt(None, None, None)
+    assert "Original Question:" in p2      # empties must not break formatting
+
+
+# --- verdict parsing ------------------------------------------------------
+
+@pytest.mark.parametrize("text,expected", [
+    (r"Analysis: they match. \boxed{yes}", "correct"),
+    (r"Analysis: they differ. \boxed{no}", "incorrect"),
+    (r"\boxed{ YES }", "correct"),
+    (r"\boxed{No}", "incorrect"),
+    ("", "unclear"),
+    (None, "unclear"),
+    ("Analysis: I am thinking about it", "unclear"),
+])
+def test_parse_verdict(text, expected):
+    assert J.parse_verdict(text) == expected
+
+
+def test_the_last_boxed_verdict_wins_not_the_first():
+    """THE TRAP. The prompt itself says 'If they match, output \\boxed{yes},
+    otherwise output \\boxed{no}'. Any echo of it puts a `yes` before the real
+    answer, and a first-match parser would score nearly every item correct --
+    a bug that looks like an excellent judge."""
+    echo = (r"If they match, output \boxed{yes}, otherwise output \boxed{no}."
+            "\nAnalysis: the examinee corrected the error."
+            "\n" + r"\boxed{no}")
+    assert J.parse_verdict(echo) == "incorrect"
+    echo_yes = (r"output \boxed{yes} otherwise \boxed{no}" "\n" r"\boxed{yes}")
+    assert J.parse_verdict(echo_yes) == "correct"
+
+
+def test_a_bare_yes_no_is_only_read_from_the_final_line():
+    assert J.parse_verdict("no boxed here\nyes") == "correct"
+    # "no" appearing mid-prose must not be harvested as a verdict
+    assert J.parse_verdict("there is no boxed answer at all\nAnalysis") == "unclear"
+
+
+# --- per-item output shape ------------------------------------------------
+
+def test_judge_item_emits_every_requested_column(tiny_run):
+    import ast
+    r = J.judge_item(stub(r"\boxed{no}"),
+                     ast.literal_eval(tiny_run.loc[55, "all_transcription_samples_raw"]),
+                     tiny_run.loc[55, "pert_a"], tiny_run.loc[55, "orig_q"])
+    for c in ("question", "ground_truth_answer", "model_answer",
+              "livemath_raw_output", "livemath_label", "parse_failed",
+              "verdict", "fidelity_prompt"):
+        assert c in r, c
+    assert r["livemath_label"] == "no"
+    assert r["parse_failed"] is False
+    assert r["verdict"] == "incorrect"
+
+
+def test_parse_failure_is_flagged_and_labelled_empty(tiny_run):
+    """`unclear` means OUR parse failed. The model has no abstain verdict --
+    its own prompt maps 'difficult to judge' onto `no` -- so this must never
+    be reported as judge uncertainty."""
+    import ast
+    r = J.judge_item(stub("Analysis: hmm, hard to say"),
+                     ast.literal_eval(tiny_run.loc[55, "all_transcription_samples_raw"]),
+                     tiny_run.loc[55, "pert_a"])
+    assert r["verdict"] == "unclear"
+    assert r["parse_failed"] is True
+    assert r["livemath_label"] == ""
+
+
+# --- the gate -------------------------------------------------------------
+
+def test_the_gate_items_are_the_two_confirmed_silent_corrections():
+    assert J.GATE_ITEMS == (55, 273)
+
+
+def test_gate_passes_only_when_both_items_are_rejected(tiny_run):
+    g = J.run_gate(stub(r"\boxed{no}"), tiny_run)
+    assert g["passed"] is True
+    assert g["verdict_label"] == "gate_passed"
+    assert set(g["verdicts"]) == set(J.GATE_ITEMS)
+    assert all(v == "incorrect" for v in g["verdicts"].values())
+    assert g["note"] == ""
+
+
+def test_gate_fails_when_the_judge_accepts_a_corrected_error(tiny_run):
+    """The failure this exists to catch: the judge says the model's
+    mathematically-better answer matches, i.e. it recalculated."""
+    g = J.run_gate(stub(r"\boxed{yes}"), tiny_run)
+    assert g["passed"] is False
+    assert g["verdict_label"] == "gated_judges_mathematics"
+    assert "grading mathematics" in g["note"]
+
+
+def test_gate_fails_closed_on_one_bad_item(tiny_run):
+    """Both must be rejected. One out of two is a fail, not a pass."""
+    g = J.run_gate(scripted([r"\boxed{no}", r"\boxed{yes}"]), tiny_run)
+    assert g["passed"] is False
+
+
+def test_gate_fails_closed_on_unparseable_output(tiny_run):
+    """An unreadable judge is not a passing judge."""
+    g = J.run_gate(stub("no verdict at all"), tiny_run)
+    assert g["passed"] is False
+
+
+def test_the_two_prompts_are_gated_independently(tiny_run):
+    """The native prompt is recorded for comparison and must not be able to
+    authorise the 300-item run."""
+    fid = J.run_gate(stub(r"\boxed{no}"), tiny_run, fidelity=True)
+    nat = J.run_gate(stub(r"\boxed{yes}"), tiny_run, fidelity=False)
+    assert fid["fidelity_prompt"] is True and fid["passed"] is True
+    assert nat["fidelity_prompt"] is False and nat["passed"] is False
+
+
+# --- diagnostics ----------------------------------------------------------
+
+def test_diagnostics_report_both_accuracy_conventions_and_per_class():
+    judged = pd.DataFrame({
+        "verdict": ["correct", "incorrect", "unclear", "correct"],
+        "has_error": [True, True, False, False],
+    }, index=[1, 2, 3, 4])
+    v1 = pd.Series([True, True, False, False], index=[1, 2, 3, 4])
+    v2 = pd.Series([True, False, False, True], index=[1, 2, 3, 4])
+    human = pd.Series({1: "correct", 2: "wrong", 4: "wrong"})
+    d = J.judge_diagnostics(judged, v1, v2, human=human)
+    assert d["counts"] == {"correct": 2, "incorrect": 1, "unclear": 1}
+    assert d["accuracy_excluding_unclear"] == pytest.approx(2 / 3)
+    assert d["accuracy_unclear_as_wrong"] == pytest.approx(2 / 4)
+    assert d["human_per_class"]["wrong"]["n"] == 2
+    assert d["human_false_pass"] == 1          # item 4: human wrong, judge yes
+    assert d["human_false_fail"] == 0
+    assert "human_overall_agreement_DO_NOT_QUOTE_ALONE" in d, (
+        "the overall figure must be named so it cannot be quoted bare")
+
+
+# --- isolation ------------------------------------------------------------
+
+def test_no_scorer_rule_is_modified():
+    """This is a separate pilot. strict_v1 and strict_v2 must be untouched."""
+    assert rescore.RULES == ("strict_v1", "fixed_v2", "relaxed_v3",
+                             "final_term_v4")
+    assert strict_v2.RULE_NAME == "strict_v2_display_primary"
+    assert J.MODEL_ID == "jnanliu/LiveMath-Judge"

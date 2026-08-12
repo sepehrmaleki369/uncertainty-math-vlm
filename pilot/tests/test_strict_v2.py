@@ -208,12 +208,29 @@ def test_the_audit_sheet_has_the_requested_shape(audit_sheet):
     assert audit_sheet["item_id"].is_unique
 
 
-def test_the_human_columns_ship_empty(audit_sheet):
-    """Same discipline as every coding sheet here: the automatic proposal and
-    the human verdict stay in separate columns so the scorer's own error rate
-    stays measurable."""
+def test_the_human_columns_are_now_fully_coded(audit_sheet):
+    """This sheet SHIPPED empty and was coded on 2026-08-12 -- the assertion
+    was flipped when the labels landed, not deleted, so the automatic columns
+    and the human verdict stay visibly separate and the coding stays pinned.
+
+    `true_wrong` is in the vocabulary because 66 of the 108 are items the
+    scorer called WRONG, and the false-pass vocabulary the sheet originally
+    shipped with had no way to say that verdict was earned.
+    """
     for c in ("final_label", "confidence", "note"):
-        assert audit_sheet[c].fillna("").eq("").all(), c
+        assert audit_sheet[c].fillna("").ne("").all(), f"{c} has uncoded rows"
+    assert set(audit_sheet["final_label"]) <= {
+        "true_correct", "true_wrong", "extraction_issue", "needs_visual"}
+    counts = audit_sheet["final_label"].value_counts().to_dict()
+    assert counts["true_correct"] == 65
+    assert counts["extraction_issue"] == 39
+    assert counts["true_wrong"] == 3
+    assert counts["needs_visual"] == 1
+    # extraction_status answers a DIFFERENT question from final_label and must
+    # not be collapsed into it.
+    assert "extraction_status" in audit_sheet.columns
+    assert set(audit_sheet["extraction_status"]) == {
+        "extraction_ok", "extraction_issue", "needs_visual"}
 
 
 def test_the_sort_is_exactly_as_specified(audit_sheet):
