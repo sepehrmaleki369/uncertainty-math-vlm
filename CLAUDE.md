@@ -169,6 +169,46 @@ whole answer against the whole ground truth skips the extractor entirely.
   **If Omni-Judge also accepts item 273, the honest conclusion is that open
   math judges are unsafe for a perturbed-answer fidelity task**, which is a
   Limitations finding rather than a failed experiment.
+- **WHAT EACH PROBE ACTUALLY TESTS, and this is the clean framing to use:**
+  - **item 55 — can the judge reject a mathematically corrected but
+    non-faithful answer? PASSED.** The page reads `1 +`, the majority sample
+    reads `1 -`, and the judge said `no`.
+  - **item 273 — can the judge reject a NON-ANSWER? FAILED.** The answer
+    handed to it is coin-tossing setup prose, and it said `yes`.
+
+  **That split makes the failure cleaner, not weaker:** the judge can spot a
+  wrong formula but cannot spot that it was handed no answer at all.
+
+- **RUN 2026-08-12, notebook 25: the 40-item diagnostic (A100, 0 parse
+  failures).** Exploratory, never a scoring run.
+
+  | | native | fidelity |
+  |---|---|---|
+  | yes / no | 31 / 9 | **33 / 7** |
+  | agrees with human `correct` (n=32) | 28 | 29 |
+  | agrees with human `wrong` (n=5) | 4 | 3 |
+
+  - **THE JUDGE PERFORMS EXACTLY AT THE TRIVIAL BASELINE.** On the 37 items
+    with a determinate human label, answering "yes" to everything scores
+    **32/37 = 86.5%**; both prompts also score **32/37 = 86.5%**. It is not
+    literally always-yes — it catches 3 of the 5 wrong items — but it pays
+    for them with 3 false fails, landing on the do-nothing baseline. **This
+    is exactly why per-class reporting is mandatory here**; the overall
+    figure looks respectable and means nothing.
+  - **THE FIDELITY CLAUSE DID NOT WORK, AND WHAT IT DID WAS BACKWARDS.** The
+    two prompts disagree on **2 of 40**, and on both the fidelity version is
+    **more lenient**, never stricter (yes 31 → 33). A 3B fine-tune does not
+    honour an added criterion that contradicts its training. **Do not assume
+    a prompt amendment can re-purpose a fine-tuned judge.**
+  - **More permissive on the perturbed items: 90% yes on `has_error=1`
+    against 75% on clean** — the direction leniency predicts.
+  - **THE "DOES IT SOLVE THE MATHS" QUESTION IS UNANSWERABLE AGAINST THIS
+    MODEL, and a 0 count must not be read as exoneration.** `looks_like_solving`
+    fired on **0 of 40** — but the model emits a bare `\boxed{yes}` / `\boxed{no}`
+    with **no reasoning at all**, despite the prompt ending in `Analysis:`.
+    With no transcript there is nothing to scan. The summary writer now says
+    so inline; the earlier version would have let "0 of 40" read as evidence.
+
 - **A failed gate is a result.** It cost one Colab session and establishes
   that this benchmark's scoring problem is not solved by swapping in an
   off-the-shelf judge.

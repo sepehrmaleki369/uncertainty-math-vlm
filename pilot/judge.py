@@ -547,9 +547,12 @@ def diagnostic_summary_md(path: str, both: pd.DataFrame,
     """
     L = ["# LiveMath-Judge — EXPLORATORY DIAGNOSTIC (not a scoring run)\n"]
     L.append("> **The gate FAILED before this ran.** On item 273 the judge "
-             "accepted `3/4` against the page's `2/4`, i.e. it recalculated. "
-             "This file characterises HOW the judge fails. **No accuracy is "
-             "reported and none may be derived from it.**\n")
+             "accepted a non-faithful / non-useful model output as matching "
+             "the ground-truth answer `2/4`. (NOT 'the model corrected 2/4 to "
+             "3/4' -- that is a Pixtral fact; on the Qwen run this item's "
+             "majority sample is coin-tossing setup prose.) This file "
+             "characterises HOW the judge fails. **No accuracy is reported "
+             "and none may be derived from it.**\n")
     L.append(f"Model: `{MODEL_ID}` · {len(both)} items · both prompts · "
              "2026-08-12\n")
 
@@ -606,11 +609,22 @@ def diagnostic_summary_md(path: str, both: pd.DataFrame,
              "the failure, accepting because the text matches is not.\n")
 
     solving = both[both["solving_fidelity"] | both["solving_native"]]
+    silent = int(both["raw_fidelity"].astype(str).str.len().le(24).sum())
     L.append(f"## Judge appears to solve rather than compare — "
              f"{len(solving)} of {len(both)}\n")
     L.append("Heuristic flag over the judge's own transcript, for review "
              "rather than as a verdict. Its criterion 3 forbids "
              "recalculating.\n")
+    if silent:
+        L.append(f"> **READ THIS BEFORE TRUSTING THE COUNT ABOVE.** "
+                 f"{silent} of {len(both)} transcripts are a bare verdict with "
+                 "no reasoning at all -- the model answers `\\boxed{yes}` or "
+                 "`\\boxed{no}` directly despite the prompt ending in "
+                 "`Analysis:`. **With no transcript to scan there is nothing "
+                 "for the heuristic to find, so a count of 0 is NOT evidence "
+                 "the judge did not recalculate** -- it is evidence the judge "
+                 "does not explain itself. This diagnostic cannot answer the "
+                 "'does it solve the maths' question against this model.**\n")
     for i, r in solving.head(10).iterrows():
         L.append(f"**item {i}** · `has_error={r['has_error']}` · "
                  f"native `{r['verdict_native']}` · fidelity "
