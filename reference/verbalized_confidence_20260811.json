@@ -1,0 +1,28 @@
+{
+  "run": "confidence_perception_full_n300_qwen2.5-vl-3b-instruct_20260811T000156Z.csv",
+  "model_id": [
+    "Qwen/Qwen2.5-VL-3B-Instruct"
+  ],
+  "n_items": 300,
+  "n_usable": 295,
+  "note": "Notebook 20. Verbalized confidence on the PERCEPTION arm. Recomputed from raw columns; locked by pilot/tests/test_verbalized_confidence.py.",
+  "accuracy": 0.45,
+  "confidence_parse_rate": 0.938,
+  "confidence_median": 95.0,
+  "confidence_n_distinct": 37,
+  "perception_entropy_auroc": {
+    "auroc": 0.8071296296296296,
+    "ci_low": 0.7566202144629564,
+    "ci_high": 0.8539326270083777
+  },
+  "neg_verbalized_confidence_auroc": {
+    "auroc": 0.5277546296296296,
+    "ci_low": 0.4627734929521357,
+    "ci_high": 0.5934273146208631
+  },
+  "paired_difference": {
+    "difference": 0.27937500000000004,
+    "ci_low": 0.19448913092979248,
+    "ci_high": 0.35911225265845476
+  }
+}

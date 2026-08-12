@@ -1,19 +1,79 @@
-\begin{thebibliography}{1}
+\begin{thebibliography}{10}
+
+\bibitem{selfconsistency}
+X.~Wang, J.~Wei, D.~Schuurmans, Q.~Le, E.~Chi, S.~Narang, A.~Chowdhery, and
+  D.~Zhou, ``Self-consistency improves chain of thought reasoning in language
+  models,'' in {\em International Conference on Learning Representations
+  (ICLR)}, 2023.
+
+\bibitem{semanticentropy}
+L.~Kuhn, Y.~Gal, and S.~Farquhar, ``Semantic uncertainty: Linguistic
+  invariances for uncertainty estimation in natural language generation,'' in
+  {\em International Conference on Learning Representations (ICLR)}, 2023.
 
 \bibitem{fermat}
-``Can vision-language models evaluate handwritten math?,'' {\em arXiv preprint
-  arXiv:2501.07244}, 2025.
-\newblock VERIFY authors and venue.
+O.~Nath, H.~Bathina, M.~S. U.~R. Khan, and M.~M. Khapra, ``Can vision-language
+  models evaluate handwritten math?,'' {\em arXiv preprint arXiv:2501.07244},
+  2025.
+
+\bibitem{kadavath}
+S.~Kadavath, T.~Conerly, A.~Askell, T.~Henighan, D.~Drain, E.~Perez, {\em
+  et~al.}, ``Language models (mostly) know what they know,'' {\em arXiv
+  preprint arXiv:2207.05221}, 2022.
+
+\bibitem{selectiveclassification}
+Y.~Geifman and R.~El-Yaniv, ``Selective classification for deep neural
+  networks,'' {\em arXiv preprint arXiv:1705.08500}, 2017.
+
+\bibitem{recoverr}
+T.~Srinivasan, J.~Hessel, T.~Gupta, B.~Y. Lin, Y.~Choi, J.~Thomason, and K.~R.
+  Chandu, ``Selective ``selective prediction'': Reducing unnecessary abstention
+  in vision-language reasoning,'' in {\em Findings of the Association for
+  Computational Linguistics (ACL Findings)}, 2024.
+
+\bibitem{mathvista}
+P.~Lu, H.~Bansal, T.~Xia, J.~Liu, C.~Li, H.~Hajishirzi, H.~Cheng, K.-W. Chang,
+  M.~Galley, and J.~Gao, ``Mathvista: Evaluating mathematical reasoning of
+  foundation models in visual contexts,'' in {\em International Conference on
+  Learning Representations (ICLR)}, 2024.
+
+\bibitem{nougat}
+L.~Blecher, G.~Cucurull, T.~Scialom, and R.~Stojnic, ``Nougat: Neural optical
+  understanding for academic documents,'' {\em arXiv preprint
+  arXiv:2308.13418}, 2023.
 
 \bibitem{errorradar}
-``Errorradar: Benchmarking complex mathematical reasoning of multimodal large
+Y.~Yan, S.~Wang, J.~Huo, H.~Li, B.~Li, J.~Su, X.~Gao, Y.-F. Zhang, T.~Xu,
+  Z.~Chu, A.~Zhong, K.~Wang, H.~Xiong, P.~S. Yu, X.~Hu, and Q.~Wen,
+  ``Errorradar: Benchmarking complex mathematical reasoning of multimodal large
   language models via error detection,'' {\em arXiv preprint arXiv:2410.04509},
   2024.
-\newblock VERIFY authors and venue.
 
 \bibitem{scratchmath}
-``Scratchmath.''
-\newblock VERIFY -- dataset used via HuggingFace songdj/ScratchMath; find and
-  cite the accompanying paper.
+``Scratchmath.'' HuggingFace dataset \texttt{songdj/ScratchMath}.
+\newblock No accompanying paper located; cited as a dataset artifact.
+
+\bibitem{mirage}
+R.~Schaeffer, B.~Miranda, and S.~Koyejo, ``Are emergent abilities of large
+  language models a mirage?,'' {\em arXiv preprint arXiv:2304.15004}, 2023.
+
+\bibitem{verifystepbystep}
+H.~Lightman, V.~Kosaraju, Y.~Burda, H.~Edwards, B.~Baker, T.~Lee, J.~Leike,
+  J.~Schulman, I.~Sutskever, and K.~Cobbe, ``Let's verify step by step,'' {\em
+  arXiv preprint arXiv:2305.20050}, 2023.
+
+\bibitem{biasintheloop}
+Z.~Zhao, A.~Esmaeili, and F.~Fard, ``Bias in the loop: Auditing llm-as-a-judge
+  for software engineering,'' {\em arXiv preprint arXiv:2604.16790}, 2026.
+
+\bibitem{qwen25vl}
+S.~Bai, K.~Chen, X.~Liu, J.~Wang, W.~Ge, S.~Song, K.~Dang, P.~Wang, S.~Wang,
+  J.~Tang, {\em et~al.}, ``Qwen2.5-vl technical report,'' {\em arXiv preprint
+  arXiv:2502.13923}, 2025.
+
+\bibitem{pixtral}
+P.~Agrawal, S.~Antoniak, E.~Bou~Hanna, B.~Bout, D.~Chaplot, J.~Chudnovsky,
+  D.~Costa, B.~De~Monicault, S.~Garg, T.~Gervet, {\em et~al.}, ``Pixtral 12b,''
+  {\em arXiv preprint arXiv:2410.07073}, 2024.
 
 \end{thebibliography}

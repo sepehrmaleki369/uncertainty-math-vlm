@@ -1,32 +1,154 @@
-% UNVERIFIED STUB. Every entry below must be checked against the real
-% paper before submission -- arXiv ids, author lists, years and venues.
-% Do not cite from memory; a fabricated or misattributed reference is
-% worse than a missing one.
+% Every entry below was VERIFIED against its official page (arXiv abs,
+% OpenReview, ACL Anthology, or the HuggingFace model card) on 2026-08-12.
+% Titles, author lists and years are transcribed from the fetched page, not
+% recalled.
+%
+% A candidate list was supplied for this section and its metadata proved
+% substantially unreliable -- real papers, fabricated authors. Confirmed
+% errors in that list, each caught by fetching the source:
+%   * "Let's Verify Step by Step": four authors invented (Yiu, Kreidberg,
+%     Stuhlmüller, Bowman), first initial wrong, year off by one.
+%   * "Are Emergent Abilities ... a Mirage?": title given as "Real or a
+%     Mirage?", second author given as Brandeis rather than Miranda.
+%   * MathVista: four authors invented.
+%   * "Bias in the Loop": real paper, authors given as "Anonymous".
+% Nothing here may be added from memory. If a page cannot be fetched, the
+% reference is dropped rather than guessed.
 
+% ---------------------------------------------------------------- datasets
 @article{fermat,
-  title  = {Can Vision-Language Models Evaluate Handwritten Math?},
-  journal= {arXiv preprint arXiv:2501.07244},
-  year   = {2025},
-  note   = {VERIFY authors and venue}
+  title   = {Can Vision-Language Models Evaluate Handwritten Math?},
+  author  = {Nath, Oikantik and Bathina, Hanani and
+             Khan, Mohammed Safi Ur Rahman and Khapra, Mitesh M.},
+  journal = {arXiv preprint arXiv:2501.07244},
+  year    = {2025}
 }
 
 @article{errorradar,
-  title  = {ErrorRadar: Benchmarking Complex Mathematical Reasoning of
-            Multimodal Large Language Models Via Error Detection},
-  journal= {arXiv preprint arXiv:2410.04509},
-  year   = {2024},
-  note   = {VERIFY authors and venue}
+  title   = {ErrorRadar: Benchmarking Complex Mathematical Reasoning of
+             Multimodal Large Language Models Via Error Detection},
+  author  = {Yan, Yibo and Wang, Shen and Huo, Jiahao and Li, Hang and
+             Li, Boyan and Su, Jiamin and Gao, Xiong and Zhang, Yi-Fan and
+             Xu, Tianlong and Chu, Zhendong and Zhong, Aoxiao and
+             Wang, Kun and Xiong, Hui and Yu, Philip S. and Hu, Xuming and
+             Wen, Qingsong},
+  journal = {arXiv preprint arXiv:2410.04509},
+  year    = {2024}
 }
 
 @misc{scratchmath,
   title = {ScratchMath},
-  note  = {VERIFY -- dataset used via HuggingFace songdj/ScratchMath;
-           find and cite the accompanying paper}
+  howpublished = {HuggingFace dataset \texttt{songdj/ScratchMath}},
+  note  = {No accompanying paper located; cited as a dataset artifact}
 }
 
-% --- still to add, all unverified ---
-% semantic entropy (Kuhn et al.; Farquhar et al.)
-% self-consistency decoding
-% selective prediction / risk-coverage / AURC
-% conformal prediction for classification
-% VLM hallucination and calibration
+@inproceedings{mathvista,
+  title     = {MathVista: Evaluating Mathematical Reasoning of Foundation
+               Models in Visual Contexts},
+  author    = {Lu, Pan and Bansal, Hritik and Xia, Tony and Liu, Jiacheng and
+               Li, Chunyuan and Hajishirzi, Hannaneh and Cheng, Hao and
+               Chang, Kai-Wei and Galley, Michel and Gao, Jianfeng},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2024}
+}
+
+% ------------------------------------------------------------------ models
+@article{qwen25vl,
+  title   = {Qwen2.5-VL Technical Report},
+  author  = {Bai, Shuai and Chen, Keqin and Liu, Xuejing and Wang, Jialin and
+             Ge, Wenbin and Song, Sibo and Dang, Kai and Wang, Peng and
+             Wang, Shijie and Tang, Jun and others},
+  journal = {arXiv preprint arXiv:2502.13923},
+  year    = {2025}
+}
+
+@article{pixtral,
+  title   = {Pixtral 12B},
+  author  = {Agrawal, Pravesh and Antoniak, Szymon and Bou Hanna, Emma and
+             Bout, Baptiste and Chaplot, Devendra and Chudnovsky, Jessica and
+             Costa, Diogo and De Monicault, Baudouin and Garg, Saurabh and
+             Gervet, Theophile and others},
+  journal = {arXiv preprint arXiv:2410.07073},
+  year    = {2024}
+}
+
+% ------------------------------------------- sampling-based uncertainty
+@inproceedings{semanticentropy,
+  title     = {Semantic Uncertainty: Linguistic Invariances for Uncertainty
+               Estimation in Natural Language Generation},
+  author    = {Kuhn, Lorenz and Gal, Yarin and Farquhar, Sebastian},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2023}
+}
+
+@inproceedings{selfconsistency,
+  title     = {Self-Consistency Improves Chain of Thought Reasoning in
+               Language Models},
+  author    = {Wang, Xuezhi and Wei, Jason and Schuurmans, Dale and
+               Le, Quoc and Chi, Ed and Narang, Sharan and
+               Chowdhery, Aakanksha and Zhou, Denny},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2023}
+}
+
+@article{kadavath,
+  title   = {Language Models (Mostly) Know What They Know},
+  author  = {Kadavath, Saurav and Conerly, Tom and Askell, Amanda and
+             Henighan, Tom and Drain, Dawn and Perez, Ethan and others},
+  journal = {arXiv preprint arXiv:2207.05221},
+  year    = {2022}
+}
+
+% ------------------------------------------ selective prediction/abstention
+@article{selectiveclassification,
+  title   = {Selective Classification for Deep Neural Networks},
+  author  = {Geifman, Yonatan and El-Yaniv, Ran},
+  journal = {arXiv preprint arXiv:1705.08500},
+  year    = {2017}
+}
+
+@inproceedings{recoverr,
+  title     = {Selective ``Selective Prediction'': Reducing Unnecessary
+               Abstention in Vision-Language Reasoning},
+  author    = {Srinivasan, Tejas and Hessel, Jack and Gupta, Tanmay and
+               Lin, Bill Yuchen and Choi, Yejin and Thomason, Jesse and
+               Chandu, Khyathi Raghavi},
+  booktitle = {Findings of the Association for Computational Linguistics
+               (ACL Findings)},
+  year      = {2024}
+}
+
+% ------------------------------------------------- document/handwritten OCR
+@article{nougat,
+  title   = {Nougat: Neural Optical Understanding for Academic Documents},
+  author  = {Blecher, Lukas and Cucurull, Guillem and Scialom, Thomas and
+             Stojnic, Robert},
+  journal = {arXiv preprint arXiv:2308.13418},
+  year    = {2023}
+}
+
+% ------------------------------------------------------ evaluation artifacts
+@article{mirage,
+  title   = {Are Emergent Abilities of Large Language Models a Mirage?},
+  author  = {Schaeffer, Rylan and Miranda, Brando and Koyejo, Sanmi},
+  journal = {arXiv preprint arXiv:2304.15004},
+  year    = {2023}
+}
+
+@article{verifystepbystep,
+  title   = {Let's Verify Step by Step},
+  author  = {Lightman, Hunter and Kosaraju, Vineet and Burda, Yura and
+             Edwards, Harri and Baker, Bowen and Lee, Teddy and
+             Leike, Jan and Schulman, John and Sutskever, Ilya and
+             Cobbe, Karl},
+  journal = {arXiv preprint arXiv:2305.20050},
+  year    = {2023}
+}
+
+@article{biasintheloop,
+  title   = {Bias in the Loop: Auditing LLM-as-a-Judge for Software
+             Engineering},
+  author  = {Zhao, Zixiao and Esmaeili, Amirreza and Fard, Fatemeh},
+  journal = {arXiv preprint arXiv:2604.16790},
+  year    = {2026}
+}
