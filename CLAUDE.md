@@ -181,8 +181,59 @@ crops need Colab).
   `test_the_dominant_answer_type_can_reach_the_sheet`.
 - Question type is **inferred** (`strict_v2._looks_mcq`) and gives **58 MCQ**,
   against the **52** recorded in the 2026-08-11 entry from a different
-  detector. Neither is validated against a human read; do not treat either as
-  exact.
+  detector. See the MCQ entry below — it is both over- AND under-inclusive.
+
+### 2026-08-12: THE MCQ DETECTOR IS UNSOUND IN BOTH DIRECTIONS — sheets built, not read
+
+`pilot/dataset_profile.py` (`mcq_trigger`, `mcq_review_set`, `mcq_caption`,
+`mcq_accuracy_sensitivity`), `pilot/28_mcq_contact_sheets.ipynb`,
+`pilot/dryruns/dryrun_nb28.py`, 12 more tests (file now 30).
+Manifest: `reference/audit/mcq_like_review_20260812.csv` (77 rows).
+**Everything is labelled "MCQ-like", never MCQ. Nobody has read the sheets.**
+
+- **THE OVER-COUNT IS PROVEN AND THE MATCHED TEXT NAMES THE CAUSE.**
+  `_looks_mcq`'s second trigger is `\(\s*[a-d]\s*\)[^\n]{0,60}\(\s*[b-e]\s*\)`
+  with `re.I`, so it matches **probability and function notation**:
+  item 82 `P(A) = P(B)`, 117 `P(A) = \frac{7}{13} …P(B)`, 234 `P(A) + P(B)`,
+  195 `f(a) = f(b)`, and 170/237 a **matching exercise**
+  (`(d)$. Similarly, $(ii)$ matches $(c)`). **6 of 58 fired with no "option"
+  word anywhere.** None is multiple choice.
+- **AND IT ALSO UNDER-COUNTS — this is the half I initially missed and it
+  reverses the framing.** **19 items NOT flagged carry a choice list
+  (`\begin{enumerate}`/`\item`) in the question.** So the corrected count can
+  go UP as well as down. **An audit of only the flagged items could find false
+  positives and nothing else** — the exact one-sided mistake the 104-item
+  `genuinely_wrong` census made, which needed a whole separate correct-side
+  spot check afterwards. `mcq_review_set` therefore ships **two groups**:
+  `flagged_mcq_like` (58, confirm/reject) and `candidate_missed` (19, recover).
+- **THE 82.8% MCQ ACCURACY IS DIAGNOSTIC ONLY. Do not quote the magnitude.**
+
+  | variant | n | `strict_v1` acc |
+  |---|---|---|
+  | as reported | 58 | **82.8%** |
+  | drop the 6 weak-trigger items | 52 | **88.5%** |
+  | drop weak + add all 19 candidates | 71 | **78.9%** |
+
+  A **~10-point swing on a detector judgement no human has ruled on.** The
+  **direction is stable** — MCQ far above free response (38.4%) under every
+  variant — so *"MCQ items score much higher"* is safe; the number is not.
+  `mcq_accuracy_sensitivity` returns `quotable=False` and says why.
+- **A presort can HIDE the suspicion it was built to surface.** Items 170/237
+  carry an enumerate, so `presort` demotes them to `choice_list_only` even
+  though the detector fired on the unsound regex. `flagged_by_weak_trigger_only`
+  (flagged AND no "option" word anywhere) is the honest test, and the caption
+  prints `WEAK trigger matched: …` off that, not off `presort`. Locked in
+  `test_weak_trigger_is_flagged_even_when_a_choice_list_demotes_the_presort`.
+- **Page and cell are computed in `mcq_review_set`, not the notebook**, so the
+  committed manifest and the rendered PNGs cannot drift; the notebook asserts
+  the rebuilt set matches the committed CSV before rendering, and the dry run
+  checks every named sheet exists. `--break-alignment` proves the
+  image-alignment guard fires (298/300 mismatches refused).
+- **TO RUN: `pilot/28_mcq_contact_sheets.ipynb` in Colab** (no GPU). Writes
+  `Drive/uncertainty-math-vlm/figures/mcq_like_review/` — `mcq_flagged_p1..7`
+  and `mcq_candidate_missed_p1..3`, captions burning in item id, `has_error`,
+  `strict_v1`, H, both spans, both labels, flags and the weak-trigger match.
+  Code `confirmed_mcq` = yes/no/unclear in the manifest.
 
 ### 2026-08-12: BUILT, NOT RUN — notebook 27, both open judges on all 300
 

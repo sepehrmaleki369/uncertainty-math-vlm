@@ -782,3 +782,234 @@ def write_summary_md(path: str, profile: pd.DataFrame, red: dict,
     with open(path, "w") as fh:
         fh.write("\n".join(L))
     return "\n".join(L)
+
+
+# ---------------------------------------------------------------------------
+# MCQ REVIEW SET. The detector is a HEURISTIC and the output is labelled
+# "MCQ-like", never "MCQ".
+#
+# `strict_v2._looks_mcq` fires on two things: the word "option" anywhere in the
+# question, truth span or answer field, or an `(a)...(b)` pattern within 60
+# characters. Measured on the real sample, the second trigger is unsound --
+# `P(A) = P(B)`, `f(a) = f(b)` and a matching exercise's `(d)... (c)` all match
+# it, and none is a multiple-choice question.
+#
+# **THE AUDIT MUST BE TWO-SIDED.** Reviewing only the flagged items can find
+# false positives and nothing else, which is the exact one-sided mistake this
+# project already made once: the 104-item `genuinely_wrong` census could only
+# surface false negatives, and a separate correct-side spot check had to be
+# built afterwards to find the other direction. So the review set also carries
+# items the detector did NOT flag but which show a choice list in the question,
+# as recovery candidates.
+# ---------------------------------------------------------------------------
+
+#: Question-side markers for an enumerated list of choices. Presence is NOT
+#: proof of MCQ -- LaTeX `enumerate` is equally how a multi-part question
+#: writes "(i) ... (ii) ...", which is why these items are candidates for a
+#: human to rule on rather than a second automatic verdict.
+_CHOICE_LIST_RE = re.compile(r"\\begin\{enumerate\}|\\item\b")
+
+_PAREN_LETTERS_RE = re.compile(r"\(\s*[a-d]\s*\)[^\n]{0,60}\(\s*[b-e]\s*\)", re.I)
+
+#: Pre-sort categories, strongest evidence first. These are PROPOSALS from
+#: text; the human read decides.
+MCQ_PRESORT = (
+    "option_word_and_choice_list",   # both signals; near-certain MCQ
+    "option_word_only",              # the word "option" but no visible list
+    "choice_list_only",              # a list but nothing says "option"
+    "paren_letters_only",            # the unsound trigger; expect false hits
+)
+
+
+def mcq_trigger(question, truth_span, answer_field) -> dict:
+    """Why `_looks_mcq` fired, and on what text. A trigger, not a verdict.
+
+    Returning the MATCHED SUBSTRING is the point: `paren_letters_only` items
+    are only recognisable as false positives once you can see that what
+    matched was `P(A) = P(B)`.
+    """
+    q = str(question or "")
+    parts = {"question": q, "truth_span": str(truth_span or ""),
+             "answer_field": str(answer_field or "")}
+    option_in = [k for k, v in parts.items() if strict_v2._OPTION_RE.search(v)]
+    has_list = bool(_CHOICE_LIST_RE.search(q))
+    blob = " ".join(parts.values())
+    paren = _PAREN_LETTERS_RE.search(blob)
+
+    if option_in and has_list:
+        presort = "option_word_and_choice_list"
+    elif option_in:
+        presort = "option_word_only"
+    elif has_list:
+        presort = "choice_list_only"
+    elif paren:
+        presort = "paren_letters_only"
+    else:
+        presort = "not_flagged"
+    return {
+        "presort": presort,
+        "option_word_in": ",".join(option_in),
+        "question_has_choice_list": has_list,
+        "paren_letters_match": paren.group(0)[:60] if paren else "",
+        "flagged_by_detector": bool(option_in) or bool(paren),
+    }
+
+
+def mcq_review_set(run: pd.DataFrame, v1: pd.Series, v2s: pd.DataFrame,
+                   per_page: int = 9, gt_col: str = "pert_a",
+                   question_col: str = "orig_q",
+                   entropy_col: str = "perception_entropy") -> pd.DataFrame:
+    """Every heuristic MCQ-like item, plus the items the detector may have MISSED.
+
+    Two groups, kept in one file with an unmissable `mcq_group` column:
+
+      * `flagged_mcq_like` -- `strict_v2._looks_mcq` said yes. Review to
+        CONFIRM or REJECT.
+      * `candidate_missed` -- not flagged, but the question carries a choice
+        list. Review to RECOVER. Without this half the audit can only ever
+        shrink the MCQ set, so a corrected count would be biased downward by
+        construction.
+
+    Sheet page and cell are computed here, not in the notebook, so the manifest
+    and the rendered PNGs cannot drift apart: both come from this one ordering.
+    """
+    rows = []
+    for i in run.index:
+        v2 = v2s.loc[i]
+        trig = mcq_trigger(run.loc[i, question_col], v2["truth_span"],
+                           run.loc[i, gt_col])
+        flagged = bool(v2["is_mcq"])
+        if not flagged and trig["presort"] != "choice_list_only":
+            continue
+        group = "flagged_mcq_like" if flagged else "candidate_missed"
+        on = [f for f in strict_v2.RISK_FLAGS if bool(v2.get(f))]
+        rows.append({
+            "item_id": int(i),
+            "mcq_group": group,
+            "presort": trig["presort"],
+            "heuristic_mcq_like": flagged,
+            "confirmed_mcq": "",                 # human fills this in
+            "reviewer_note": "",
+            "has_error": bool(run.loc[i, "has_error"]),
+            "strict_v1_correct": bool(v1.loc[i]),
+            "strict_v2_correct": bool(v2["correct_strict_v2_display_primary"]),
+            "entropy": float(run.loc[i, entropy_col]),
+            "span_m_disp": v2["model_span"],
+            "span_t_disp": v2["truth_span"],
+            "label_m": v2["model_label"],
+            "label_t": v2["truth_label"],
+            "model_tier": v2["model_tier"],
+            "truth_tier": v2["truth_tier"],
+            "flags": ",".join(on),
+            "option_word_in": trig["option_word_in"],
+            # The honest weak-trigger test. `presort` can demote a
+            # paren-matched item to `choice_list_only` when the question
+            # happens to carry an enumerate -- items 170 and 237 are MATCHING
+            # exercises whose list is the things to match, not options -- and
+            # that would hide exactly the suspicion the reviewer needs.
+            "flagged_by_weak_trigger_only": flagged and not trig["option_word_in"],
+            "question_has_choice_list": trig["question_has_choice_list"],
+            "paren_letters_match": trig["paren_letters_match"],
+            "question_head": " ".join(str(run.loc[i, question_col]).split())[:160],
+        })
+    out = pd.DataFrame(rows)
+    order = {p: n for n, p in enumerate(MCQ_PRESORT)}
+    out["_g"] = out["mcq_group"].map({"flagged_mcq_like": 0, "candidate_missed": 1})
+    out["_p"] = out["presort"].map(lambda p: order.get(p, 99))
+    out = out.sort_values(["_g", "_p", "item_id"]).drop(columns=["_g", "_p"])
+    out = out.reset_index(drop=True)
+
+    # Page/cell are assigned by walking the frame IN ITS FINAL ORDER, with a
+    # per-group counter. The notebook renders each group in this same order,
+    # so a caption can never end up under the wrong page number.
+    stem = {"flagged_mcq_like": "mcq_flagged",
+            "candidate_missed": "mcq_candidate_missed"}
+    pos = {g: 0 for g in out["mcq_group"].unique()}
+    files, cells = [], []
+    for _, r in out.iterrows():
+        n = pos[r["mcq_group"]]
+        files.append(f"{stem[r['mcq_group']]}_p{n // per_page + 1}.png")
+        cells.append(n % per_page + 1)
+        pos[r["mcq_group"]] = n + 1
+    out["contact_sheet_file"] = files
+    out["contact_sheet_cell"] = cells
+    return out
+
+
+def mcq_caption(row, width: int = 52) -> str:
+    """Burned-in caption for one contact-sheet cell.
+
+    Carries every field the brief listed. `MCQ?` leads because the reviewer's
+    job on this sheet is to answer that, and `paren_letters_match` is shown
+    verbatim on the weak-trigger items so a false positive is legible without
+    leaving the sheet.
+    """
+    def z(x, n=width):
+        s = " ".join(str(x).split())
+        return s[:n] + ("..." if len(s) > n else "")
+
+    tier = {"display_math": "disp", "last_line": "line", "option": "opt",
+            "parse_fail": "FAIL", "inline_math": "inl"}
+    head = (f"item {int(row['item_id'])}  err={int(bool(row['has_error']))}  "
+            f"v1={'OK' if row['strict_v1_correct'] else 'X'}  "
+            f"H={float(row['entropy']):.2f}")
+    why = row["presort"].replace("_", "-")
+    if row["mcq_group"] == "candidate_missed":
+        why = "NOT-FLAGGED " + why
+    lines = [z(head), z(f"MCQ? {why}")]
+    # Shown whenever no "option" word exists anywhere, not only on the
+    # `paren_letters_only` presort: a matching exercise carries an enumerate
+    # and is demoted to `choice_list_only`, yet the detector still fired on
+    # the unsound regex and the reviewer must be able to see that.
+    if not row.get("option_word_in") and row["paren_letters_match"]:
+        lines.append(z(f"  WEAK trigger matched: {row['paren_letters_match']}"))
+    mt = tier.get(row["model_tier"], row["model_tier"])
+    tt = tier.get(row["truth_tier"], row["truth_tier"])
+    lines += [
+        z(f"span  M[{mt}]: {row['span_m_disp']}"),
+        z(f"span  T[{tt}]: {row['span_t_disp']}"),
+        z(f"label M: {row['label_m']}"),
+        z(f"label T: {row['label_t']}"),
+    ]
+    if row["flags"]:
+        lines.append(z(f"flags: {row['flags']}"))
+    return "\n".join(lines)
+
+
+def mcq_accuracy_sensitivity(profile: pd.DataFrame,
+                             review: pd.DataFrame) -> dict:
+    """How far the MCQ accuracy headline can move on the detector alone.
+
+    Reported as a RANGE because the audit is not yet done. The point is to
+    decide whether the figure is quotable, and a single number cannot answer
+    that question.
+    """
+    flagged = sorted(review.loc[review["mcq_group"] == "flagged_mcq_like",
+                                "item_id"])
+    weak = sorted(review.loc[review["flagged_by_weak_trigger_only"].astype(bool),
+                             "item_id"])
+    missed = sorted(review.loc[review["mcq_group"] == "candidate_missed",
+                               "item_id"])
+
+    def acc(items):
+        sub = profile.loc[[i for i in items if i in profile.index]]
+        return (float(sub["strict_v1_correct"].mean()) if len(sub)
+                else float("nan"), len(sub))
+
+    as_reported, n_rep = acc(flagged)
+    strict_only, n_strict = acc([i for i in flagged if i not in weak])
+    widest, n_wide = acc([i for i in flagged if i not in weak] + missed)
+    return {
+        "n_flagged": len(flagged), "n_weak_trigger": len(weak),
+        "n_candidate_missed": len(missed),
+        "as_reported": {"n": n_rep, "accuracy": as_reported},
+        "drop_weak_trigger": {"n": n_strict, "accuracy": strict_only},
+        "drop_weak_add_missed": {"n": n_wide, "accuracy": widest},
+        "range": (min(as_reported, strict_only, widest),
+                  max(as_reported, strict_only, widest)),
+        "quotable": False,
+        "why": ("the count and the accuracy both move with a detector "
+                "judgement that no human has ruled on yet; the DIRECTION "
+                "(MCQ far above free response) is stable across every "
+                "variant, the MAGNITUDE is not"),
+    }

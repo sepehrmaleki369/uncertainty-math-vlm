@@ -244,3 +244,142 @@ def test_a_short_truth_span_is_not_called_vacuous():
         "max_entropy": False, "parse_failed": False, "truth_span_len": 1,
     })
     assert "vacuous" not in dp._tile_note(row)
+
+
+# --- the MCQ review set -----------------------------------------------------
+#
+# The detector is a heuristic. These pin the two things that decide whether an
+# audit built on it can produce an unbiased corrected count: that the unsound
+# trigger is visible to the reviewer, and that the review set is TWO-SIDED.
+
+def _v2row(**kw):
+    base = {"is_mcq": True, "truth_span": "option a", "model_span": "option a",
+            "truth_label": "text:option a", "model_label": "text:option a",
+            "model_tier": "option", "truth_tier": "option",
+            "correct_strict_v2_display_primary": True}
+    base.update(kw)
+    for f in strict_v2.RISK_FLAGS:
+        base.setdefault(f, False)
+    return base
+
+
+def _mcq_inputs(questions, answers, is_mcq, spans=None):
+    n = len(questions)
+    run = pd.DataFrame({
+        "orig_q": questions, "pert_a": answers,
+        "has_error": [False] * n, "perception_entropy": [0.5] * n,
+    })
+    v2s = pd.DataFrame([
+        _v2row(is_mcq=is_mcq[i],
+               truth_span=(spans or answers)[i]) for i in range(n)])
+    return run, pd.Series([True] * n), v2s
+
+
+@pytest.mark.parametrize("blob,expected", [
+    (r"If \(P(A) = \frac{7}{13}\) and \(P(B) = \frac{9}{13}\)", "(A) = \\frac{7}{13}\\) and \\(P(B)"),
+    (r"a relation where $f(a) = f(b)$", "(a) = f(b)"),
+])
+def test_the_weak_trigger_returns_what_it_matched(blob, expected):
+    """A `paren_letters_only` hit is only recognisable as a false positive once
+    you can SEE that what matched was probability or function notation. Item
+    117 is `P(A)...P(B)`, item 195 is `f(a) = f(b)`; neither is multiple
+    choice."""
+    t = dp.mcq_trigger(blob, "", "")
+    assert t["presort"] == "paren_letters_only"
+    assert expected in t["paren_letters_match"]
+    assert t["flagged_by_detector"]
+
+
+def test_the_option_word_outranks_the_weak_trigger():
+    t = dp.mcq_trigger(r"Which is correct? \begin{enumerate}\item x\end{enumerate}",
+                       "option d", "Answer: option d")
+    assert t["presort"] == "option_word_and_choice_list"
+    assert "truth_span" in t["option_word_in"]
+
+
+def test_a_choice_list_alone_is_a_candidate_not_a_verdict():
+    """LaTeX `enumerate` is equally how a multi-part question writes
+    '(i) ... (ii) ...', so a list is a reason to LOOK, never a second
+    automatic verdict."""
+    t = dp.mcq_trigger(r"\begin{enumerate}\item Find x\item Find y\end{enumerate}",
+                       "x = 3", "x = 3")
+    assert t["presort"] == "choice_list_only"
+    assert not t["flagged_by_detector"]
+
+
+def test_the_review_set_is_two_sided():
+    """THE BIAS GUARD. Reviewing only flagged items can find false positives
+    and nothing else, so a corrected count would shrink by construction. That
+    is the one-sided mistake the `genuinely_wrong` census already made once."""
+    run, v1, v2s = _mcq_inputs(
+        questions=["pick one: option a or b",
+                   r"\begin{enumerate}\item Find x\end{enumerate}",
+                   "plain question"],
+        answers=["option a", "x = 3", "7"],
+        is_mcq=[True, False, False])
+    rev = dp.mcq_review_set(run, v1, v2s)
+    assert set(rev["mcq_group"]) == {"flagged_mcq_like", "candidate_missed"}
+    assert list(rev.loc[rev["mcq_group"] == "candidate_missed", "item_id"]) == [1]
+    assert 2 not in set(rev["item_id"]), "a plain item must not enter the set"
+
+
+def test_weak_trigger_is_flagged_even_when_a_choice_list_demotes_the_presort():
+    """Items 170 and 237 are MATCHING exercises: they carry an enumerate, so
+    `presort` becomes `choice_list_only`, yet the detector fired on the
+    unsound regex. Keying suspicion off `presort` alone would hide them."""
+    run, v1, v2s = _mcq_inputs(
+        questions=[r"Match: $(a)$ pairs with $(b)$. \begin{enumerate}\item p\end{enumerate}"],
+        answers=["(b)"], is_mcq=[True], spans=["(b)"])
+    rev = dp.mcq_review_set(run, v1, v2s)
+    assert rev.loc[0, "presort"] == "choice_list_only"
+    assert bool(rev.loc[0, "flagged_by_weak_trigger_only"]), (
+        "no 'option' word anywhere means the detector fired on the regex")
+    assert "WEAK trigger matched" in dp.mcq_caption(rev.loc[0])
+
+
+def test_manifest_paging_matches_the_render_order():
+    """The notebook renders each group in the manifest's order, so page/cell
+    must be derived from that same order or a reviewer follows the CSV to the
+    wrong page."""
+    n = 25
+    run, v1, v2s = _mcq_inputs(["pick an option"] * n, ["option a"] * n,
+                               [True] * n)
+    rev = dp.mcq_review_set(run, v1, v2s, per_page=9)
+    for pos, (_, r) in enumerate(rev.iterrows()):
+        assert r["contact_sheet_file"] == f"mcq_flagged_p{pos // 9 + 1}.png"
+        assert r["contact_sheet_cell"] == pos % 9 + 1
+
+
+def test_the_human_columns_ship_empty():
+    run, v1, v2s = _mcq_inputs(["pick an option"], ["option a"], [True])
+    rev = dp.mcq_review_set(run, v1, v2s)
+    assert rev.loc[0, "confirmed_mcq"] == ""
+    assert rev.loc[0, "reviewer_note"] == ""
+
+
+def test_the_caption_never_claims_confirmed_mcq():
+    """Every sheet is labelled MCQ-*like*. A caption asserting MCQ would be
+    the automatic verdict the human pass exists to replace."""
+    run, v1, v2s = _mcq_inputs(["pick an option"], ["option a"], [True])
+    cap = dp.mcq_caption(dp.mcq_review_set(run, v1, v2s).loc[0])
+    assert "MCQ?" in cap
+    assert "confirmed" not in cap.lower()
+
+
+def test_the_sensitivity_refuses_to_call_the_number_quotable():
+    """The count moves with a detector judgement no human has ruled on, so the
+    magnitude is not quotable even though the direction is stable."""
+    run, v1, v2s = _mcq_inputs(
+        questions=["pick one: option a", r"$P(A) = P(B)$",
+                   r"\begin{enumerate}\item Find x\end{enumerate}"],
+        answers=["option a", "0.5", "x = 3"],
+        is_mcq=[True, True, False])
+    rev = dp.mcq_review_set(run, v1, v2s)
+    prof = pd.DataFrame({
+        "item_id": [0, 1, 2], "strict_v1_correct": [True, False, False],
+    }).set_index("item_id", drop=False)
+    s = dp.mcq_accuracy_sensitivity(prof, rev)
+    assert s["n_flagged"] == 2 and s["n_weak_trigger"] == 1
+    assert s["n_candidate_missed"] == 1
+    assert s["quotable"] is False
+    assert s["range"][0] <= s["as_reported"]["accuracy"] <= s["range"][1]

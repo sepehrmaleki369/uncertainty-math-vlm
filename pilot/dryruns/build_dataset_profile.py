@@ -104,3 +104,21 @@ for by in ("has_error", "question_type_if_available", "answer_shape"):
               f"v1={g.loc[lvl,'strict_v1_accuracy']:.1%}  "
               f"v2={g.loc[lvl,'strict_v2_accuracy']:.1%}  "
               f"AUROC={g.loc[lvl,'auroc_status']}")
+
+# --- MCQ review manifest (notebook 28 renders the PNG sheets in Colab) ------
+review = dp.mcq_review_set(run, v1, v2s, per_page=9)
+mcq_path = OUT / "mcq_like_review_20260812.csv"
+review.to_csv(mcq_path, index=False)
+print(f"\nMCQ review -> {mcq_path}  ({len(review)} rows)")
+print(review.groupby(["mcq_group", "presort"]).size().to_string())
+
+sens = dp.mcq_accuracy_sensitivity(profile, review)
+print(f"\nheuristic MCQ-like {sens['n_flagged']} "
+      f"(weak trigger {sens['n_weak_trigger']}) · "
+      f"candidates missed {sens['n_candidate_missed']}")
+for k, label in (("as_reported", "as reported"),
+                 ("drop_weak_trigger", "drop weak-trigger"),
+                 ("drop_weak_add_missed", "drop weak + add candidates")):
+    print(f"  {label:28s} n={sens[k]['n']:3d}  v1 acc {sens[k]['accuracy']:.1%}")
+print(f"  MCQ accuracy range {sens['range'][0]:.1%}-{sens['range'][1]:.1%}, "
+      f"quotable={sens['quotable']}")
