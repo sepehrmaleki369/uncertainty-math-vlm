@@ -1,4 +1,4 @@
-\begin{thebibliography}{15}
+\begin{thebibliography}{16}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -50,6 +50,15 @@ Hunter Lightman, Vineet Kosaraju, Yura Burda, Harri Edwards, Bowen Baker, Teddy
   Lee, Jan Leike, John Schulman, Ilya Sutskever, and Karl Cobbe.
 \newblock Let's verify step by step.
 \newblock \emph{arXiv preprint arXiv:2305.20050}, 2023.
+
+\bibitem[Liu et~al.(2026)Liu, Chatain, Kobel-Keller, Kortemeyer, Willwacher,
+  and Sachan]{asaghandwritten}
+Tianyi Liu, Julia Chatain, Laura Kobel-Keller, Gerd Kortemeyer, Thomas
+  Willwacher, and Mrinmaya Sachan.
+\newblock Ai-assisted automated short answer grading of handwritten
+  university-level mathematics exam.
+\newblock \emph{Teaching Mathematics and its Applications: An International
+  Journal of the IMA}, 45\penalty0 (1):\penalty0 84--105, 2026.
 
 \bibitem[Lu et~al.(2024)Lu, Bansal, Xia, Liu, Li, Hajishirzi, Cheng, Chang,
   Galley, and Gao]{mathvista}
