@@ -183,7 +183,70 @@ crops need Colab).
   against the **52** recorded in the 2026-08-11 entry from a different
   detector. See the MCQ entry below — it is both over- AND under-inclusive.
 
-### 2026-08-12: THE MCQ DETECTOR IS UNSOUND IN BOTH DIRECTIONS — sheets built, not read
+### 2026-08-12: MCQ AUDIT COMPLETE — 55 confirmed, and the heuristic was nearly unbiased
+
+All 77 review items human-coded (`reference/audit/mcq_like_review_20260812.csv`,
+`confirmed_mcq` / `mcq_type` / `coding_depth` / `reviewer_note`).
+
+| | n | ruled MCQ | not MCQ |
+|---|---|---|---|
+| `flagged_mcq_like` | 58 | 54 | **4** |
+| `candidate_missed` | 19 | **1** | 18 |
+| **total** | 77 | **55** | 22 |
+
+- **THE HEADLINE IS NOW QUOTABLE, and it barely moved.**
+
+  | | n | `strict_v1` acc | mean H |
+  |---|---|---|---|
+  | heuristic MCQ-like | 58 | 82.8% | 0.452 |
+  | **CONFIRMED MCQ** | **55** | **83.6%** (46/55) | 0.423 |
+  | free response | 245 | **38.8%** (95/245) | 1.085 |
+
+  **The pre-audit sensitivity range was 78.9–88.5% and the truth landed at
+  83.6%, 0.8 points off the uncorrected figure.** The detector was wrong in
+  both directions and **the two errors very nearly cancelled**: it wrongly
+  included 4 items scoring 50%, and missed 1 item that was wrong.
+  **Lesson worth keeping: a detector being demonstrably wrong in both
+  directions does not mean the aggregate it feeds is wrong.** The range was
+  the honest thing to report before the audit; it was also much wider than the
+  error turned out to be.
+- **The 4 false positives are exactly the ones the weak-trigger flag caught,
+  and its precision was 4/6.** Confirmed not-MCQ: **82, 117, 195, 234** — all
+  `P(A)`/`P(B)`/`f(a)=f(b)` notation. **170 and 237 ARE MCQ**, both *matching*
+  questions (left `(i)-(iv)` to right `(a)-(d)`), so the regex fired for a
+  wrong reason on a right answer.
+- **`mcq_type` is a new distinction the coder introduced and it matters for
+  scoring.** Item 170 is a **matching** question whose answer is a 4-way
+  mapping `(i)→(d), (ii)→(c), (iii)→(a), (iv)→(b)`, but its **truth span is
+  the bare `(b)` — one quarter of the answer**, and the model's
+  `Finally, (iv) matches (b)` is scored wrong. The scorer checks a quarter of
+  a matching answer; that is a `multi_answer_collapse` case, not a model
+  failure. Same for 237.
+- **Item 8 carries `options_not_visible_in_crop`:** its answer is `option b`
+  while the page shows no option list, so *neither the model nor a human could
+  recover the letter from the image*. It is the only `option_word_only` item
+  and it is scored WRONG at max entropy — an unwinnable item, not a misread.
+- **ID RECONCILIATION, flagged so it is reversible: the coder wrote "item 41",
+  but item 41 of this run is an ellipse-equation item** (`x²/75 + y²/100 = 1`,
+  no options, `strict_v1` correct) **that was never on any sheet.** The
+  description matched item 8 on four independent points (the coder's own
+  phrase "option-word-only" is that item's unique presort, truth span
+  literally `option b`, no visible choice list). Recorded against **item 8**
+  with the reconciliation in `reviewer_note`. **The count is unaffected either
+  way** — item 8 was already `yes` from the sweep.
+- **CODING DEPTH IS RECORDED, because this project has already measured that
+  it matters.** 25 items were read one by one; **52 were ruled by a block
+  sweep** (*"the rest were mcq exactly"*) — the same sweep pattern whose
+  first-40-vs-extra-60 disagreement hit **p=0.00007** on the false-pass audit.
+  **Two reasons it is far safer here:** the judgement is objective (options
+  are visible or they are not), and **51 of the 52 swept items carry BOTH a
+  choice list in the question AND the word "option" in the answer**, an
+  independent text signal agreeing with the sweep. Only **item 237** is swept
+  without corroboration, and it is a matching question like 170.
+- Free-response accuracy moves 38.4% → **38.8%**; the MCQ-vs-free gap is
+  **44.8 points** and was never in doubt.
+
+### 2026-08-12: the MCQ detector, and why it needed auditing (superseded by the entry above)
 
 `pilot/dataset_profile.py` (`mcq_trigger`, `mcq_review_set`, `mcq_caption`,
 `mcq_accuracy_sensitivity`), `pilot/28_mcq_contact_sheets.ipynb`,

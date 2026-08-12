@@ -104,6 +104,20 @@ Every AUROC below scores entropy against **`strict_v1` correctness**, so the col
 
 **All four comparisons below are descriptive splits of one run. None is a controlled contrast**, and the groups differ in more than the dimension named, so a gap is a place to look rather than an effect that has been isolated.
 
+### 2.8 MCQ after the human audit (supersedes the heuristic row above)
+
+The MCQ detector is a heuristic and was audited on both sides: all 58 flagged items, plus 19 it did NOT flag whose questions carry a choice list. A one-sided review could only have shrunk the set.
+
+| set | n | `strict_v1` acc | mean H |
+|---|---|---|---|
+| heuristic MCQ-like | 58 | 82.8% | 0.452 |
+| **confirmed MCQ** | **55** | **83.6%** | 0.423 |
+| free response | 245 | 38.8% | 1.085 |
+
+**The detector was wrong in both directions and the two errors nearly cancelled.** It wrongly included 4 items (`P(A)`/`P(B)` and `f(a)=f(b)` notation read as options) and missed 1. The pre-audit sensitivity range was 78.9-88.5%; the audited value sits 0.8 points from the uncorrected figure. **A detector demonstrably wrong in both directions does not necessarily bias the aggregate it feeds.**
+
+Two audited items are MCQ but not option-pick, and both are SCORING problems rather than model failures: items 170 and 237 are **matching** questions whose answer is a four-way mapping, yet the truth span is a bare `(b)` -- one quarter of the answer. Item 8's page shows **no options at all** while its answer is `option b`, so the letter is not recoverable from the image by any reader.
+
 - **MCQ vs free response is the largest single split.** Multiple-choice items score far higher and sit at much lower entropy: there are only a few reachable answers, so five samples agree easily and a match is cheap. Read it as a property of the answer space, not as the model reading those pages better.
 - **`has_error` costs accuracy and leaves the AUROC alone.** The two strata's AUROCs are within noise of each other, which reproduces the locked finding that entropy works equally well on both. The accuracy gap is the known cost of the balanced design.
 - **Structured and prose answers are where scoring falls apart.** `text_conclusion` and `system_answer` are the worst groups by a wide margin and carry the highest max-entropy rates. This is the quantitative form of the standing Limitations sentence: the automatic labels are unsafe for long or multi-part answers.

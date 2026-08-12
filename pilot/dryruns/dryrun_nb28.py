@@ -209,10 +209,22 @@ for _, r in weak.iterrows():
         f"item {r['item_id']} was flagged with no 'option' word anywhere, so "
         "the caption must show what the regex actually matched")
 
-# The human columns ship EMPTY -- this is a coding sheet, not a result.
-for col in ("confirmed_mcq", "reviewer_note"):
-    assert (committed[col].isna() | (committed[col].astype(str) == "")).all(), (
-        f"{col} must ship empty; a pre-filled verdict is not a human read")
+# The committed manifest is now CODED (2026-08-12). A freshly built review set
+# still ships its human columns empty -- pinned in
+# test_the_human_columns_ship_empty -- but the file on disk carries the human
+# read, and asserting it is empty was a stale check that broke the moment the
+# coder filled it in. Pin the coding instead.
+assert (committed["confirmed_mcq"].astype(str) != "").all(), (
+    "the committed manifest is coded; a blank verdict means a lost row")
+assert set(committed["confirmed_mcq"]) <= {"yes", "no", "unclear"}, (
+    sorted(set(committed["confirmed_mcq"])))
+n_yes = int((committed["confirmed_mcq"] == "yes").sum())
+assert n_yes == 55, f"confirmed MCQ moved from 55 to {n_yes}"
+# 52 of the 58 flagged items were ruled by a block sweep rather than one by
+# one. Recorded, because this project measured a sweep and an item-by-item
+# pass disagreeing at p=0.00007 on the false-pass audit.
+assert set(committed["coding_depth"].dropna()) <= {"item_by_item", "block_sweep", ""}
+assert int((committed["coding_depth"] == "block_sweep").sum()) == 52
 
 manifest_out = _os.path.join(sheet_dir, "mcq_like_review_20260812.csv")
 assert _os.path.exists(manifest_out), "the sheet folder must carry its own CSV"

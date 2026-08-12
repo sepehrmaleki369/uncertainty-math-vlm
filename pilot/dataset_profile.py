@@ -555,7 +555,8 @@ def _md_table(g: pd.DataFrame) -> str:
 
 
 def write_summary_md(path: str, profile: pd.DataFrame, red: dict,
-                     meta: dict, groups: dict) -> str:
+                     meta: dict, groups: dict,
+                     mcq_review: Optional[pd.DataFrame] = None) -> str:
     """The distribution report. Descriptive only; no new claim is made here."""
     n = len(profile)
     L = [f"# FERMAT n={n} — distribution and performance by item type\n",
@@ -658,6 +659,42 @@ def write_summary_md(path: str, profile: pd.DataFrame, red: dict,
              "None is a controlled contrast**, and the groups differ in more "
              "than the dimension named, so a gap is a place to look rather "
              "than an effect that has been isolated.\n")
+    if mcq_review is not None and (mcq_review["confirmed_mcq"].astype(str) != "").any():
+        yes = sorted(mcq_review.loc[mcq_review["confirmed_mcq"] == "yes",
+                                    "item_id"])
+        mcq = profile.loc[[i for i in yes if i in profile.index]]
+        fr = profile.drop(index=[i for i in yes if i in profile.index])
+        heur = profile[profile["question_type_if_available"] == "mcq"]
+        L.append("### 2.8 MCQ after the human audit (supersedes the heuristic row above)\n")
+        L.append("The MCQ detector is a heuristic and was audited on both "
+                 "sides: all 58 flagged items, plus 19 it did NOT flag whose "
+                 "questions carry a choice list. A one-sided review could only "
+                 "have shrunk the set.\n")
+        L.append("| set | n | `strict_v1` acc | mean H |")
+        L.append("|---|---|---|---|")
+        L.append(f"| heuristic MCQ-like | {len(heur)} | "
+                 f"{heur['strict_v1_correct'].mean():.1%} | "
+                 f"{heur['entropy'].mean():.3f} |")
+        L.append(f"| **confirmed MCQ** | **{len(mcq)}** | "
+                 f"**{mcq['strict_v1_correct'].mean():.1%}** | "
+                 f"{mcq['entropy'].mean():.3f} |")
+        L.append(f"| free response | {len(fr)} | "
+                 f"{fr['strict_v1_correct'].mean():.1%} | "
+                 f"{fr['entropy'].mean():.3f} |")
+        L.append("\n**The detector was wrong in both directions and the two "
+                 "errors nearly cancelled.** It wrongly included 4 items "
+                 "(`P(A)`/`P(B)` and `f(a)=f(b)` notation read as options) and "
+                 "missed 1. The pre-audit sensitivity range was 78.9-88.5%; "
+                 "the audited value sits 0.8 points from the uncorrected "
+                 "figure. **A detector demonstrably wrong in both directions "
+                 "does not necessarily bias the aggregate it feeds.**\n")
+        L.append("Two audited items are MCQ but not option-pick, and both are "
+                 "SCORING problems rather than model failures: items 170 and "
+                 "237 are **matching** questions whose answer is a four-way "
+                 "mapping, yet the truth span is a bare `(b)` -- one quarter "
+                 "of the answer. Item 8's page shows **no options at all** "
+                 "while its answer is `option b`, so the letter is not "
+                 "recoverable from the image by any reader.\n")
     L.append("- **MCQ vs free response is the largest single split.** "
              "Multiple-choice items score far higher and sit at much lower "
              "entropy: there are only a few reachable answers, so five samples "

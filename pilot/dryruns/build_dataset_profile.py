@@ -71,7 +71,9 @@ groups = {by: dp.group_metrics(profile, by) for by in (
 red = dp.red_markup_report(run)
 meta = dp.metadata_availability(run)
 md_path = OUT / "dataset_distribution_by_type_20260812.md"
-dp.write_summary_md(str(md_path), profile, red, meta, groups)
+_mcq_csv = OUT / "mcq_like_review_20260812.csv"
+_mcq = pd.read_csv(_mcq_csv) if _mcq_csv.exists() else None
+dp.write_summary_md(str(md_path), profile, red, meta, groups, mcq_review=_mcq)
 print(f"report     -> {md_path}")
 
 examples = dp.example_selection(profile)
@@ -108,6 +110,29 @@ for by in ("has_error", "question_type_if_available", "answer_shape"):
 # --- MCQ review manifest (notebook 28 renders the PNG sheets in Colab) ------
 review = dp.mcq_review_set(run, v1, v2s, per_page=9)
 mcq_path = OUT / "mcq_like_review_20260812.csv"
+
+# PRESERVE THE HUMAN COLUMNS. `mcq_review_set` rebuilds the sheet from the run
+# and ships its human columns empty by design, so writing it straight out
+# DESTROYS a completed audit -- which is exactly what happened once here, on a
+# re-run after the coding was applied but before it was committed. Merge the
+# existing codings back in, keyed on item_id, and refuse to drop a coded row.
+if mcq_path.exists():
+    _old = pd.read_csv(mcq_path)
+    _human = [c for c in ("confirmed_mcq", "reviewer_note", "coding_depth",
+                          "mcq_type") if c in _old.columns]
+    if _human:
+        _prev = _old.set_index("item_id")[_human]
+        _coded = _prev[_prev.get("confirmed_mcq", pd.Series(dtype=str))
+                       .astype(str).str.strip().ne("").fillna(False)]
+        missing = sorted(set(_coded.index) - set(review["item_id"]))
+        assert not missing, (
+            f"the rebuilt review set drops CODED items {missing}; refusing to "
+            "write and lose a human read")
+        review = review.drop(columns=[c for c in _human if c in review.columns])
+        review = review.merge(_prev.reset_index(), on="item_id", how="left")
+        for c in _human:
+            review[c] = review[c].fillna("")
+        print(f"preserved {len(_coded)} existing human codings")
 review.to_csv(mcq_path, index=False)
 print(f"\nMCQ review -> {mcq_path}  ({len(review)} rows)")
 print(review.groupby(["mcq_group", "presort"]).size().to_string())
