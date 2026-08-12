@@ -453,3 +453,206 @@ def test_parse_omni_text_tolerates_a_dropped_letter_but_not_a_missing_verdict():
     intact, so it cannot invent a verdict that was never emitted."""
     assert J.parse_omni_text("EquivaleceJudgmentFALSe") == "incorrect"
     assert J.parse_omni_text("EquivalenceJudgment") == "unclear"
+
+
+# --- both judges on all 300: the exploratory diagnostic frame ---------------
+#
+# These pin the encodings that decide whether the file can be misread. The
+# risk here is not a wrong verdict, it is a RIGHT number quoted without the
+# denominator or baseline that makes it mean anything.
+
+def _frame(n=100, livemath_yes=None, omni_yes=None, v1_correct=None,
+           unclear_livemath=(), unclear_omni=(), gold=None, answer=None,
+           omni_raw=None, has_error=None):
+    """Build a diagnostic frame from explicit verdict sets. No model involved."""
+    idx = list(range(n))
+    livemath_yes = set(range(n // 2)) if livemath_yes is None else set(livemath_yes)
+    omni_yes = set(range(n // 2)) if omni_yes is None else set(omni_yes)
+    v1_correct = set(range(n // 2)) if v1_correct is None else set(v1_correct)
+    has_error = set(range(0, n, 2)) if has_error is None else set(has_error)
+
+    def verdicts(yes, unclear):
+        return pd.Series(["unclear" if i in unclear else
+                          ("correct" if i in yes else "incorrect")
+                          for i in idx], index=idx)
+
+    run = pd.DataFrame({
+        "has_error": [i in has_error for i in idx],
+        "pert_a": [(gold or {}).get(i, f"gold {i}") for i in idx],
+        "orig_q": [f"question {i}" for i in idx],
+        "perception_entropy": [0.5] * n,
+    }, index=idx)
+    lm = pd.DataFrame({"verdict": verdicts(livemath_yes, unclear_livemath),
+                       "raw_output": [r"\boxed{yes}"] * n}, index=idx)
+    om = pd.DataFrame({"verdict": verdicts(omni_yes, unclear_omni),
+                       "raw_output": [(omni_raw or {}).get(i, f"judgement {i}")
+                                      for i in idx]}, index=idx)
+    return J.open_judge_frame(
+        run,
+        pd.Series([(answer or {}).get(i, f"answer {i}") for i in idx], index=idx),
+        lm, om,
+        pd.Series([i in v1_correct for i in idx], index=idx),
+        pd.Series([i in v1_correct for i in idx], index=idx))
+
+
+def test_the_requested_schema_is_exact_and_extras_come_after():
+    """The caller specified 17 columns in an order. Extras may be appended for
+    the manual rationale pass, but must never be interleaved into that block."""
+    f = _frame(20)
+    assert list(f.columns[:len(J.OPEN_JUDGE_COLUMNS)]) == list(J.OPEN_JUDGE_COLUMNS)
+    assert list(f.columns[len(J.OPEN_JUDGE_COLUMNS):]) == list(J.OPEN_JUDGE_EXTRA_COLUMNS)
+
+
+def test_an_unreadable_verdict_is_NA_not_disagreement():
+    """`unclear` means OUR parse failed. Writing it as False would assert the
+    judge contradicted the rule, which is a different and stronger claim."""
+    f = _frame(10, unclear_livemath={3})
+    assert pd.isna(f.loc[3, "livemath_agrees_strict_v1"])
+    assert pd.isna(f.loc[3, "judges_agree"])
+    assert f.loc[3, "livemath_parse_failed"]
+    assert f["livemath_agrees_strict_v1"].dtype.name == "boolean"
+
+
+def test_two_parse_failures_are_not_two_judges_agreeing():
+    """Both unreadable is UNDECIDABLE. Counting it as agreement would inflate
+    the single number this file exists to report honestly."""
+    f = _frame(10, unclear_livemath={4}, unclear_omni={4})
+    assert pd.isna(f.loc[4, "judges_agree"])
+    diag = J.open_judge_diagnostics(f)
+    assert diag["judge_vs_judge"]["n_both_determinate"] == 9
+    assert diag["judge_vs_judge"]["undecidable_either_parse_failed"] == 1
+
+
+def test_a_partial_run_raises_instead_of_being_silently_analysed():
+    """A short judge run is a resumable checkpoint problem, not a result. An
+    inner join would quietly report diagnostics over whatever survived."""
+    n = 10
+    run = pd.DataFrame({"has_error": [True] * n, "pert_a": ["g"] * n,
+                        "orig_q": ["q"] * n, "perception_entropy": [0.0] * n},
+                       index=range(n))
+    full = pd.DataFrame({"verdict": ["correct"] * n, "raw_output": [""] * n},
+                        index=range(n))
+    with pytest.raises(ValueError, match="resume the checkpoint"):
+        J.open_judge_frame(run, pd.Series(["a"] * n, index=range(n)),
+                           full, full.iloc[:6],
+                           pd.Series([True] * n, index=range(n)),
+                           pd.Series([True] * n, index=range(n)))
+
+
+def test_the_always_yes_baseline_equals_the_rules_own_correct_rate():
+    """THE GUARD. A judge answering yes to everything agrees with a rule on
+    exactly the rule's correct items, so it scores that rate for free.
+    Notebook 25 found LiveMath-Judge sitting exactly on the analogous
+    baseline. Quoting an agreement rate without this number is a misuse."""
+    f = _frame(100, livemath_yes=set(range(100)), v1_correct=set(range(47)))
+    diag = J.open_judge_diagnostics(f)
+    d = diag["livemath_vs_strict_v1"]
+    assert d["rate"] == pytest.approx(0.47)
+    assert d["always_yes_agreement"] == pytest.approx(0.47)
+    assert d["rate"] == pytest.approx(d["always_yes_agreement"]), (
+        "an always-yes judge must score exactly the baseline, not above it")
+
+
+def test_kappa_exposes_agreement_that_is_only_arithmetic():
+    """Two lenient judges agree often without agreeing about anything. Here
+    raw agreement is 80% and kappa is BELOW zero -- the rate alone would read
+    as substantial concordance."""
+    f = _frame(100, livemath_yes=set(range(90)), omni_yes=set(range(10, 100)))
+    jj = J.open_judge_diagnostics(f)["judge_vs_judge"]
+    assert jj["rate"] == pytest.approx(0.80)
+    assert jj["chance_rate"] == pytest.approx(0.82)
+    assert jj["kappa"] < 0
+
+
+def test_the_summary_reports_no_accuracy_and_leads_with_both_failures(tmp_path):
+    f = _frame(30)
+    diag = J.open_judge_diagnostics(f)
+    path = str(tmp_path / "s.md")
+    text = J.open_judges_summary_md(path, f, diag, J.rationale_sample(f))
+    low = text.lower()
+    assert "not a scoring run" in low
+    assert "verdict" in low and "rationale" in low
+    assert "corrected accuracy" in low
+    import re
+    assert not re.search(r"\baccuracy\b\s*[:=]", text, re.I), (
+        "the diagnostic summary must never emit an accuracy figure")
+    assert "always-yes baseline" in text
+    assert "kappa" in low
+    assert diag["reports_accuracy"] is False
+
+
+# --- the item-273 signature, made countable --------------------------------
+
+def test_invented_reference_catches_the_item_273_failure():
+    """Omni-Judge wrote \"The reference answer is 3/4\" when we passed `2/4`
+    and the model answered a bare `}`. `3/4` is in none of its three inputs."""
+    toks = J.invented_reference_tokens(
+        "The student's answer of 2/4 is incorrect. The reference answer is 3/4.",
+        "A die is thrown.", r"P(E) = \frac{2}{4}", "}")
+    assert "3/4" in toks
+
+
+def test_a_latex_reference_is_not_reported_as_invented():
+    """`\\frac{2}{4}` and `2/4` are the same number written two ways. Without
+    the normalisation every prose citation of the reference would flag."""
+    assert J.invented_reference_tokens("the reference is 2/4", "q",
+                                       r"P(E)=\frac{2}{4}", "ans") == []
+    assert J.invented_reference_tokens("the total is 13000", "q",
+                                       "the total is 13,000", "ans") == []
+
+
+def test_the_flag_cannot_see_a_one_digit_invented_answer():
+    """A documented UNDER-trigger, pinned so it is never read as a clean rate:
+    a bare digit appears in almost any input by chance, so short tokens are
+    skipped and a one-digit fabrication is invisible."""
+    assert J.invented_reference_tokens("the answer is 7", "q", "gold 1 2 3",
+                                       "ans") == []
+
+
+def test_a_missing_rationale_yields_no_flag():
+    """LiveMath-Judge emits a bare boxed verdict, so there is nothing to scan.
+    An empty list here must mean 'no transcript', never 'judge behaved'."""
+    assert J.invented_reference_tokens("", "q", "gold", "ans") == []
+    assert J.invented_reference_tokens(None, "q", "gold", "ans") == []
+
+
+# --- the fixed rationale sample --------------------------------------------
+
+def test_the_rationale_sample_is_fixed_and_oversamples_has_error():
+    f = _frame(60, has_error=set(range(30)))
+    a = J.rationale_sample(f, n_has_error=8, n_clean=4)
+    b = J.rationale_sample(f, n_has_error=8, n_clean=4)
+    assert a == b, "the sample must be reproducible across sessions"
+    assert len(a) == 12
+    assert sum(1 for i in a if f.loc[i, "has_error"]) == 8
+
+
+def test_the_probes_count_toward_their_stratum():
+    """55 and 273 are both has_error=1. Adding them on top would make that
+    stratum 10 while the code claimed 8 -- the same off-by-two the notebook 25
+    sampler was fixed for."""
+    f = _frame(300, has_error=set(range(150)) | {273})
+    picked = J.rationale_sample(f, n_has_error=8, n_clean=4)
+    assert 55 in picked and 273 in picked
+    assert sum(1 for i in picked if f.loc[i, "has_error"]) == 8
+
+
+def test_gate_items_are_re_derived_from_the_300_not_re_run():
+    """Both probes sit inside these 300, so notebook 24 and 26's verdicts come
+    back for free. A mismatch means version drift, not a gate failure."""
+    f = _frame(300, livemath_yes={273}, omni_yes=set(),
+               has_error=set(range(150)) | {273})
+    rep = J.open_judge_diagnostics(f)["gate_reproduction"]
+    assert rep["livemath"][55]["matches"] and rep["livemath"][273]["matches"]
+    assert rep["omni"][55]["matches"] and rep["omni"][273]["matches"]
+    drift = _frame(300, livemath_yes={55, 273}, omni_yes=set())
+    assert not J.open_judge_diagnostics(drift)["gate_reproduction"]["livemath"][55]["matches"]
+
+
+def test_the_all300_diagnostic_modifies_no_scorer_rule():
+    """`strict_v1`/`strict_v2` are read only. Locked because this notebook is
+    the third scorer reported alongside them, not a replacement."""
+    assert rescore.RULES == ("strict_v1", "fixed_v2", "relaxed_v3", "final_term_v4")
+    assert strict_v2.RULE_NAME == "strict_v2_display_primary"
+    src = open(J.__file__).read()
+    assert "def rescore_run" not in src and "def score_item_v2" not in src

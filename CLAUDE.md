@@ -105,6 +105,69 @@ one) is still Drive-only, and nothing may be quoted from it anyway.
 
 ## Current findings
 
+### 2026-08-12: BUILT, NOT RUN — notebook 27, both open judges on all 300
+
+`pilot/27_open_judges_all300.ipynb`, `pilot/judge.py` (new
+`open_judge_*` section), `pilot/dryruns/dryrun_nb27.py`, 15 new tests.
+**Exploratory diagnostic only. Nothing it produces may be reported as
+corrected accuracy, and no function in it returns one.**
+
+**Why run judges that already failed.** Both failures are currently
+*single items*. LiveMath-Judge failed the verdict gate on 273; Omni-Judge
+failed the rationale check on 273. An all-300 pass converts two anecdotes
+into **rates** — and the one worth having is
+`invented_reference_tokens`, which flags a justification citing a number
+present in **none** of question, reference or model answer. That is the
+item-273 signature (*"The reference answer is 3/4"* when we passed `2/4`)
+made countable.
+
+- **THE TRAP THE WHOLE NOTEBOOK IS BUILT AROUND, and it is the same one
+  the cross-audit entry records: agreement between two unreliable scorers
+  measures neither of them.** `strict_v1` calls 47.0% of items correct, so
+  **a judge answering "yes" to everything agrees with it on 47.0% by
+  construction** — and notebook 25 already found LiveMath-Judge sitting
+  exactly on that trivial baseline against human labels. Every agreement
+  figure therefore ships with `always_yes_agreement`, and judge-vs-judge
+  agreement with its chance rate and **Cohen's kappa**. **A raw agreement
+  number quoted alone out of this file is a misuse of it.** Pinned in
+  `test_the_always_yes_baseline_equals_the_rules_own_correct_rate` and
+  `test_kappa_exposes_agreement_that_is_only_arithmetic` (80% raw
+  agreement, kappa **below zero**).
+- **`unclear` is NA, never `False`.** Recording an unreadable verdict as
+  disagreement asserts the judge *contradicted* the rule, which is a
+  different and stronger claim than "we could not read a verdict". Two
+  parse failures are likewise **undecidable, not two judges agreeing** —
+  counting them as agreement would inflate the single number the file
+  exists to report honestly.
+- **Both judges are fed ONE shared majority answer, computed once.**
+  Letting each recompute it is one refactor away from feeding them
+  different inputs, which would still produce a plausible-looking
+  comparison table. The dry run's stubs record what each was shown and
+  compare element by element.
+- **Sequential model loads, not concurrent.** 3B then 8B with an explicit
+  free between, so it fits a 16 GB runtime. Both loops checkpoint every 25
+  items and **refuse to resume across a different model id or prompt** —
+  a stale checkpoint would silently mix two judges into one column.
+- **The gate items come back for free**, since 55 and 273 are inside the
+  300. `GATE_REPRODUCTION` records what notebooks 24/26 saw; a mismatch is
+  reported as **version drift, not a gate failure**, and does not raise.
+- **The invented-number flag errs BOTH ways and the docstring says so.**
+  It over-triggers on incidental numerals and **cannot see a one-digit
+  invented answer at all**, since a bare digit appears in almost any input
+  by chance. The flagged tokens are kept in the CSV so a human dismisses a
+  false hit in seconds. Pinned in
+  `test_the_flag_cannot_see_a_one_digit_invented_answer`.
+- **A low `looks_like_solving` count for LiveMath-Judge is NOT
+  exoneration** — it emits a bare `\boxed{}` with no reasoning, so there
+  is no transcript to scan. The summary writer says so inline whenever
+  silent transcripts are present, the same guard notebook 25 needed.
+- Outputs: `reference/audit/open_judges_all300_diagnostic_20260812.csv`
+  (the 17 requested columns in order, plus 7 clearly-separated extras for
+  the manual rationale pass) and a summary `.md` whose no-accuracy
+  property is asserted by both the tests and the dry run.
+- `strict_v1`, `strict_v2` and the audit CSVs are **read only**; no scorer
+  rule is touched.
+
 ### RUN 2026-08-12: Omni-Judge passes the VERDICT gate and fails the RATIONALE check
 
 `pilot/26_omni_judge_gate.ipynb`, gate only. `KbsdJames/Omni-Judge` —

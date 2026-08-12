@@ -788,3 +788,547 @@ def parse_omni_text(text: Optional[str]) -> str:
     if not hits:
         return "unclear"
     return "correct" if hits[-1].lower() == "true" else "incorrect"
+
+
+# ---------------------------------------------------------------------------
+# BOTH OPEN JUDGES ON ALL 300 -- EXPLORATORY DIAGNOSTIC. NOT A SCORING PATH.
+#
+# Both judges have already failed a safety check, and the two failures are
+# different in kind:
+#
+#   * **LiveMath-Judge failed the VERDICT gate** -- on item 273 it accepted a
+#     non-answer (coin-tossing setup prose) as matching the ground truth.
+#   * **Omni-Judge PASSED the verdict gate and failed the RATIONALE check** --
+#     on the same item it returned the desired `FALSE`, but its justification
+#     showed it had reconstructed its own reference answer (`3/4`, a string
+#     present in none of its three inputs) and graded against that. The right
+#     verdict from a comparison it never performed.
+#
+# So no accuracy may be computed here and no function below returns one. What
+# an all-300 pass CAN do is turn those two one-item anecdotes into RATES:
+# how often the judges disagree with each other, how often each disagrees with
+# a frozen rule, and how often Omni's justification cites a number that appears
+# in none of its inputs.
+#
+# **THE TRAP THIS SECTION IS BUILT AROUND.** Agreement between two unreliable
+# scorers measures neither of them. Worse, `strict_v1` calls 47% of items
+# correct, so a judge that answers "yes" to everything agrees with it on 47%
+# by construction -- and notebook 25 already found LiveMath-Judge sitting
+# exactly on that trivial baseline. Every agreement figure below is therefore
+# reported next to `always_yes_agreement`, and judge-vs-judge agreement next to
+# its chance rate and Cohen's kappa. A raw agreement number quoted alone from
+# this file is a misuse of it.
+# ---------------------------------------------------------------------------
+
+#: Exactly the requested output schema, in the requested order.
+OPEN_JUDGE_COLUMNS = (
+    "item_id", "has_error", "ground_truth_answer", "qwen_answer",
+    "strict_v1_correct", "strict_v2_correct",
+    "livemath_verdict", "livemath_raw_output", "livemath_parse_failed",
+    "omni_verdict", "omni_raw_output", "omni_parse_failed",
+    "livemath_agrees_strict_v1", "livemath_agrees_strict_v2",
+    "omni_agrees_strict_v1", "omni_agrees_strict_v2",
+    "judges_agree",
+)
+
+#: Appended AFTER the requested block, never interleaved, so the schema above
+#: stays exactly as specified while the file still carries what the manual
+#: rationale pass needs (a human label to check against, and the flags that
+#: choose which transcripts are worth reading).
+OPEN_JUDGE_EXTRA_COLUMNS = (
+    "human_label", "perception_entropy", "answer_type",
+    "livemath_looks_like_solving", "omni_looks_like_solving",
+    "omni_invented_reference", "omni_invented_tokens",
+)
+
+#: What notebooks 24 and 26 recorded on the two probes, under greedy decoding.
+#: The all-300 run contains both items, so it re-derives them for free. A
+#: mismatch is not a gate failure -- it means the judge, decoder or library
+#: version drifted between sessions, and the rest of the file should be read
+#: with that in mind.
+GATE_REPRODUCTION = {
+    "livemath": {55: "incorrect", 273: "correct"},
+    "omni": {55: "incorrect", 273: "incorrect"},
+}
+
+
+def _agreement_column(verdict: pd.Series, rule: pd.Series) -> pd.Series:
+    """Nullable agreement between a judge verdict and a rule's boolean.
+
+    **`unclear` becomes NA, never False.** Encoding an unreadable verdict as
+    disagreement would assert that the judge contradicted the rule, which is a
+    different and stronger claim than "we could not read a verdict at all".
+    Every count derived from this column is therefore over the determinate
+    subset, and its denominator is reported alongside it.
+    """
+    rule = rule.reindex(verdict.index)
+    vals = []
+    for i in verdict.index:
+        v = verdict.loc[i]
+        if v not in ("correct", "incorrect") or pd.isna(rule.loc[i]):
+            vals.append(pd.NA)
+        else:
+            vals.append((v == "correct") == bool(rule.loc[i]))
+    return pd.Series(vals, index=verdict.index, dtype="boolean")
+
+
+def open_judge_frame(run: pd.DataFrame, answers: pd.Series,
+                     livemath: pd.DataFrame, omni: pd.DataFrame,
+                     v1: pd.Series, v2: pd.Series,
+                     human: Optional[pd.Series] = None,
+                     answer_types: Optional[pd.Series] = None,
+                     gt_col: str = "pert_a", question_col: str = "orig_q",
+                     entropy_col: str = "perception_entropy") -> pd.DataFrame:
+    """Assemble the per-item diagnostic frame.
+
+    `livemath` and `omni` are indexed by item with columns `verdict` and
+    `raw_output`. `answers` is the SINGLE Qwen majority answer both judges were
+    shown -- passed in rather than recomputed per judge, because feeding the
+    two judges even slightly different inputs would make every comparison in
+    this file meaningless. Mismatched coverage raises rather than silently
+    inner-joining, since a short run is a resumable checkpoint problem, not a
+    result.
+    """
+    missing = {"livemath": set(run.index) - set(livemath.index),
+               "omni": set(run.index) - set(omni.index)}
+    if any(missing.values()):
+        raise ValueError(
+            "both judges must cover every item before the frame is built; "
+            f"missing livemath={sorted(missing['livemath'])[:8]} "
+            f"omni={sorted(missing['omni'])[:8]} -- resume the checkpoint "
+            "rather than analysing a partial run")
+
+    idx = run.index
+    out = pd.DataFrame(index=idx)
+    out["item_id"] = [int(i) for i in idx]
+    out["has_error"] = [bool(run.loc[i, "has_error"]) for i in idx]
+    out["ground_truth_answer"] = [str(run.loc[i, gt_col] or "") for i in idx]
+    out["qwen_answer"] = answers.reindex(idx).fillna("").astype(str)
+    out["strict_v1_correct"] = v1.reindex(idx).astype(bool)
+    out["strict_v2_correct"] = v2.reindex(idx).astype(bool)
+
+    for tag, judged in (("livemath", livemath), ("omni", omni)):
+        v = judged["verdict"].reindex(idx)
+        out[f"{tag}_verdict"] = v
+        out[f"{tag}_raw_output"] = judged["raw_output"].reindex(idx).fillna("")
+        out[f"{tag}_parse_failed"] = (v == "unclear")
+
+    for tag in ("livemath", "omni"):
+        for rule in ("strict_v1", "strict_v2"):
+            out[f"{tag}_agrees_{rule}"] = _agreement_column(
+                out[f"{tag}_verdict"], out[f"{rule}_correct"])
+
+    # NA when EITHER judge failed to parse: two unreadable outputs are not two
+    # judges agreeing, and counting them as agreement would inflate the one
+    # number this file exists to report honestly.
+    both = out["livemath_verdict"].isin(("correct", "incorrect")) & \
+        out["omni_verdict"].isin(("correct", "incorrect"))
+    out["judges_agree"] = pd.Series(
+        [bool(out.loc[i, "livemath_verdict"] == out.loc[i, "omni_verdict"])
+         if both.loc[i] else pd.NA for i in idx],
+        index=idx, dtype="boolean")
+
+    out["human_label"] = [str(human.get(i, "")) if human is not None else ""
+                          for i in idx]
+    out["perception_entropy"] = run[entropy_col].reindex(idx) \
+        if entropy_col in run else float("nan")
+    out["answer_type"] = [answer_types.get(i, "") if answer_types is not None
+                          else "" for i in idx]
+
+    for tag in ("livemath", "omni"):
+        out[f"{tag}_looks_like_solving"] = out[f"{tag}_raw_output"].map(
+            looks_like_solving)
+
+    q = run[question_col] if question_col in run else pd.Series("", index=idx)
+    invented = [invented_reference_tokens(out.loc[i, "omni_raw_output"],
+                                          q.get(i, ""),
+                                          out.loc[i, "ground_truth_answer"],
+                                          out.loc[i, "qwen_answer"])
+                for i in idx]
+    out["omni_invented_tokens"] = ["; ".join(t) for t in invented]
+    out["omni_invented_reference"] = [bool(t) for t in invented]
+
+    return out[list(OPEN_JUDGE_COLUMNS) + list(OPEN_JUDGE_EXTRA_COLUMNS)]
+
+
+# --- the item-273 signature, as a countable flag ---------------------------
+
+_FRAC_RE = re.compile(r"\\[dt]?frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}")
+_NUMERIC_TOKEN_RE = re.compile(r"\d+(?:\.\d+)?(?:/\d+(?:\.\d+)?)?")
+
+
+def _numeric_surface(*texts) -> str:
+    """Normalise text so numbers compare as substrings.
+
+    `\\frac{3}{4}`, `3 / 4` and `3/4` must all reduce to the same surface, or
+    the detector below reports a token as invented merely because the judge
+    wrote it in prose while the reference wrote it in LaTeX.
+    """
+    joined = " ".join(str(t or "") for t in texts)
+    prev = None
+    while prev != joined:                       # nested \frac
+        prev = joined
+        joined = _FRAC_RE.sub(r"\1/\2", joined)
+    joined = re.sub(r"(?<=\d),(?=\d\d\d)", "", joined)      # 13,000 -> 13000
+    return re.sub(r"\s*/\s*", "/", joined)
+
+
+def invented_reference_tokens(rationale: Optional[str],
+                              question: Optional[str],
+                              gold: Optional[str],
+                              answer: Optional[str],
+                              min_len: int = 2) -> list:
+    """Numbers the judge cites that appear in NONE of the inputs it was given.
+
+    This is the item-273 signature made countable. There, Omni-Judge wrote
+    *"The reference answer is 3/4"* while the reference we passed was `2/4`
+    and the model answered a bare `}`; `3/4` occurs in none of the question,
+    the reference or the answer. It had re-derived a reference from the
+    problem text and graded against that.
+
+    **A review flag, never a verdict, and it errs in both directions.** It
+    OVER-triggers on incidental numerals (a judge writing "criterion 12" or a
+    year), and UNDER-triggers by construction: tokens shorter than `min_len`
+    are skipped because a bare `3` appears in almost any input by chance, so
+    a one-digit invented answer is invisible to it. The returned tokens are
+    kept in the CSV precisely so a human can dismiss a false hit in seconds.
+    """
+    if not rationale:
+        return []
+    hay = _numeric_surface(question, gold, answer)
+    said = _numeric_surface(rationale)
+    seen, out = set(), []
+    for m in _NUMERIC_TOKEN_RE.finditer(said):
+        tok = m.group(0)
+        if len(tok) < min_len or tok in seen:
+            continue
+        seen.add(tok)
+        if tok not in hay:
+            out.append(tok)
+    return out
+
+
+# --- diagnostics ------------------------------------------------------------
+
+def open_judge_diagnostics(frame: pd.DataFrame) -> dict:
+    """Counts and agreements. **Returns no accuracy, by construction.**
+
+    Every agreement figure ships with the number that makes it readable:
+    `always_yes_agreement` for the rule comparisons (a judge answering yes to
+    everything scores exactly that), and `chance_rate`/`kappa` for
+    judge-vs-judge (two lenient judges agree often without agreeing about
+    anything).
+    """
+    n = len(frame)
+    out = {"n": n, "reports_accuracy": False}
+
+    for tag in ("livemath", "omni"):
+        v = frame[f"{tag}_verdict"]
+        det = int((v == "correct").sum()) + int((v == "incorrect").sum())
+        out[tag] = {
+            "correct": int((v == "correct").sum()),
+            "incorrect": int((v == "incorrect").sum()),
+            "parse_failed": int((v == "unclear").sum()),
+            "n_determinate": det,
+            "yes_rate_determinate": (float((v == "correct").sum()) / det
+                                     if det else float("nan")),
+        }
+
+    ja = frame["judges_agree"]
+    det = ja.notna()
+    nd = int(det.sum())
+    lv = frame.loc[det, "livemath_verdict"] == "correct"
+    ov = frame.loc[det, "omni_verdict"] == "correct"
+    p_l, p_o = (float(lv.mean()), float(ov.mean())) if nd else (float("nan"),) * 2
+    pe = p_l * p_o + (1 - p_l) * (1 - p_o) if nd else float("nan")
+    po = float((ja[det] == True).mean()) if nd else float("nan")  # noqa: E712
+    out["judge_vs_judge"] = {
+        "n_both_determinate": nd,
+        "agree": int((ja == True).sum()),        # noqa: E712
+        "disagree": int((ja == False).sum()),    # noqa: E712
+        "undecidable_either_parse_failed": int((~det).sum()),
+        "rate": po,
+        "chance_rate": pe,
+        "kappa": ((po - pe) / (1 - pe)) if nd and pe < 1 else float("nan"),
+    }
+
+    for tag in ("livemath", "omni"):
+        for rule in ("strict_v1", "strict_v2"):
+            a = frame[f"{tag}_agrees_{rule}"]
+            d = a.notna()
+            nd = int(d.sum())
+            jc = frame.loc[d, f"{tag}_verdict"] == "correct"
+            rc = frame.loc[d, f"{rule}_correct"].astype(bool)
+            out[f"{tag}_vs_{rule}"] = {
+                "n_determinate": nd,
+                "agree": int((a == True).sum()),      # noqa: E712
+                "disagree": int((a == False).sum()),  # noqa: E712
+                "rate": float((a[d] == True).mean()) if nd else float("nan"),  # noqa: E712
+                "judge_yes_rule_wrong": int((jc & ~rc).sum()),
+                "judge_no_rule_correct": int((~jc & rc).sum()),
+                # A judge answering "correct" to everything agrees with the
+                # rule on exactly the rule's own correct items. Quote the rate
+                # above without this and the number means nothing.
+                "always_yes_agreement": float(rc.mean()) if nd else float("nan"),
+            }
+
+    for flag, name in ((True, "has_error"), (False, "clean")):
+        sub = frame[frame["has_error"] == flag]
+        block = {"n": len(sub)}
+        for tag in ("livemath", "omni"):
+            v = sub[f"{tag}_verdict"]
+            d = int((v != "unclear").sum())
+            block[f"{tag}_yes"] = int((v == "correct").sum())
+            block[f"{tag}_yes_rate"] = (float((v == "correct").sum()) / d
+                                        if d else float("nan"))
+        ja_s = sub["judges_agree"]
+        block["judges_agree_rate"] = (float((ja_s[ja_s.notna()] == True).mean())  # noqa: E712
+                                      if ja_s.notna().any() else float("nan"))
+        block["omni_invented_reference"] = int(sub["omni_invented_reference"].sum())
+        out[name] = block
+
+    out["omni_invented_reference_total"] = int(frame["omni_invented_reference"].sum())
+    out["livemath_solving_total"] = int(frame["livemath_looks_like_solving"].sum())
+    out["omni_solving_total"] = int(frame["omni_looks_like_solving"].sum())
+    out["livemath_silent_transcripts"] = int(
+        frame["livemath_raw_output"].astype(str).str.len().le(24).sum())
+
+    out["gate_reproduction"] = {
+        tag: {i: {"expected": want,
+                  "observed": (frame.loc[i, f"{tag}_verdict"]
+                               if i in frame.index else "absent"),
+                  "matches": (i in frame.index
+                              and frame.loc[i, f"{tag}_verdict"] == want)}
+              for i, want in probes.items()}
+        for tag, probes in GATE_REPRODUCTION.items()
+    }
+    return out
+
+
+def rationale_sample(frame: pd.DataFrame, n_has_error: int = 8,
+                     n_clean: int = 4, seed: int = 20260812,
+                     force: Sequence[int] = GATE_ITEMS) -> list:
+    """A FIXED small set of transcripts to read by hand, oversampling `has_error=1`.
+
+    Deterministic and priority-ordered rather than uniform, because a uniform
+    draw of 12 from 300 would mostly return items where both judges said yes
+    and there is nothing to read. Priority: the forced probes, then items
+    flagged as citing an invented reference, then judge-vs-judge
+    disagreements, then items carrying a determinate human label, then a
+    seeded fill. The probes COUNT toward their stratum so the totals are
+    exactly as requested.
+    """
+    import numpy as np
+
+    rng = np.random.default_rng(seed)
+    picked = []
+    for flag, want in ((True, n_has_error), (False, n_clean)):
+        pool = frame[frame["has_error"] == flag]
+        chosen = [i for i in force if i in pool.index]
+        tiers = [
+            pool.index[pool["omni_invented_reference"].astype(bool)],
+            # `.fillna(False)` throughout: the subsets below mean
+            # "demonstrably disagreed", not "did not demonstrably agree". An
+            # undecidable pair belongs in neither, and leaving the NA in the
+            # mask makes the answer depend on the pandas version.
+            pool.index[(pool["judges_agree"] == False).fillna(False)],  # noqa: E712
+            pool.index[pool["human_label"].isin(["correct", "wrong"])],
+            pool.index,
+        ]
+        for tier in tiers:
+            remaining = [i for i in tier if i not in chosen]
+            rng.shuffle(remaining)
+            for i in remaining:
+                if len(chosen) >= want:
+                    break
+                chosen.append(i)
+            if len(chosen) >= want:
+                break
+        picked.extend(chosen[:want])
+    return sorted(int(i) for i in picked)
+
+
+def open_judges_summary_md(path: str, frame: pd.DataFrame, diag: dict,
+                           rationales: Sequence[int]) -> str:
+    """The human-readable summary. Emits NO accuracy figure, by construction.
+
+    Ordering is deliberate and matches the other summary writers in this
+    module: a reader who stops after the first paragraph must still know that
+    both judges failed a safety check and that nothing here is a corrected
+    accuracy.
+    """
+    L = ["# Open judges on all 300 — EXPLORATORY DIAGNOSTIC (not a scoring run)\n"]
+    L.append("> **Both judges had already failed a safety check before this "
+             "ran, in different ways.** LiveMath-Judge failed the *verdict* "
+             "gate: on item 273 it accepted a non-answer as matching the "
+             "ground truth. Omni-Judge *passed* the verdict gate and failed "
+             "the *rationale* check: it returned the desired `FALSE` while "
+             "its justification showed it had reconstructed its own reference "
+             "answer and graded against that.\n")
+    L.append("> **Nothing in this file is a corrected accuracy and none may "
+             "be derived from it.** No judge verdict is model accuracy; these "
+             "are scorer diagnostics on a fixed set of Qwen outputs.\n")
+    L.append(f"`{MODEL_ID}` (fidelity prompt) and `{OMNI_MODEL_ID}` (native "
+             f"prompt, baked into its tokenizer) · {diag['n']} items · "
+             "2026-08-12\n")
+
+    L.append("## Verdict counts\n")
+    L.append("| judge | yes | no | parse failed | yes-rate (determinate) |")
+    L.append("|---|---|---|---|---|")
+    for tag, name in (("livemath", "LiveMath-Judge"), ("omni", "Omni-Judge")):
+        d = diag[tag]
+        L.append(f"| {name} | {d['correct']} | {d['incorrect']} | "
+                 f"{d['parse_failed']} | {d['yes_rate_determinate']:.1%} |")
+    L.append("\n`parse failed` means *our* parse found no verdict. Neither "
+             "model has an abstain option — LiveMath-Judge's own prompt maps "
+             "\"difficult to judge\" onto `no` — so this is never judge "
+             "uncertainty.\n")
+
+    jj = diag["judge_vs_judge"]
+    L.append("## Judge vs judge\n")
+    L.append(f"- both determinate on **{jj['n_both_determinate']}** items "
+             f"(undecidable on {jj['undecidable_either_parse_failed']})")
+    L.append(f"- agree **{jj['agree']}** · disagree **{jj['disagree']}** · "
+             f"rate **{jj['rate']:.1%}**")
+    L.append(f"- agreement expected by chance at these two yes-rates: "
+             f"**{jj['chance_rate']:.1%}** · Cohen's kappa **{jj['kappa']:.3f}**")
+    L.append("\n**Read the kappa, not the rate.** Two lenient judges agree "
+             "often without agreeing about anything: if both say yes to most "
+             "items, a high raw agreement follows arithmetically. Kappa near "
+             "zero means the agreement is entirely that arithmetic.\n")
+
+    L.append("## Against the frozen rules\n")
+    L.append("Neither rule is ground truth, and neither judge is. This table "
+             "measures how far apart four unreliable scorers sit, not which "
+             "one is right.\n")
+    L.append("| judge | rule | n | agree | disagree | judge yes / rule wrong | "
+             "judge no / rule correct | rate | always-yes baseline |")
+    L.append("|---|---|---|---|---|---|---|---|---|")
+    for tag, name in (("livemath", "LiveMath"), ("omni", "Omni")):
+        for rule in ("strict_v1", "strict_v2"):
+            d = diag[f"{tag}_vs_{rule}"]
+            L.append(f"| {name} | `{rule}` | {d['n_determinate']} | "
+                     f"{d['agree']} | {d['disagree']} | "
+                     f"{d['judge_yes_rule_wrong']} | "
+                     f"{d['judge_no_rule_correct']} | {d['rate']:.1%} | "
+                     f"**{d['always_yes_agreement']:.1%}** |")
+    L.append("\n**The last column is the one that makes the rest readable.** "
+             "A judge answering \"yes\" to every item agrees with a rule on "
+             "exactly the rule's own correct items, so it scores the "
+             "always-yes baseline for free. Notebook 25 already found "
+             "LiveMath-Judge sitting exactly on that baseline against human "
+             "labels. An agreement rate at or below it is worth nothing.\n")
+
+    L.append("## Split by `has_error`\n")
+    L.append("| stratum | n | LiveMath yes | Omni yes | judges agree | "
+             "Omni cites an invented number |")
+    L.append("|---|---|---|---|---|---|")
+    for name, label in (("has_error", "`has_error=1` (injected error)"),
+                        ("clean", "clean")):
+        d = diag[name]
+        L.append(f"| {label} | {d['n']} | {d['livemath_yes']} "
+                 f"({d['livemath_yes_rate']:.1%}) | {d['omni_yes']} "
+                 f"({d['omni_yes_rate']:.1%}) | {d['judges_agree_rate']:.1%} | "
+                 f"{d['omni_invented_reference']} |")
+    L.append("\nA faithful transcription of an injected error *should* be "
+             "`yes`, so a high rate on `has_error=1` is not by itself wrong. "
+             "The leniency signature is the rate being **higher** there than "
+             "on clean items: that direction means the judge is forgiving the "
+             "injected error rather than scoring fidelity to it.\n")
+
+    L.append("## Does the judge re-derive the answer instead of comparing?\n")
+    L.append(f"- Omni-Judge justifications citing a number present in "
+             f"**none** of question, reference or model answer: "
+             f"**{diag['omni_invented_reference_total']} of {diag['n']}**")
+    L.append(f"- `looks_like_solving` heuristic: LiveMath "
+             f"{diag['livemath_solving_total']}, Omni "
+             f"{diag['omni_solving_total']}\n")
+    L.append("The invented-number flag is the item-273 signature made "
+             "countable: there, Omni-Judge wrote *\"The reference answer is "
+             "3/4\"* when we had passed `2/4` and the model had answered a "
+             "bare `}`. It is a **review flag, not a verdict**, and it errs "
+             "both ways — it over-triggers on incidental numerals and cannot "
+             "see a one-digit invented answer at all, since a bare digit "
+             "appears in almost any input by chance.\n")
+    if diag["livemath_silent_transcripts"]:
+        L.append(f"> **The `looks_like_solving` count for LiveMath-Judge "
+                 f"cannot be read as exoneration.** "
+                 f"{diag['livemath_silent_transcripts']} of {diag['n']} of its "
+                 "transcripts are a bare verdict with no reasoning at all, "
+                 "despite the prompt ending in `Analysis:`. With no transcript "
+                 "there is nothing for the heuristic to find, so a low count "
+                 "is evidence the judge does not explain itself, not evidence "
+                 "it compared properly.\n")
+
+    L.append("## Gate items, re-derived\n")
+    L.append("Items 55 and 273 sit inside these 300, so the notebook 24 and "
+             "26 gate verdicts come back for free. A mismatch is not a gate "
+             "failure; it means the judge, decoder or library version drifted "
+             "between sessions.\n")
+    L.append("| judge | item | expected | observed | matches |")
+    L.append("|---|---|---|---|---|")
+    for tag, probes in diag["gate_reproduction"].items():
+        for i, r in probes.items():
+            L.append(f"| {tag} | {i} | `{r['expected']}` | "
+                     f"`{r['observed']}` | {'yes' if r['matches'] else '**NO**'} |")
+
+    agree = (frame["judges_agree"] == True).fillna(False)     # noqa: E712
+    disagree = (frame["judges_agree"] == False).fillna(False)  # noqa: E712
+    dis = frame[disagree]
+    L.append(f"\n## Examples: the judges disagree — {len(dis)} items\n")
+    for i, r in dis.head(6).iterrows():
+        L.append(f"**item {i}** · `has_error={r['has_error']}` · LiveMath "
+                 f"`{r['livemath_verdict']}` · Omni `{r['omni_verdict']}` · "
+                 f"`strict_v1` {'correct' if r['strict_v1_correct'] else 'wrong'}\n")
+        L.append(f"- truth: `{str(r['ground_truth_answer'])[:150]}`")
+        L.append(f"- model: `{str(r['qwen_answer'])[:150]}`")
+        L.append(f"- Omni says: {str(r['omni_raw_output'])[:300]}\n")
+
+    both_yes_rule_wrong = frame[agree &
+                                (frame["livemath_verdict"] == "correct") &
+                                (~frame["strict_v1_correct"])]
+    both_no_rule_right = frame[agree &
+                               (frame["livemath_verdict"] == "incorrect") &
+                               (frame["strict_v1_correct"])]
+    L.append("## Examples: both judges agree but differ from `strict_v1`\n")
+    L.append(f"- both `yes`, rule says wrong: **{len(both_yes_rule_wrong)}** "
+             "— the set the judges would *recover*, and the set most likely "
+             "to contain their false passes")
+    L.append(f"- both `no`, rule says correct: **{len(both_no_rule_right)}** "
+             "— candidate false passes of the rule, independently flagged\n")
+    for title, sub in (("both yes / rule wrong", both_yes_rule_wrong),
+                       ("both no / rule correct", both_no_rule_right)):
+        L.append(f"### {title}\n")
+        for i, r in sub.head(4).iterrows():
+            L.append(f"**item {i}** · `has_error={r['has_error']}` · human "
+                     f"`{r['human_label'] or '—'}`\n")
+            L.append(f"- truth: `{str(r['ground_truth_answer'])[:150]}`")
+            L.append(f"- model: `{str(r['qwen_answer'])[:150]}`\n")
+
+    L.append("## Fixed sample for manual rationale inspection\n")
+    L.append(f"Items {list(rationales)} — seeded and priority-ordered, "
+             "oversampling `has_error=1`. Only Omni-Judge writes a "
+             "justification, so it is the only one there is anything to "
+             "read.\n")
+    for i in rationales:
+        if i not in frame.index:
+            continue
+        r = frame.loc[i]
+        L.append(f"### item {i} · `has_error={r['has_error']}` · human "
+                 f"`{r['human_label'] or '—'}`\n")
+        L.append(f"- LiveMath `{r['livemath_verdict']}` · Omni "
+                 f"`{r['omni_verdict']}` · `strict_v1` "
+                 f"{'correct' if r['strict_v1_correct'] else 'wrong'} · "
+                 f"`strict_v2` "
+                 f"{'correct' if r['strict_v2_correct'] else 'wrong'}")
+        if r["omni_invented_tokens"]:
+            L.append(f"- **numbers cited by the judge but absent from every "
+                     f"input:** `{r['omni_invented_tokens']}`")
+        L.append(f"- truth: `{str(r['ground_truth_answer'])[:300]}`")
+        L.append(f"- model: `{str(r['qwen_answer'])[:300]}`")
+        L.append(f"- Omni justification:\n\n```\n"
+                 f"{str(r['omni_raw_output'])[:900]}\n```\n")
+
+    text = "\n".join(L)
+    pathlib_write(path, text)
+    return text
