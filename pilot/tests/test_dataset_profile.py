@@ -1,0 +1,246 @@
+"""Locks `pilot.dataset_profile`. Offline, synthetic fixtures, no model.
+
+The risks here are not arithmetic. They are the three ways a distribution
+table can look informative and mean nothing:
+
+  * grouping by a variable that the model's own behaviour helped define, so
+    the group's accuracy is partly the grouping;
+  * printing an AUROC inside a group where every item carries the same label,
+    which is the degeneracy behind this project's one retracted result;
+  * reading `\\textcolor{red}` as injected-error metadata when it fires on
+    most CLEAN pages too.
+"""
+
+import pandas as pd
+import pytest
+
+import pilot.dataset_profile as dp
+import pilot.strict_v2 as strict_v2
+
+
+def _profile(n=120, correct_frac=0.5, types=None, has_error=None):
+    """A synthetic profile frame with the columns group_metrics consumes.
+
+    Types CYCLE rather than sitting in contiguous blocks, so every type spans
+    both correctness classes -- a blocked fixture makes each type single-class
+    and every AUROC vacuously unavailable, which would let a broken guard pass.
+    Human labels are a SUPERSET of determinate ones, as they are in the real
+    audit: `extraction_issue` carries a raw label and no determinate truth.
+    """
+    types = types or ["numeric", "text_conclusion"]
+    rows = []
+    for i in range(n):
+        correct = i < int(n * correct_frac)
+        labelled = i % 5 == 0
+        indeterminate = labelled and (i % 10 == 0)
+        rows.append({
+            "item_id": i,
+            "has_error": (i % 2 == 0) if has_error is None else (i in has_error),
+            "strict_v1_correct": correct,
+            "strict_v2_correct": correct,
+            "answer_type": types[i % len(types)],
+            "question_type_if_available": "free_response",
+            # Entropy tracks correctness, so a real AUROC is recoverable where
+            # one is licensed.
+            "entropy": 0.2 if correct else 1.4,
+            "parse_failed": i % 10 == 0,
+            "max_entropy": i % 7 == 0,
+            "truth_span_len": 5 + (i % 40),
+            "human_label_if_available": (
+                ("extraction_issue" if indeterminate else "true_correct")
+                if labelled else ""),
+            "human_truth_if_available": (
+                "" if not labelled else
+                ("indeterminate" if indeterminate else "correct")),
+        })
+    return pd.DataFrame(rows).set_index("item_id", drop=False)
+
+
+# --- answer types come from the truth side only ----------------------------
+
+def test_answer_types_ignore_the_model_span():
+    """THE GROUPING GUARD. strict_v2 ORs each risk flag across model and truth
+    because a risk either side is a risk for the comparison. Grouping that way
+    would make a group's accuracy partly a statement about which items the
+    model answered badly."""
+    truth = "x = 3"
+    model_prose = "the required number is twenty four apples"
+    gt_flags = strict_v2.answer_flags(truth, "sympy:eq(x,3)", False)
+    model_flags = strict_v2.answer_flags(model_prose, "text:...", False)
+    assert model_flags["text_conclusion"], "fixture must trip the model side"
+    assert not gt_flags["text_conclusion"]
+    assert dp.truth_answer_type(gt_flags, truth) == "single_expression", (
+        "a prose MODEL span must not move the item into the prose group")
+
+
+@pytest.mark.parametrize("span,label,expected", [
+    ("42", "sympy:42", "numeric"),
+    ("11130 cm", "text:11130 cm", "numeric"),
+    ("x^2 + 1", "sympy:x**2+1", "single_expression"),
+    ("", "", "unknown"),
+])
+def test_truth_answer_type_basic_shapes(span, label, expected):
+    flags = strict_v2.answer_flags(span, label, False)
+    assert dp.truth_answer_type(flags, span) == expected
+
+
+def test_uninferable_types_are_declared_not_silently_dropped():
+    """The brief asked for table/cell and proof categories. Neither is
+    derivable from the stored fields, and saying so is the deliverable."""
+    assert "table_cell_answer" in dp.UNINFERABLE_TYPES
+    assert "proof_conclusion" in dp.UNINFERABLE_TYPES
+    assert "table_cell_answer" not in dp.ANSWER_TYPE_ORDER
+
+
+# --- the AUROC must be refused, not approximated ---------------------------
+
+def test_no_auroc_inside_a_group_defined_by_the_label():
+    """Splitting on a rule's verdict makes correctness constant within each
+    group. That is the retracted stratified result's exact failure shape, so
+    it is detected structurally rather than left to a reader."""
+    g = dp.group_metrics(_profile(), "strict_v1_correct").set_index("group")
+    for level in g.index:
+        assert g.loc[level, "auroc"] is None
+        assert g.loc[level, "auroc_status"] == "degenerate_split_defined_by_the_label"
+
+
+def test_no_auroc_below_the_registered_minority_minimum():
+    prof = _profile(n=100, correct_frac=0.9)     # minority = 10
+    g = dp.group_metrics(prof, "question_type_if_available").set_index("group")
+    assert g.loc["free_response", "auroc"] is None
+    assert g.loc["free_response", "auroc_status"] == "underpowered_minority_10"
+
+
+def test_an_auroc_is_reported_when_the_split_licenses_one():
+    g = dp.group_metrics(_profile(n=200), "answer_type").set_index("group")
+    row = g.loc["numeric"]
+    assert row["auroc"] is not None and row["auroc_ci"]
+    assert row["auroc_status"] in ("excludes_chance", "includes_chance")
+
+
+def test_group_accuracies_and_shares_are_real():
+    prof = _profile(n=100, correct_frac=0.3)
+    g = dp.group_metrics(prof, "question_type_if_available").set_index("group")
+    assert g.loc["free_response", "n"] == 100
+    assert g.loc["free_response", "strict_v1_accuracy"] == pytest.approx(0.30)
+    assert g.loc["free_response", "share"] == pytest.approx(1.0)
+
+
+def test_extraction_issue_is_not_folded_into_wrong():
+    """`extraction_issue` means the verdict was UNEARNED, which leaves the
+    model's answer undecided. Counting it as wrong is the easiest available
+    way to manufacture a result here, so it can never reach false_pass."""
+    prof = _profile(n=100)
+    g = dp.group_metrics(prof, "question_type_if_available").set_index("group")
+    assert g.loc["free_response", "extraction_issue_rate"] > 0
+    assert g.loc["free_response", "false_pass_v1"] == 0
+    assert g.loc["free_response", "n_human_determinate"] < \
+        g.loc["free_response", "n_human_labelled"]
+
+
+# --- the red markup is not error metadata ----------------------------------
+
+def test_red_spans_are_brace_balanced():
+    """`[^{}]*` truncates at the first inner brace, which is extractor bug 1."""
+    assert dp.red_spans(r"\textcolor{red}{\hat{b}}") == [r"\hat{b}"]
+    assert dp.red_spans(r"a \textcolor{red}{1} b \textcolor{red}{2}") == ["1", "2"]
+    assert dp.red_spans(None) == []
+
+
+def test_red_markup_is_rejected_as_error_location_when_it_fires_on_clean_pages():
+    """THE DECISIVE CHECK. If red marked the injected error it would be rare on
+    clean pages. On the real sample it appears on 73% of them."""
+    run = pd.DataFrame({
+        "has_error": [True] * 4 + [False] * 4,
+        "pert_a": [r"\textcolor{red}{7}"] * 4 + [r"\textcolor{red}{also note}"] * 3
+        + ["plain"],
+    })
+    r = dp.red_markup_report(run)
+    assert r["clean_items_with_red"] == 3
+    assert r["clean_with_red_share"] == pytest.approx(0.75)
+    assert r["usable_as_error_location"] is False
+
+
+def test_an_error_item_without_red_is_reported():
+    """Absence of red does not mean absence of an error, so the exceptions are
+    listed rather than rounded away."""
+    run = pd.DataFrame({"has_error": [True, True],
+                        "pert_a": [r"\textcolor{red}{7}", "no markup"]})
+    assert dp.red_markup_report(run)["error_items_without_red"] == [1]
+
+
+# --- metadata availability is checked, not assumed -------------------------
+
+def test_absent_metadata_is_reported_absent():
+    run = pd.DataFrame({"has_error": [True], "pert_a": ["x"], "orig_q": ["q"],
+                        "handwriting_style": [True], "image_quality": [True]})
+    fields = {f["field"]: f for f in dp.metadata_availability(run)["fields"]}
+    for name in ("injected error location", "injected error type/category",
+                 "original clean answer", "page / image id",
+                 "problem type / subject / topic"):
+        assert fields[name]["available"] is False, name
+    assert fields["has_error"]["available"] is True
+    assert fields["image quality"]["available"] is True
+
+
+def test_orig_q_is_not_mistaken_for_the_clean_answer():
+    """`orig_q` is the QUESTION. Its name invites reading it as the original
+    answer, which would turn 'no clean answer stored' into a false positive."""
+    run = pd.DataFrame({"has_error": [True], "pert_a": ["x"], "orig_q": ["q"]})
+    fields = {f["field"]: f for f in dp.metadata_availability(run)["fields"]}
+    assert fields["original clean answer"]["available"] is False
+    assert "orig_q" not in fields["original clean answer"]["columns_checked"]
+
+
+# --- example selection ------------------------------------------------------
+
+def test_example_selection_is_balanced_and_seeded():
+    prof = _profile(n=200, correct_frac=0.5,
+                    types=["numeric", "text_conclusion", "set_answer",
+                           "single_expression"])
+    a = dp.example_selection(prof)
+    b = dp.example_selection(prof)
+    assert list(a.index) == list(b.index), "selection must be reproducible"
+    assert len(a) == 20
+    assert int(a["has_error"].sum()) == 10
+    assert int(a["strict_v1_correct"].sum()) == 10
+
+
+def test_the_dominant_answer_type_can_reach_the_sheet():
+    """A fixed ANSWER_TYPE_ORDER round robin put `numeric` and
+    `single_expression` LAST, so with five slots per cell the two types
+    covering 54% of the corpus could never appear. Shuffling made the
+    exclusion unbiased instead of systematic."""
+    common = "single_expression"
+    prof = _profile(n=200, types=[common] * 18 + ["set_answer",
+                                                 "text_conclusion"])
+    picked = dp.example_selection(prof)
+    assert common in set(picked["answer_type"]), (
+        "the most common answer type must be reachable by the sampler")
+
+
+def test_a_vacuous_match_is_the_note_that_wins():
+    """A long span collapsing to a one-symbol label on BOTH sides is the
+    mechanism behind most audited false passes, and it is invisible from the
+    verdict. It must outrank the cheaper notes (parse failure, rule
+    disagreement) or the tile says nothing useful about item 117."""
+    row = pd.Series({
+        "label_m": "sympy:p", "label_t": "sympy:p",
+        "span_t_disp": r"P(A|B) = \frac{P(A \cap B)}{P(B)} = \frac{4}{9}.",
+        "span_m_disp": "P(A|B) = ...", "answer_type": "set_answer",
+        "strict_v1_correct": True, "strict_v2_correct": False,
+        "max_entropy": False, "parse_failed": True, "truth_span_len": 60,
+    })
+    assert "vacuous" in dp._tile_note(row)
+
+
+def test_a_short_truth_span_is_not_called_vacuous():
+    """`sympy:4` against a genuinely short numeric truth is a real match, not
+    a collapse. Flagging it would make the note meaningless on MCQ items."""
+    row = pd.Series({
+        "label_m": "sympy:4", "label_t": "sympy:4", "span_t_disp": "4",
+        "span_m_disp": "4", "answer_type": "numeric",
+        "strict_v1_correct": True, "strict_v2_correct": True,
+        "max_entropy": False, "parse_failed": False, "truth_span_len": 1,
+    })
+    assert "vacuous" not in dp._tile_note(row)

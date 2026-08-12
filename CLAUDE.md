@@ -105,6 +105,85 @@ one) is still Drive-only, and nothing may be quoted from it anyway.
 
 ## Current findings
 
+### 2026-08-12: DISTRIBUTION BY ITEM TYPE — and the red markup is NOT error metadata
+
+`pilot/dataset_profile.py`, `pilot/dryruns/build_dataset_profile.py`,
+`pilot/tests/test_dataset_profile.py` (18 tests). Offline, no inference.
+Artifacts: `reference/audit/dataset_distribution_by_type_20260812.{md,csv}`
+and `.../dataset_examples_contact_sheets_20260812/` (20 captioned tiles,
+**text-only** — FERMAT is gated and its images never reach the run CSV, so
+crops need Colab).
+
+- **`\textcolor{red}` CANNOT be used as injected-error location or type, and
+  the earlier note in this file that "FERMAT marks the injected error in red"
+  is too strong.** Measured: red appears in **258/300** ground truths,
+  **885 spans**. It is on **149/150 error items but ALSO 109/150 clean ones
+  (72.7%)**, and clean items carry *more* of it on average (3.61 spans vs
+  2.29). Reading the spans says why — on clean items red marks added
+  elaboration and restated steps (one is a whole sentence starting
+  *"Additionally, if we consider the factorial function…"*), on error items it
+  marks changed values. **So red marks what was MODIFIED when the variant was
+  generated, not what is WRONG.** Not specific (fires on 73% of clean), not
+  unique (median 2 spans, up to 10), not necessary (**item 142 is
+  `has_error=1` with no red at all**), and carries no type information.
+  Legitimate only as a pointer when reading one item by hand; never counted
+  or aggregated.
+- **The dataset provides NO error location, NO error type, NO clean answer,
+  NO page/image id and NO subject/topic.** `has_error` is binary and is the
+  only label describing the perturbation. **`orig_q` is the QUESTION — its
+  name invites reading it as the original answer**, which would turn "no
+  clean answer stored" into a false positive; pinned in
+  `test_orig_q_is_not_mistaken_for_the_clean_answer`.
+- **ANSWER TYPES MUST BE DERIVED FROM THE TRUTH SIDE ONLY.**
+  `strict_v2.score_item_v2` deliberately ORs each shape flag across model and
+  truth (right for a review queue). Grouping that way makes a group's accuracy
+  partly a statement about *which items the model answered badly* — a short
+  wrong model span puts the item in the group that then looks inaccurate by
+  construction. Truth-only vs OR'd differ on **26 of 300**, so it moves real
+  mass. Both are in the CSV (`answer_type`, `answer_type_either_side`).
+- **The splits, `strict_v1` / `strict_v2`:**
+
+  | split | n | v1 acc | mean H | AUROC |
+  |---|---|---|---|---|
+  | `has_error=0` | 150 | 52.7% | 0.942 | 0.813 [0.744, 0.875] |
+  | `has_error=1` | 150 | 41.3% | 0.985 | 0.817 [0.749, 0.880] |
+  | MCQ | 58 | **82.8%** | 0.452 | underpowered (minority 10) |
+  | free response | 242 | 38.4% | 1.086 | 0.760 [0.698, 0.817] |
+  | simple value | 215 | 57.2% | 0.879 | 0.824 [0.767, 0.873] |
+  | structured/prose | 85 | **21.2%** | 1.176 | underpowered (minority 18) |
+
+  Worst types: **`system_answer` 5.9% (1/17)** and **`text_conclusion` 13.2%**
+  with a **47.4% max-entropy rate**. Best: `mcq_option` 86.8%.
+  **The AUROC is flat across `has_error`** — reproduces the locked finding.
+- **Span length is monotone and then INVERTS, and the inversion is the
+  finding.** 75.6% (4–10 chars) → 54.7% → 31.0% → **14.3% (>100 chars)**. But
+  **tiny spans (≤3) score a middling 46.9% while carrying the HIGHEST
+  `extraction_issue` rate of any bucket, 58.1%** — their verdicts are the
+  least earned. A tiny span's verdict is unreliable in *either* direction, not
+  a good score.
+- **`false_pass` is 0 in every group and that is a DEFINITION, not a clean
+  bill of health.** The audit codes an unearned verdict `extraction_issue` →
+  *indeterminate*, so it can never reach that column. The unearned rate is the
+  `extraction_issue` column: **13.5% among audited `strict_v1`-correct items**.
+  The canonical figure with its p=0.00007 two-pass disagreement stays in the
+  spot-check entry.
+- **AUROC is REFUSED, not approximated, in two situations** — minority class
+  below the registered 30, and a group *defined by* the correctness label
+  (accuracy is then 0%/100% by construction). Grouping by `strict_v2` verdict
+  reports `underpowered`, which **masks something worse**: the two rules agree
+  on 269/300, so that split is very nearly degenerate too and simply has no
+  AUROC to give. Both are locked in tests.
+- **A real selection bug, caught by looking at the output rather than by an
+  assert.** The contact-sheet sampler round-robined over a FIXED type order
+  that puts `numeric` and `single_expression` last, so with five slots per
+  cell the two types covering **54% of the corpus could never appear**.
+  Shuffling the order made the exclusion unbiased; pinned in
+  `test_the_dominant_answer_type_can_reach_the_sheet`.
+- Question type is **inferred** (`strict_v2._looks_mcq`) and gives **58 MCQ**,
+  against the **52** recorded in the 2026-08-11 entry from a different
+  detector. Neither is validated against a human read; do not treat either as
+  exact.
+
 ### 2026-08-12: BUILT, NOT RUN — notebook 27, both open judges on all 300
 
 `pilot/27_open_judges_all300.ipynb`, `pilot/judge.py` (new

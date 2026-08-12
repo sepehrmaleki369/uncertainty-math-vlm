@@ -1,0 +1,413 @@
+<!doctype html><meta charset="utf-8">
+<title>FERMAT n=300 — example contact sheet (text-only)</title>
+<style>
+ body{font:14px/1.5 system-ui,sans-serif;margin:24px;max-width:1200px}
+ .banner{background:#fff4e5;border-left:4px solid #e69500;padding:12px 16px;
+          margin-bottom:20px}
+ .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));
+        gap:16px}
+ .tile{border:1px solid #ddd;border-radius:8px;padding:12px;margin:0}
+ .tile.err{border-left:4px solid #c0392b} .tile.clean{border-left:4px solid #2980b9}
+ .pill{display:inline-block;background:#eee;border-radius:10px;padding:1px 8px;
+        font-size:12px;margin-left:4px}
+ .pill.ok{background:#d6f5d6} .pill.no{background:#fadbd8}
+ .imgslot{background:#f6f6f6;border:1px dashed #bbb;color:#888;text-align:center;
+           padding:22px 8px;margin:10px 0;font-size:12px}
+ dl{margin:0;display:grid;grid-template-columns:88px 1fr;gap:2px 8px;font-size:13px}
+ dt{color:#666} dd{margin:0;overflow-wrap:anywhere}
+ code{background:#f4f4f4;padding:1px 3px}
+</style>
+<h1>FERMAT n=300 — example contact sheet</h1>
+<div class="banner">
+<b>Text-only.</b> FERMAT is gated and its images are not persisted to the run
+CSV, so no crop can be rendered offline. <b>Image export requires an
+authenticated Colab/Drive session</b> (reuse notebook 23's contact-sheet
+machinery). Every caption field the image sheet would carry is already here,
+so attaching tiles is an asset export, not a re-analysis.
+</div>
+<p>20 items: 10 <code>has_error=1</code>,
+10 clean;
+10 scored correct by <code>strict_v1</code>.
+Selection is seeded and round-robin over answer types, never hand-picked.</p>
+<div class="grid">
+  <figure class="tile clean">
+    <figcaption>
+      <b>item 44</b>
+      <span class="pill">has_error=0</span>
+      <span class="pill ok">v1 correct</span>
+      <span class="pill ok">v2 correct</span>
+      <span class="pill">mcq_option</span>
+      <span class="pill">H=0.000</span>
+    </figcaption>
+    <div class="imgslot">image not available offline &mdash; export from Colab</div>
+    <dl>
+      <dt>truth span</dt><dd>option a</dd>
+      <dt>model span</dt><dd>option a</dd>
+      <dt>truth label</dt><dd><code>text:option a</code></dd>
+      <dt>model label</dt><dd><code>text:option a</code></dd>
+      <dt>human</dt><dd>true_correct</dd>
+      <dt>note</dt><dd>scored correct by both rules</dd>
+    </dl>
+  </figure>
+  <figure class="tile err">
+    <figcaption>
+      <b>item 56</b>
+      <span class="pill">has_error=1</span>
+      <span class="pill no">v1 wrong</span>
+      <span class="pill no">v2 wrong</span>
+      <span class="pill">numeric</span>
+      <span class="pill">H=0.950</span>
+    </figcaption>
+    <div class="imgslot">image not available offline &mdash; export from Colab</div>
+    <dl>
+      <dt>truth span</dt><dd>95^\circ</dd>
+      <dt>model span</dt><dd>95^\circ F</dd>
+      <dt>truth label</dt><dd><code>sympy:95**circ</code></dd>
+      <dt>model label</dt><dd><code>sympy:95**circ*f</code></dd>
+      <dt>human</dt><dd>extraction_issue</dd>
+      <dt>note</dt><dd>scored wrong; span and label shown for comparison</dd>
+    </dl>
+  </figure>
+  <figure class="tile clean">
+    <figcaption>
+      <b>item 62</b>
+      <span class="pill">has_error=0</span>
+      <span class="pill ok">v1 correct</span>
+      <span class="pill no">v2 wrong</span>
+      <span class="pill">text_conclusion</span>
+      <span class="pill">H=1.332</span>
+    </figcaption>
+    <div class="imgslot">image not available offline &mdash; export from Colab</div>
+    <dl>
+      <dt>truth span</dt><dd>\left( \frac{f}{g} \right)(x) = \frac{\sqrt{x}}{x}, \quad x \neq 0.</dd>
+      <dt>model span</dt><dd>\left(\frac{f}{g}\right)(x) = \frac{\sqrt{x}}{x}, \quad x \neq 0.</dd>
+      <dt>truth label</dt><dd><code>sympy:eq(x*(f/g), sqrt(x)/x)</code></dd>
+      <dt>model label</dt><dd><code>sympy:eq(x*(f/g), sqrt(x)/x)</code></dd>
+      <dt>human</dt><dd>true_correct</dd>
+      <dt>note</dt><dd>the two rules disagree on this item</dd>
+    </dl>
+  </figure>
+  <figure class="tile err">
+    <figcaption>
+      <b>item 64</b>
+      <span class="pill">has_error=1</span>
+      <span class="pill no">v1 wrong</span>
+      <span class="pill no">v2 wrong</span>
+      <span class="pill">text_conclusion</span>
+      <span class="pill">H=1.332</span>
+    </figcaption>
+    <div class="imgslot">image not available offline &mdash; export from Colab</div>
+    <dl>
+      <dt>truth span</dt><dd>\sin^{-1} \left( \sin \frac{3\pi}{5} \right) = \sin^{-1} \left( \sin \frac{2\pi}{5} \right) = \frac{2\pi}{5}.</dd>
+      <dt>model span</dt><dd>\sin^{-1}\left(\sin \frac{3\pi}{5}\right) = \sin^{-1}\left(\sin \frac{2\pi}{5}\right) = \frac{2\pi}{5}.</dd>
+      <dt>truth label</dt><dd><code>text:\sin^{-1} ( \sin \frac{3\pi}{5} ) = \sin^{-1} ( \sin \frac{2\pi}{5} ) = \frac{2\pi}{5}</code></dd>
+      <dt>model label</dt><dd><code>text:\sin^{-1}(\sin \frac{3\pi}{5}) = \sin^{-1}(\sin \frac{2\pi}{5}) = \frac{2\pi}{5}</code></dd>
+      <dt>human</dt><dd>—</dd>
+      <dt>note</dt><dd>prose conclusion; strict matching cannot score a sentence</dd>
+    </dl>
+  </figure>
+  <figure class="tile err">
+    <figcaption>
+      <b>item 117</b>
+      <span class="pill">has_error=1</span>
+      <span class="pill ok">v1 correct</span>
+      <span class="pill no">v2 wrong</span>
+      <span class="pill">set_answer</span>
+      <span class="pill">H=0.950</span>
+    </figcaption>
+    <div class="imgslot">image not available offline &mdash; export from Colab</div>
+    <dl>
+      <dt>truth span</dt><dd>P(A|B) = \frac{P(A \cap B)}{P(B)} = \frac{\frac{4}{13}}{\frac{9}{13}} = \textcolor{red}{\frac{4 \times 13}{9 \times 13}} = \frac{4}{9}.</dd>
+      <dt>model span</dt><dd>P(A|B) = \frac{P(ADB)}{P(B)} = \frac{\frac{4}{13}}{\frac{9}{13}} = \frac{4 \times 13}{9 \times 13} = \frac{4}{9}</dd>
+      <dt>truth label</dt><dd><code>sympy:p</code></dd>
+      <dt>model label</dt><dd><code>sympy:p</code></dd>
+      <dt>human</dt><dd>true_correct</dd>
+      <dt>note</dt><dd>both labels collapsed to `sympy:p` from a long span; the match is vacuous</dd>
+    </dl>
+  </figure>
+  <figure class="tile clean">
+    <figcaption>
+      <b>item 132</b>
+      <span class="pill">has_error=0</span>
+      <span class="pill ok">v1 correct</span>
+      <span class="pill ok">v2 correct</span>
+      <span class="pill">system_answer</span>
+      <span class="pill">H=0.673</span>
+    </figcaption>
+    <div class="imgslot">image not available offline &mdash; export from Colab</div>
+    <dl>
+      <dt>truth span</dt><dd>x = 3, \, y = 1</dd>
+      <dt>model span</dt><dd>x = 3, \quad y = 1.</dd>
+      <dt>truth label</dt><dd><code>sympy:eq(x, 3)</code></dd>
+      <dt>model label</dt><dd><code>sympy:eq(x, 3)</code></dd>
+      <dt>human</dt><dd>true_correct</dd>
+      <dt>note</dt><dd>scored correct by both rules</dd>
+    </dl>
+  </figure>
+  <figure class="tile clean">
+    <figcaption>
+      <b>item 147</b>
+      <span class="pill">has_error=0</span>
+      <span class="pill ok">v1 correct</span>
+      <span class="pill ok">v2 correct</span>
+      <span class="pill">multi_value</span>
+      <span class="pill">H=0.500</span>
+    </figcaption>
+    <div class="imgslot">image not available offline &mdash; export from Colab</div>
+    <dl>
+      <dt>truth span</dt><dd>12, 35, 37</dd>
+      <dt>model span</dt><dd>12, 35, 37</dd>
+      <dt>truth label</dt><dd><code>sympy:12</code></dd>
+      <dt>model label</dt><dd><code>sympy:12</code></dd>
+      <dt>human</dt><dd>true_correct</dd>
+      <dt>note</dt><dd>scored correct by both rules</dd>
+    </dl>
+  </figure>
+  <figure class="tile err">
+    <figcaption>
+      <b>item 149</b>
+      <span class="pill">has_error=1</span>
+      <span class="pill no">v1 wrong</span>
+      <span class="pill no">v2 wrong</span>
+      <span class="pill">multi_value</span>
+      <span class="pill">H=1.055</span>
+    </figcaption>
+    <div class="imgslot">image not available offline &mdash; export from Colab</div>
+    <dl>
+      <dt>truth span</dt><dd>0^\circ, 0^\circ, 1^\circ</dd>
+      <dt>model span</dt><dd>1^\circ</dd>
+      <dt>truth label</dt><dd><code>sympy:0**circ</code></dd>
+      <dt>model label</dt><dd><code>sympy:1**circ</code></dd>
+      <dt>human</dt><dd>true_correct</dd>
+      <dt>note</dt><dd>scored wrong; span and label shown for comparison</dd>
+    </dl>
+  </figure>
+  <figure class="tile clean">
+    <figcaption>
+      <b>item 170</b>
+      <span class="pill">has_error=0</span>
+      <span class="pill no">v1 wrong</span>
+      <span class="pill no">v2 wrong</span>
+      <span class="pill">mcq_option</span>
+      <span class="pill">H=0.500</span>
+    </figcaption>
+    <div class="imgslot">image not available offline &mdash; export from Colab</div>
+    <dl>
+      <dt>truth span</dt><dd>(b)</dd>
+      <dt>model span</dt><dd>Finally, (iv) matches (b)</dd>
+      <dt>truth label</dt><dd><code>sympy:b</code></dd>
+      <dt>model label</dt><dd><code>text:finally, (iv) matches (b)</code></dd>
+      <dt>human</dt><dd>extraction_issue</dd>
+      <dt>note</dt><dd>tiny truth span; a coincidental match or miss is cheap here</dd>
+    </dl>
+  </figure>
+  <figure class="tile err">
+    <figcaption>
+      <b>item 173</b>
+      <span class="pill">has_error=1</span>
+      <span class="pill no">v1 wrong</span>
+      <span class="pill no">v2 wrong</span>
+      <span class="pill">mcq_option</span>
+      <span class="pill">H=0.500</span>
+    </figcaption>
+    <div class="imgslot">image not available offline &mdash; export from Colab</div>
+    <dl>
+      <dt>truth span</dt><dd>option d</dd>
+      <dt>model span</dt><dd>2x = 10</dd>
+      <dt>truth label</dt><dd><code>text:option d</code></dd>
+      <dt>model label</dt><dd><code>sympy:eq(2*x, 10)</code></dd>
+      <dt>human</dt><dd>extraction_issue</dd>
+      <dt>note</dt><dd>scored wrong; span and label shown for comparison</dd>
+    </dl>
+  </figure>
+  <figure class="tile err">
+    <figcaption>
+      <b>item 183</b>
+      <span class="pill">has_error=1</span>
+      <span class="pill ok">v1 correct</span>
+      <span class="pill no">v2 wrong</span>
+      <span class="pill">derivative_equation</span>
+      <span class="pill">H=0.950</span>
+    </figcaption>
+    <div class="imgslot">image not available offline &mdash; export from Colab</div>
+    <dl>
+      <dt>truth span</dt><dd>(1 - x^2) \frac{d^2 y}{dx^2} - x \frac{dy}{dx} = 0</dd>
+      <dt>model span</dt><dd>(1-x^2)\frac{d^2y}{dx^2} - x\frac{dy}{dx} = 0.</dd>
+      <dt>truth label</dt><dd><code>sympy:eq(-x*derivative(y, x) + ((d**2*y)/(dx**2))*(1 - x**2), 0)</code></dd>
+      <dt>model label</dt><dd><code>sympy:eq(-x*derivative(y, x) + ((d**2*y)/(dx**2))*(1 - x**2), 0)</code></dd>
+      <dt>human</dt><dd>true_correct</dd>
+      <dt>note</dt><dd>the two rules disagree on this item</dd>
+    </dl>
+  </figure>
+  <figure class="tile clean">
+    <figcaption>
+      <b>item 194</b>
+      <span class="pill">has_error=0</span>
+      <span class="pill ok">v1 correct</span>
+      <span class="pill ok">v2 correct</span>
+      <span class="pill">set_answer</span>
+      <span class="pill">H=0.673</span>
+    </figcaption>
+    <div class="imgslot">image not available offline &mdash; export from Colab</div>
+    <dl>
+      <dt>truth span</dt><dd>(a,c) \in R</dd>
+      <dt>model span</dt><dd>(a,c) \in R</dd>
+      <dt>truth label</dt><dd><code>text:(a,c) \in r</code></dd>
+      <dt>model label</dt><dd><code>text:(a,c) \in r</code></dd>
+      <dt>human</dt><dd>true_correct</dd>
+      <dt>note</dt><dd>scored correct by both rules</dd>
+    </dl>
+  </figure>
+  <figure class="tile err">
+    <figcaption>
+      <b>item 210</b>
+      <span class="pill">has_error=1</span>
+      <span class="pill ok">v1 correct</span>
+      <span class="pill ok">v2 correct</span>
+      <span class="pill">single_expression</span>
+      <span class="pill">H=0.500</span>
+    </figcaption>
+    <div class="imgslot">image not available offline &mdash; export from Colab</div>
+    <dl>
+      <dt>truth span</dt><dd>B = 45^\circ</dd>
+      <dt>model span</dt><dd>B = 45^\circ</dd>
+      <dt>truth label</dt><dd><code>sympy:eq(b, 45**circ)</code></dd>
+      <dt>model label</dt><dd><code>sympy:eq(b, 45**circ)</code></dd>
+      <dt>human</dt><dd>—</dd>
+      <dt>note</dt><dd>scored correct by both rules</dd>
+    </dl>
+  </figure>
+  <figure class="tile err">
+    <figcaption>
+      <b>item 215</b>
+      <span class="pill">has_error=1</span>
+      <span class="pill ok">v1 correct</span>
+      <span class="pill ok">v2 correct</span>
+      <span class="pill">multi_value</span>
+      <span class="pill">H=0.673</span>
+    </figcaption>
+    <div class="imgslot">image not available offline &mdash; export from Colab</div>
+    <dl>
+      <dt>truth span</dt><dd>\frac{3}{\sqrt{77}}, \quad \frac{-2}{\sqrt{77}}, \quad \frac{8}{\sqrt{77}}.</dd>
+      <dt>model span</dt><dd>\frac{3}{\sqrt{77}}, \frac{-2}{\sqrt{77}}, \frac{8}{\sqrt{77}}</dd>
+      <dt>truth label</dt><dd><code>sympy:3/(sqrt(77))</code></dd>
+      <dt>model label</dt><dd><code>sympy:3/(sqrt(77))</code></dd>
+      <dt>human</dt><dd>true_correct</dd>
+      <dt>note</dt><dd>at least one sample failed to parse</dd>
+    </dl>
+  </figure>
+  <figure class="tile err">
+    <figcaption>
+      <b>item 249</b>
+      <span class="pill">has_error=1</span>
+      <span class="pill no">v1 wrong</span>
+      <span class="pill no">v2 wrong</span>
+      <span class="pill">derivative_equation</span>
+      <span class="pill">H=0.950</span>
+    </figcaption>
+    <div class="imgslot">image not available offline &mdash; export from Colab</div>
+    <dl>
+      <dt>truth span</dt><dd>\frac{d}{dx}(a^x) = a^x \textcolor{red}{x \log a}</dd>
+      <dt>model span</dt><dd>\frac{d}{dx}(a^x) = a^x \log a</dd>
+      <dt>truth label</dt><dd><code>sympy:eq(derivative(a**x, x), a**x*(x*log(a, e)))</code></dd>
+      <dt>model label</dt><dd><code>sympy:eq(derivative(a**x, x), a**x*log(a, e))</code></dd>
+      <dt>human</dt><dd>extraction_issue</dd>
+      <dt>note</dt><dd>scored wrong; span and label shown for comparison</dd>
+    </dl>
+  </figure>
+  <figure class="tile clean">
+    <figcaption>
+      <b>item 253</b>
+      <span class="pill">has_error=0</span>
+      <span class="pill no">v1 wrong</span>
+      <span class="pill no">v2 wrong</span>
+      <span class="pill">derivative_equation</span>
+      <span class="pill">H=1.609</span>
+    </figcaption>
+    <div class="imgslot">image not available offline &mdash; export from Colab</div>
+    <dl>
+      <dt>truth span</dt><dd>\frac{dy}{dx} = \frac{dy/d\theta}{dx/d\theta} = \frac{3a \sin^2 \theta \cos \theta}{-3a \cos^2 \theta \sin \theta} = -\tan \theta = -\frac{\sqrt[3]{y}}{x}</dd>
+      <dt>model span</dt><dd>\dfrac{dy}{dx} = \dfrac{\dfrac{dy}{d\theta}}{\dfrac{dx}{d\theta}} = \dfrac{3a\sin^{5}\theta\cos\theta}{-3a\cos^{5}\theta\sin\theta} = -\tan\theta = -\dfrac{3\sqrt{y}}{x}</dd>
+      <dt>truth label</dt><dd><code>text:\frac{dy}{dx} = \frac{dy/d\theta}{dx/d\theta} = \frac{3a \sin^2 \theta \cos \theta}{-3a \cos^2 \theta \sin \theta} = -\tan \theta = -\frac{\sqrt[3]{y}}{x}</code></dd>
+      <dt>model label</dt><dd><code>text:\dfrac{dy}{dx} = \dfrac{\dfrac{dy}{d\theta}}{\dfrac{dx}{d\theta}} = \dfrac{3a\sin^{5}\theta\cos\theta}{-3a\cos^{5}\theta\sin\theta} = -\tan\theta = -\dfrac{3\sqrt{y}}{x}</code></dd>
+      <dt>human</dt><dd>extraction_issue</dd>
+      <dt>note</dt><dd>all five samples differ; entropy at its ceiling</dd>
+    </dl>
+  </figure>
+  <figure class="tile clean">
+    <figcaption>
+      <b>item 276</b>
+      <span class="pill">has_error=0</span>
+      <span class="pill no">v1 wrong</span>
+      <span class="pill no">v2 wrong</span>
+      <span class="pill">numeric</span>
+      <span class="pill">H=1.055</span>
+    </figcaption>
+    <div class="imgslot">image not available offline &mdash; export from Colab</div>
+    <dl>
+      <dt>truth span</dt><dd>243</dd>
+      <dt>model span</dt><dd>Therefore, 243 is not a perfect cube</dd>
+      <dt>truth label</dt><dd><code>sympy:243</code></dd>
+      <dt>model label</dt><dd><code>text:therefore, 243 is not a perfect cube</code></dd>
+      <dt>human</dt><dd>true_correct</dd>
+      <dt>note</dt><dd>tiny truth span; a coincidental match or miss is cheap here</dd>
+    </dl>
+  </figure>
+  <figure class="tile err">
+    <figcaption>
+      <b>item 286</b>
+      <span class="pill">has_error=1</span>
+      <span class="pill ok">v1 correct</span>
+      <span class="pill ok">v2 correct</span>
+      <span class="pill">mcq_option</span>
+      <span class="pill">H=0.950</span>
+    </figcaption>
+    <div class="imgslot">image not available offline &mdash; export from Colab</div>
+    <dl>
+      <dt>truth span</dt><dd>option c</dd>
+      <dt>model span</dt><dd>option c</dd>
+      <dt>truth label</dt><dd><code>text:option c</code></dd>
+      <dt>model label</dt><dd><code>text:option c</code></dd>
+      <dt>human</dt><dd>true_correct</dd>
+      <dt>note</dt><dd>scored correct by both rules</dd>
+    </dl>
+  </figure>
+  <figure class="tile clean">
+    <figcaption>
+      <b>item 290</b>
+      <span class="pill">has_error=0</span>
+      <span class="pill no">v1 wrong</span>
+      <span class="pill no">v2 wrong</span>
+      <span class="pill">multi_value</span>
+      <span class="pill">H=0.950</span>
+    </figcaption>
+    <div class="imgslot">image not available offline &mdash; export from Colab</div>
+    <dl>
+      <dt>truth span</dt><dd>\left( 0, -\frac{13}{3} \right).</dd>
+      <dt>model span</dt><dd>\left(0, -\frac{13}{3}\right).</dd>
+      <dt>truth label</dt><dd><code>text:( 0, -\frac{13}{3} )</code></dd>
+      <dt>model label</dt><dd><code>text:(0, -\frac{13}{3})</code></dd>
+      <dt>human</dt><dd>—</dd>
+      <dt>note</dt><dd>at least one sample failed to parse</dd>
+    </dl>
+  </figure>
+  <figure class="tile clean">
+    <figcaption>
+      <b>item 296</b>
+      <span class="pill">has_error=0</span>
+      <span class="pill no">v1 wrong</span>
+      <span class="pill no">v2 wrong</span>
+      <span class="pill">text_conclusion</span>
+      <span class="pill">H=1.332</span>
+    </figcaption>
+    <div class="imgslot">image not available offline &mdash; export from Colab</div>
+    <dl>
+      <dt>truth span</dt><dd>\int_0^{\frac{\pi}{2}} \log \sin x \, dx = -\frac{\pi}{2} \log 2.</dd>
+      <dt>model span</dt><dd>\int_{0}^{\pi} \log \sin t \, dt = -\pi \log 2</dd>
+      <dt>truth label</dt><dd><code>sympy:eq(integral(log(sin(x), e), (x, 0, pi/2)), -pi/2*log(2, e))</code></dd>
+      <dt>model label</dt><dd><code>sympy:eq(integral(log(sin(t), e), (t, 0, pi)), -pi*log(2, e))</code></dd>
+      <dt>human</dt><dd>extraction_issue</dd>
+      <dt>note</dt><dd>prose conclusion; strict matching cannot score a sentence</dd>
+    </dl>
+  </figure>
+</div>
