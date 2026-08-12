@@ -1,50 +1,60 @@
 % =====================================================================
-%  WACV 2027 (Round 2) submission -- Evaluations & Datasets track
+%  WACV 2027 (Round 2) submission -- Datasets track
 %
-%  IMPORTANT: this file is a CONTENT skeleton, not a submission-ready
-%  document. WACV rejects without review any paper that does not use the
-%  official template. Download the WACV 2027 Author Kit, then move this
-%  content into it -- do not try to reproduce the style file by hand.
-%      https://wacv.thecvf.com/Conferences/2027/AuthorGuides
+%  Built on the OFFICIAL WACV 2027 Author Kit (wacv.sty, preamble.tex and
+%  ieeenat_fullname.bst are the kit's own files, copied verbatim -- do not
+%  hand-edit them). Kit fetched 2026-08-12 from
+%      https://wacv.thecvf.com/static/wacv-2027-author-kit-template.zip
 %
 %  Hard rules from the author guides:
 %    * 8 pages maximum EXCLUDING references. Over-length = desk reject.
-%    * Double-blind. No author names, no grant IDs, no identifying repo
-%      links anywhere -- including in the supplementary and in any code.
-%    * Reviewers are encouraged to run submitted code.
+%    * Papers not using the template, or not anonymised, are rejected
+%      without review.
+%    * Double-blind: the [review] option below renders the author block as
+%      "Anonymous WACV submission", so the \author{} content is not shown.
+%      Set \wacvPaperID once CMT assigns one.
 %
-%  Dates (WACV 2027, Round 2 -- note: 2027, not 2026):
-%    enrollment 21 Aug 2026 | paper 28 Aug 2026 | supplementary 30 Aug 2026
+%  Dates (WACV 2027, Round 2): enrol 21 Aug 2026 | paper 28 Aug 2026
 %
-%  EVERY numeric claim below is taken from reference/*.json, which are
-%  recomputed from raw model output and asserted by pilot/tests/. Do not
-%  retype a number from memory; run paper/check_numbers.py after editing.
+%  EVERY numeric claim is taken from reference/*.json, which are recomputed
+%  from raw model output and asserted by pilot/tests/. Do not retype a
+%  number from memory; run paper/check_numbers.py after editing.
 % =====================================================================
 
 \documentclass[10pt,twocolumn,letterpaper]{article}
-% >>> REPLACE the two lines below with the official WACV 2027 style <<<
-\usepackage[margin=0.75in]{geometry}
-\usepackage{times}
 
-\usepackage{graphicx}
-\usepackage{booktabs}
-\usepackage{amsmath}
-\usepackage{amssymb}
-\usepackage{xcolor}
-\usepackage[colorlinks,allcolors=blue]{hyperref}
+%%%%%%%%% PAPER TYPE
+\usepackage[review,datasets]{wacv}   % REVIEW version, Datasets track
+% \usepackage{wacv}                  % camera-ready
 
-\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+\input{preamble}
+
+\definecolor{wacvblue}{rgb}{0.21,0.49,0.74}
+\usepackage[pagebackref,breaklinks,colorlinks,allcolors=wacvblue]{hyperref}
+
+%%%%%%%%% PAPER ID -- update once CMT assigns one
+\def\wacvPaperID{*****}
+\def\confName{WACV}
+\def\confYear{2027}
+
 \newcommand{\ci}[2]{{\small$[#1,\,#2]$}}
 
-\title{When Correctness Is the Prediction: An Evaluation Trap in\\
+\title{When Correctness Is the Prediction: An Evaluation Trap in
 Sampling-Based Uncertainty for Handwritten Mathematics}
-\author{}                     % double-blind: leave empty
-\date{}
+
+% Double-blind: [review] replaces this block with an anonymous byline.
+\author{First Author\\
+Institution1\\
+{\tt\small firstauthor@i1.org}
+\and
+Second Author\\
+Institution2\\
+{\tt\small secondauthor@i2.org}
+}
 
 \begin{document}
 \maketitle
 
-% =====================================================================
 \begin{abstract}
 Sampling a vision--language model repeatedly and measuring how much it
 disagrees with itself is a cheap, label-free uncertainty signal. We
@@ -728,16 +738,10 @@ problem rather than comparing to the reference they were handed. Where a
 correctness label is itself estimated, it deserves the same scrutiny as
 the quantity being estimated against it.
 
-% =====================================================================
-{\small
-% The official WACV/CVPR kit provides ieee_fullname.bst. It is not part of a
-% stock TeX Live install, so this falls back to a bundled IEEE-ish style to
-% keep the draft compilable outside the kit. Inside the kit the first branch
-% is taken automatically -- nothing to remember to switch back.
-\IfFileExists{ieee_fullname.bst}
-  {\bibliographystyle{ieee_fullname}}
-  {\bibliographystyle{ieeetr}}
-\bibliography{refs}
+{
+    \small
+    \bibliographystyle{ieeenat_fullname}
+    \bibliography{refs}
 }
 
 \end{document}

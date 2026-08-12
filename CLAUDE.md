@@ -437,6 +437,17 @@ pass detects what it was built to detect.
      harder."*
   **Do not present corrected accuracy as a clean improvement, and do not
   claim the corrected AUROC.**
+- **THE PAPER DELIBERATELY OMITS THE ~51% POINT ESTIMATE, AND THIS IS NOT AN
+  OVERSIGHT TO "FIX".** `paper/main.tex` reports corrected accuracy ONLY as
+  *"an audit-sensitive range, roughly 44–61% under conservative false-pass
+  assumptions."* Sentence 1 above keeps the point estimate because this file
+  is the internal record; the paper drops it because the figure moves with a
+  coding judgement — the first 40-item pass implies ~51%, the extra 60 implies
+  ~68%, and the two disagree at **p=0.00007**. The range is the finding; any
+  point inside it is not. **Do not reintroduce a single corrected-accuracy
+  number into the paper**, and note that `paper/check_numbers.py` will not
+  catch it, because the guard is a verification step in the writing plan, not
+  an assertion in code.
 ### 2026-08-12: THE EXTENSION BACKFIRED — the two coder passes disagree at p=0.00007
 
 `reference/audit/spotcheck_extra60_qwen_strict_v1_correct_20260812.csv`

@@ -14,3 +14,10 @@ paper/*.aux
 paper/*.log
 paper/*.out
 paper/*.blg
+
+# LaTeX build artifacts (paper/main.pdf and main.bbl are tracked deliberately)
+paper/*.aux
+paper/*.log
+paper/*.blg
+paper/*.out
+paper/*.brf
