@@ -665,36 +665,62 @@ def write_summary_md(path: str, profile: pd.DataFrame, red: dict,
         mcq = profile.loc[[i for i in yes if i in profile.index]]
         fr = profile.drop(index=[i for i in yes if i in profile.index])
         heur = profile[profile["question_type_if_available"] == "mcq"]
-        L.append("### 2.8 MCQ after the human audit (supersedes the heuristic row above)\n")
-        L.append("The MCQ detector is a heuristic and was audited on both "
-                 "sides: all 58 flagged items, plus 19 it did NOT flag whose "
-                 "questions carry a choice list. A one-sided review could only "
-                 "have shrunk the set.\n")
+        n_flag = int((mcq_review["mcq_group"] == "flagged_mcq_like").sum())
+        n_miss = int((mcq_review["mcq_group"] == "candidate_missed").sum())
+        fp = sorted(mcq_review.loc[(mcq_review["mcq_group"] == "flagged_mcq_like")
+                                   & (mcq_review["confirmed_mcq"] == "no"),
+                                   "item_id"])
+        rec = sorted(mcq_review.loc[(mcq_review["mcq_group"] == "candidate_missed")
+                                    & (mcq_review["confirmed_mcq"] == "yes"),
+                                    "item_id"])
+        L.append("### 2.8 Answer format: MCQ vs free response (DIAGNOSTIC)\n")
+        L.append("> **This is diagnostic evidence that answer format strongly "
+                 "affects apparent accuracy. It is not a headline result and "
+                 "must not be presented as one.** It says something about the "
+                 "answer space and the scorer, not about the model reading "
+                 "multiple-choice pages better.\n")
         L.append("| set | n | `strict_v1` acc | mean H |")
         L.append("|---|---|---|---|")
-        L.append(f"| heuristic MCQ-like | {len(heur)} | "
+        L.append(f"| **confirmed MCQ** | **{len(mcq)}** | "
+                 f"**{mcq['strict_v1_correct'].mean():.1%}** "
+                 f"({int(mcq['strict_v1_correct'].sum())}/{len(mcq)}) | "
+                 f"{mcq['entropy'].mean():.3f} |")
+        L.append(f"| **free response** | **{len(fr)}** | "
+                 f"**{fr['strict_v1_correct'].mean():.1%}** "
+                 f"({int(fr['strict_v1_correct'].sum())}/{len(fr)}) | "
+                 f"{fr['entropy'].mean():.3f} |")
+        L.append(f"| heuristic MCQ-like (pre-audit) | {len(heur)} | "
                  f"{heur['strict_v1_correct'].mean():.1%} | "
                  f"{heur['entropy'].mean():.3f} |")
-        L.append(f"| **confirmed MCQ** | **{len(mcq)}** | "
-                 f"**{mcq['strict_v1_correct'].mean():.1%}** | "
-                 f"{mcq['entropy'].mean():.3f} |")
-        L.append(f"| free response | {len(fr)} | "
-                 f"{fr['strict_v1_correct'].mean():.1%} | "
-                 f"{fr['entropy'].mean():.3f} |")
-        L.append("\n**The detector was wrong in both directions and the two "
-                 "errors nearly cancelled.** It wrongly included 4 items "
-                 "(`P(A)`/`P(B)` and `f(a)=f(b)` notation read as options) and "
-                 "missed 1. The pre-audit sensitivity range was 78.9-88.5%; "
-                 "the audited value sits 0.8 points from the uncorrected "
-                 "figure. **A detector demonstrably wrong in both directions "
-                 "does not necessarily bias the aggregate it feeds.**\n")
-        L.append("Two audited items are MCQ but not option-pick, and both are "
-                 "SCORING problems rather than model failures: items 170 and "
-                 "237 are **matching** questions whose answer is a four-way "
-                 "mapping, yet the truth span is a bare `(b)` -- one quarter "
-                 "of the answer. Item 8's page shows **no options at all** "
-                 "while its answer is `option b`, so the letter is not "
-                 "recoverable from the image by any reader.\n")
+        L.append("\n**The detector was checked by hand, on both sides.** "
+                 f"Of **{n_flag} flagged** items, **{n_flag - len(fp)} are true "
+                 f"MCQ and {len(fp)} are false positives** "
+                 f"({', '.join(str(i) for i in fp)} -- `P(A)`/`P(B)` and "
+                 "`f(a)=f(b)` notation matched by an options regex). Of "
+                 f"**{n_miss} missed candidates**, **{len(rec)} was recovered** "
+                 f"(item {rec[0] if rec else '-'}). A one-sided review of only "
+                 "the flagged items could have shrunk the set and never grown "
+                 "it.\n")
+        L.append("**Three caveats travel with this table:**\n")
+        L.append("1. **Items 170 and 237 are MCQ-like but not ordinary "
+                 "single-option MCQ.** They are *matching* questions whose "
+                 "answer is a four-way mapping, while the truth span is a bare "
+                 "`(b)` -- one quarter of the answer. The scorer marks them "
+                 "wrong for a reason that is not a misread.")
+        L.append("2. **Item 8's options are not visible in the crop.** Its "
+                 "answer is `option b` but the page shows no option list, so "
+                 "the letter is **visually unrecoverable by any reader**, "
+                 "model or human. It is scored wrong at maximum entropy.")
+        L.append("3. **The gap is about answer format, not reading skill.** "
+                 "A multiple-choice answer space has few reachable values, so "
+                 "five samples agree easily and a string match is cheap. Read "
+                 "the gap as a property of the task format.\n")
+        L.append("For the record, the pre-audit sensitivity range was "
+                 "78.9-88.5% and the audited value sits 0.8 points from the "
+                 "uncorrected 82.8%: the detector was wrong in both "
+                 "directions and the two errors very nearly cancelled. **A "
+                 "detector demonstrably wrong in both directions does not "
+                 "necessarily bias the aggregate it feeds.**\n")
     L.append("- **MCQ vs free response is the largest single split.** "
              "Multiple-choice items score far higher and sit at much lower "
              "entropy: there are only a few reachable answers, so five samples "

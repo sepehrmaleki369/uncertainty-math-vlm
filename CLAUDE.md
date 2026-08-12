@@ -183,33 +183,51 @@ crops need Colab).
   against the **52** recorded in the 2026-08-11 entry from a different
   detector. See the MCQ entry below — it is both over- AND under-inclusive.
 
-### 2026-08-12: MCQ AUDIT COMPLETE — 55 confirmed, and the heuristic was nearly unbiased
+### 2026-08-12: ANSWER FORMAT — a DIAGNOSTIC, agreed with the user 2026-08-12
 
-All 77 review items human-coded (`reference/audit/mcq_like_review_20260812.csv`,
-`confirmed_mcq` / `mcq_type` / `coding_depth` / `reviewer_note`).
+**KEEP THIS AS A DIAGNOSTIC ANSWER-FORMAT ANALYSIS. It is NOT a headline
+result and must not be presented as one.** It is evidence that *answer format
+strongly affects apparent accuracy* — a property of the answer space and the
+scorer, not of the model reading multiple-choice pages better.
+**`paper/main.tex` is NOT to carry this unless the user explicitly asks.**
 
-| | n | ruled MCQ | not MCQ |
+**THE TWO NUMBERS TO USE, copy them rather than re-deriving:**
+
+| set | n | `strict_v1` accuracy | mean H |
 |---|---|---|---|
-| `flagged_mcq_like` | 58 | 54 | **4** |
-| `candidate_missed` | 19 | **1** | 18 |
-| **total** | 77 | **55** | 22 |
+| **confirmed MCQ** | **55** | **83.6%** (46/55) | **0.423** |
+| **free response** | **245** | **38.8%** (95/245) | **1.085** |
 
-- **THE HEADLINE IS NOW QUOTABLE, and it barely moved.**
+**The heuristic detector was manually checked, on both sides:** of **58
+flagged**, **54 are true MCQ and 4 are false positives**; of **19 missed
+candidates**, **1 was recovered**. All 77 coded in
+`reference/audit/mcq_like_review_20260812.csv` (`confirmed_mcq` / `mcq_type` /
+`coding_depth` / `reviewer_note`).
 
-  | | n | `strict_v1` acc | mean H |
-  |---|---|---|---|
-  | heuristic MCQ-like | 58 | 82.8% | 0.452 |
-  | **CONFIRMED MCQ** | **55** | **83.6%** (46/55) | 0.423 |
-  | free response | 245 | **38.8%** (95/245) | 1.085 |
+**THE THREE CAVEATS THAT TRAVEL WITH THE NUMBERS — do not drop them:**
 
-  **The pre-audit sensitivity range was 78.9–88.5% and the truth landed at
+1. **Items 170 and 237 are MCQ-like but NOT ordinary single-option MCQ.** They
+   are *matching* questions whose answer is a four-way mapping
+   `(i)→(d), (ii)→(c), (iii)→(a), (iv)→(b)`, while the truth span is a bare
+   `(b)` — **one quarter of the answer**. Scored wrong for a reason that is
+   not a misread.
+2. **Item 8's options are not visible in the crop.** Its answer is `option b`
+   while the page shows no option list, so the letter is **visually
+   unrecoverable by any reader**, model or human. Scored wrong at max entropy.
+3. **Not a headline.** The gap is about answer format; an MCQ answer space has
+   few reachable values, so five samples agree easily and a string match is
+   cheap.
+
+- **The pre-audit sensitivity range was 78.9–88.5% and the truth landed at
   83.6%, 0.8 points off the uncorrected figure.** The detector was wrong in
   both directions and **the two errors very nearly cancelled**: it wrongly
   included 4 items scoring 50%, and missed 1 item that was wrong.
   **Lesson worth keeping: a detector being demonstrably wrong in both
   directions does not mean the aggregate it feeds is wrong.** The range was
   the honest thing to report before the audit; it was also much wider than the
-  error turned out to be.
+  error turned out to be. `mcq_accuracy_sensitivity` still returns
+  `quotable=False` because it prices the HEURISTIC's uncertainty; its
+  `superseded_by` field points at the coded manifest.
 - **The 4 false positives are exactly the ones the weak-trigger flag caught,
   and its precision was 4/6.** Confirmed not-MCQ: **82, 117, 195, 234** — all
   `P(A)`/`P(B)`/`f(a)=f(b)` notation. **170 and 237 ARE MCQ**, both *matching*
@@ -226,14 +244,16 @@ All 77 review items human-coded (`reference/audit/mcq_like_review_20260812.csv`,
   while the page shows no option list, so *neither the model nor a human could
   recover the letter from the image*. It is the only `option_word_only` item
   and it is scored WRONG at max entropy — an unwinnable item, not a misread.
-- **ID RECONCILIATION, flagged so it is reversible: the coder wrote "item 41",
-  but item 41 of this run is an ellipse-equation item** (`x²/75 + y²/100 = 1`,
-  no options, `strict_v1` correct) **that was never on any sheet.** The
-  description matched item 8 on four independent points (the coder's own
-  phrase "option-word-only" is that item's unique presort, truth span
-  literally `option b`, no visible choice list). Recorded against **item 8**
-  with the reconciliation in `reviewer_note`. **The count is unaffected either
-  way** — item 8 was already `yes` from the sweep.
+- **ID RECONCILIATION — CONFIRMED by the user 2026-08-12.** The coder wrote
+  "item 41", but **item 41 of this run is an ellipse-equation item**
+  (`x²/75 + y²/100 = 1`, no options, `strict_v1` correct) **that was never on
+  any sheet.** The description matched item 8 on four independent points (the
+  coder's own phrase "option-word-only" is that item's unique presort, truth
+  span literally `option b`, no visible choice list). Recorded against
+  **item 8**; the user confirmed it **"unless another sheet proves
+  otherwise"**, and that standing condition is written into the row's
+  `reviewer_note` so a later sheet can reopen it. **The count is unaffected
+  either way** — item 8 was already `yes` from the sweep.
 - **CODING DEPTH IS RECORDED, because this project has already measured that
   it matters.** 25 items were read one by one; **52 were ruled by a block
   sweep** (*"the rest were mcq exactly"*) — the same sweep pattern whose

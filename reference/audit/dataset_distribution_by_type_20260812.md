@@ -104,19 +104,25 @@ Every AUROC below scores entropy against **`strict_v1` correctness**, so the col
 
 **All four comparisons below are descriptive splits of one run. None is a controlled contrast**, and the groups differ in more than the dimension named, so a gap is a place to look rather than an effect that has been isolated.
 
-### 2.8 MCQ after the human audit (supersedes the heuristic row above)
+### 2.8 Answer format: MCQ vs free response (DIAGNOSTIC)
 
-The MCQ detector is a heuristic and was audited on both sides: all 58 flagged items, plus 19 it did NOT flag whose questions carry a choice list. A one-sided review could only have shrunk the set.
+> **This is diagnostic evidence that answer format strongly affects apparent accuracy. It is not a headline result and must not be presented as one.** It says something about the answer space and the scorer, not about the model reading multiple-choice pages better.
 
 | set | n | `strict_v1` acc | mean H |
 |---|---|---|---|
-| heuristic MCQ-like | 58 | 82.8% | 0.452 |
-| **confirmed MCQ** | **55** | **83.6%** | 0.423 |
-| free response | 245 | 38.8% | 1.085 |
+| **confirmed MCQ** | **55** | **83.6%** (46/55) | 0.423 |
+| **free response** | **245** | **38.8%** (95/245) | 1.085 |
+| heuristic MCQ-like (pre-audit) | 58 | 82.8% | 0.452 |
 
-**The detector was wrong in both directions and the two errors nearly cancelled.** It wrongly included 4 items (`P(A)`/`P(B)` and `f(a)=f(b)` notation read as options) and missed 1. The pre-audit sensitivity range was 78.9-88.5%; the audited value sits 0.8 points from the uncorrected figure. **A detector demonstrably wrong in both directions does not necessarily bias the aggregate it feeds.**
+**The detector was checked by hand, on both sides.** Of **58 flagged** items, **54 are true MCQ and 4 are false positives** (82, 117, 195, 234 -- `P(A)`/`P(B)` and `f(a)=f(b)` notation matched by an options regex). Of **19 missed candidates**, **1 was recovered** (item 209). A one-sided review of only the flagged items could have shrunk the set and never grown it.
 
-Two audited items are MCQ but not option-pick, and both are SCORING problems rather than model failures: items 170 and 237 are **matching** questions whose answer is a four-way mapping, yet the truth span is a bare `(b)` -- one quarter of the answer. Item 8's page shows **no options at all** while its answer is `option b`, so the letter is not recoverable from the image by any reader.
+**Three caveats travel with this table:**
+
+1. **Items 170 and 237 are MCQ-like but not ordinary single-option MCQ.** They are *matching* questions whose answer is a four-way mapping, while the truth span is a bare `(b)` -- one quarter of the answer. The scorer marks them wrong for a reason that is not a misread.
+2. **Item 8's options are not visible in the crop.** Its answer is `option b` but the page shows no option list, so the letter is **visually unrecoverable by any reader**, model or human. It is scored wrong at maximum entropy.
+3. **The gap is about answer format, not reading skill.** A multiple-choice answer space has few reachable values, so five samples agree easily and a string match is cheap. Read the gap as a property of the task format.
+
+For the record, the pre-audit sensitivity range was 78.9-88.5% and the audited value sits 0.8 points from the uncorrected 82.8%: the detector was wrong in both directions and the two errors very nearly cancelled. **A detector demonstrably wrong in both directions does not necessarily bias the aggregate it feeds.**
 
 - **MCQ vs free response is the largest single split.** Multiple-choice items score far higher and sit at much lower entropy: there are only a few reachable answers, so five samples agree easily and a match is cheap. Read it as a property of the answer space, not as the model reading those pages better.
 - **`has_error` costs accuracy and leaves the AUROC alone.** The two strata's AUROCs are within noise of each other, which reproduces the locked finding that entropy works equally well on both. The accuracy gap is the known cost of the balanced design.
