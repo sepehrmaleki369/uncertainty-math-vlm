@@ -63,12 +63,23 @@ VERDICTS = ("correct", "incorrect", "unclear")
 #: snippet omits this and defaults to 20, truncating before the verdict.
 MAX_NEW_TOKENS = 512
 
-#: The two confirmed silent-correction cases. Item 55's page reads
-#: `1 + tan x tan y` and the model wrote `1 -`; item 273's reads `2/4` and
-#: Pixtral wrote `3/4` on all five samples. A fidelity judge must return
-#: `incorrect` on both -- neither pair is mathematically equivalent, so even
-#: a pure equivalence judge should reject them. If it does not, it is
-#: recalculating despite being told not to.
+#: Two probes a fidelity judge must return `incorrect` on. They test DIFFERENT
+#: things on the Qwen run, and conflating them was an error worth recording:
+#:
+#: * **item 55 IS a silent correction here.** The page reads
+#:   `1 + tan x tan y`, the majority sample reads `1 -`, so the answer handed
+#:   to the judge is the model's textbook-correct repair of the injected
+#:   error. Rejecting it tests fidelity directly.
+#: * **item 273 is NOT a silent correction on this run.** The `3/4` repair is
+#:   PIXTRAL's, unanimous across its five samples. On Qwen the majority label
+#:   is the bare `}` and the answer field is coin-tossing setup prose --
+#:   "We write H for 'head' and T for 'Tail'..." -- not an answer at all.
+#:   Rejecting it therefore tests whether the judge accepts a NON-ANSWER, a
+#:   weaker premise but a stricter bar: there is no mathematics to be lenient
+#:   about, so accepting it cannot be excused as equivalence.
+#:
+#: Both must come back `incorrect`. A `yes` on 55 means the judge recalculated;
+#: a `yes` on 273 means it accepted an unrelated passage as a match.
 GATE_ITEMS = (55, 273)
 
 #: The model's own template, verbatim from its card. Deviating from the

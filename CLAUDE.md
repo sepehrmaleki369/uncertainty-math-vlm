@@ -105,6 +105,74 @@ one) is still Drive-only, and nothing may be quoted from it anyway.
 
 ## Current findings
 
+### RUN 2026-08-12: LiveMath-Judge FAILS the fidelity gate — do not use it as the scorer
+
+`pilot/judge.py`, `pilot/24_livemath_judge.ipynb` (gated scoring path),
+`pilot/25_livemath_judge_diagnostic.ipynb` (exploratory), 32 tests.
+`jnanliu/LiveMath-Judge` — Qwen2.5-3B-Instruct fine-tune, Apache-2.0,
+arXiv 2412.13147, emits `\boxed{yes}`/`\boxed{no}`.
+
+**Motivation.** The audit found 14 of 16 confirmed false passes were
+`extract_final_answer` picking a wrong or partial span. A judge reading the
+whole answer against the whole ground truth skips the extractor entirely.
+
+**Result: GATED.** The 300-item run was never spent.
+
+| probe | verdict | required |
+|---|---|---|
+| item 55 | `incorrect` | ✅ |
+| item 273 | **`correct`** | ❌ |
+
+- **THE HEADLINE SENTENCE:** *on item 273 the judge accepted a
+  non-faithful / non-useful model output as matching the ground-truth answer
+  `2/4`.* **LiveMath-Judge failed the fidelity gate and must not be used as
+  the scorer.**
+- **DO NOT SAY "the model corrected 2/4 to 3/4" ABOUT THIS RUN.** That is a
+  PIXTRAL fact — Pixtral gave `3/4` unanimously. The gate runs on the **Qwen**
+  CSV, where item 273's majority label is the bare `}` and the answer field
+  handed to the judge is coin-tossing setup prose (*"We write H for 'head'
+  and T for 'Tail'…"*), not `3/4`. Only sample s1 said `3/4`. The same
+  Qwen/Pixtral conflation was caught once before on this item; it recurred
+  here.
+- **The two probes test DIFFERENT things on the Qwen run, and the gate
+  comment originally implied otherwise.** Item 55 *is* a silent correction on
+  Qwen (page `1 +`, majority sample `1 -`), so it tests fidelity directly and
+  the judge passed it. Item 273 is not — it tests whether the judge accepts a
+  **non-answer**, which is a weaker premise but a **stricter bar**: there is
+  no mathematics to be lenient about, so accepting an unrelated passage
+  cannot be excused as equivalence. Fixed in `GATE_ITEMS`' docstring.
+- **Reading the model card rather than assuming it found three things.** Its
+  criterion 3 (*"You do not need to recalculate"*) already helps; criterion 2
+  (*"equivalent … is also considered correct"*) is the danger, the same
+  acceptance that made Math-Verify unsafe here. And **it has no abstain
+  verdict** — its prompt maps *"difficult to judge"* onto `no` — so `unclear`
+  in our output can only ever mean OUR parse failed.
+- **TWO BUGS IN THE PUBLISHED USAGE SNIPPET, both silent.**
+  `apply_chat_template(return_tensors='pt')` returns a TENSOR that the snippet
+  then subscripts as `inputs['input_ids']` (needs `return_dict=True`); and
+  `generate()` is called with no `max_new_tokens`, defaulting to 20, which
+  truncates before the boxed verdict — every item would have parsed as a
+  failure looking like judge breakage rather than truncation.
+- **Two bugs caught by tests before any GPU time.** The verdict parser must
+  take the **last** boxed answer, since the prompt contains a literal
+  `\boxed{yes}` and a first-match parser would score nearly everything
+  correct. And the bare yes/no fallback matched `"no verdict at all"` as a
+  `no`, which made `run_gate` **pass on unparseable output**.
+- **NEXT CANDIDATE, user's recommendation: Omni-Judge** (~8B, trained from
+  GPT-4o judgments, reported stronger than LiveMath-Judge). **Test it on the
+  SAME gate, items 55 and 273, before anything else.** Also raised:
+  `Qwen2.5-Math-7B-Instruct` prompted as a fidelity comparator, and
+  DeepSeek-Math / DeepSeek-R1-Distill-Qwen-7B — the latter noted as *likely to
+  solve the maths*, which is precisely the hazard here.
+  **Verify any candidate's model card before writing the adapter** — doing so
+  for LiveMath-Judge found the two snippet bugs above.
+  **If Omni-Judge also accepts item 273, the honest conclusion is that open
+  math judges are unsafe for a perturbed-answer fidelity task**, which is a
+  Limitations finding rather than a failed experiment.
+- **A failed gate is a result.** It cost one Colab session and establishes
+  that this benchmark's scoring problem is not solved by swapping in an
+  off-the-shelf judge.
+
 ### 2026-08-12: CROSS-AUDIT DIAGNOSTICS — and why there is no pooled number
 
 `pilot/audit_diagnostics.py`, `pilot/tests/test_audit_diagnostics.py`
