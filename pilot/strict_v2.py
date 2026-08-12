@@ -301,3 +301,173 @@ def review_priority(scored: pd.DataFrame) -> pd.Series:
     out[medium] = "medium"
     out[high] = "high"
     return out
+
+
+#: Sort for the human audit sheet: the items most likely to be a false pass
+#: first, then a stable tiebreak on item id so two builds never differ.
+AUDIT_SORT = ("rules_disagree", "tiny_suspicious_non_mcq",
+              "sympy_partial_parse_risk", "multi_answer_collapse")
+
+_HTML_HEAD = """<meta charset="utf-8">
+<title>strict_v2 high-priority human audit</title>
+<style>
+:root{--bg:#fbfaf7;--fg:#22201d;--mut:#6b6560;--line:#e2ddd5;--card:#fff;
+      --warn:#8a5a00;--warnbg:#fdf3e0;--dis:#8a2f2f;--disbg:#fdeaea;--code:#f3f0ea}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#191817;--fg:#eae6e0;--mut:#a49d95;--line:#332f2b;--card:#211f1d;
+  --warn:#e0aa5a;--warnbg:#332813;--dis:#e08a8a;--disbg:#331a1a;--code:#2a2724}}
+:root[data-theme="dark"]{--bg:#191817;--fg:#eae6e0;--mut:#a49d95;--line:#332f2b;
+  --card:#211f1d;--warn:#e0aa5a;--warnbg:#332813;--dis:#e08a8a;--disbg:#331a1a;--code:#2a2724}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);margin:0;padding:24px;
+ font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+header{max-width:1000px;margin:0 auto 28px}
+h1{font-size:22px;margin:0 0 8px}
+.sub{color:var(--mut);font-size:14px;max-width:70ch}
+.card{max-width:1000px;margin:0 auto 20px;background:var(--card);
+ border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.card.dis{border-left:4px solid var(--dis)}
+.hd{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;margin-bottom:10px}
+.id{font-weight:650;font-size:17px}
+.meta{color:var(--mut);font-size:13px}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}
+.chip{font-size:11px;padding:2px 8px;border-radius:999px;
+ background:var(--warnbg);color:var(--warn);border:1px solid transparent}
+.chip.d{background:var(--disbg);color:var(--dis)}
+figure{margin:12px 0}
+img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:6px;
+ background:#fff;display:block}
+.noimg{padding:22px;border:1px dashed var(--line);border-radius:6px;
+ color:var(--mut);font-size:13px;text-align:center}
+table.kv{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px}
+table.kv td{padding:5px 8px;border-top:1px solid var(--line);vertical-align:top}
+table.kv td:first-child{color:var(--mut);white-space:nowrap;width:1%}
+code{background:var(--code);padding:1px 5px;border-radius:4px;
+ font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-word}
+.fields{display:grid;grid-template-columns:200px 130px 1fr;gap:8px;margin-top:12px}
+@media(max-width:720px){.fields{grid-template-columns:1fr}}
+select,input,textarea{font:inherit;font-size:13px;padding:6px 8px;
+ border:1px solid var(--line);border-radius:6px;background:var(--bg);
+ color:var(--fg);width:100%}
+textarea{min-height:38px;resize:vertical}
+.bar{position:sticky;top:0;z-index:9;background:var(--bg);padding:10px 0 14px;
+ border-bottom:1px solid var(--line);margin-bottom:20px}
+.bar .in{max-width:1000px;margin:0 auto;display:flex;gap:10px;align-items:center;
+ flex-wrap:wrap}
+button{font:inherit;font-size:13px;padding:7px 14px;border-radius:6px;
+ border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}
+button:hover{border-color:var(--mut)}
+.count{color:var(--mut);font-size:13px}
+</style>
+"""
+
+
+def _chip(name: str, dis: bool = False) -> str:
+    return f'<span class="chip{" d" if dis else ""}">{name}</span>'
+
+
+def high_priority_audit_sheet(queue: pd.DataFrame, out_csv: str, out_html: str,
+                              image_dir: str = "images") -> pd.DataFrame:
+    """Build the CSV + HTML coding sheet for the high-priority tier.
+
+    `image_path` is RELATIVE to the HTML, because the FERMAT images are gated
+    and only exist in Colab -- notebook 23 exports them next to these files.
+    The HTML degrades to a labelled placeholder rather than a broken image
+    when they are not there yet, so the sheet is readable either way.
+
+    The human fields ship empty and are editable in the browser; the page
+    keeps them in localStorage and can emit the finished CSV, so a pass can be
+    done in one sitting without hand-editing a spreadsheet. **Nothing here
+    scores anything** -- human reading overrides every automatic label.
+    """
+    high = queue[queue["priority"] == "high"].copy()
+    high["item_id"] = high["item"].astype(int)
+    for c in AUDIT_SORT:
+        high[c] = high[c].astype(bool)
+    high = high.sort_values(list(AUDIT_SORT) + ["item_id"],
+                            ascending=[False] * len(AUDIT_SORT) + [True])
+    high["image_path"] = high["item_id"].map(
+        lambda i: f"{image_dir}/item{i:03d}.png")
+
+    flag_cols = [c for c in ALL_FLAGS if c in high.columns and c != "sympy_match"]
+    cols = (["item_id", "image_path", "priority",
+             "span_m_disp", "span_t_disp", "label_m", "label_t",
+             "strict_v1_correct", "strict_v2_correct", "rules_disagree"]
+            + flag_cols + ["final_label", "confidence", "note"])
+    out = high.rename(columns={
+        "model_span": "span_m_disp", "truth_span": "span_t_disp",
+        "model_label": "label_m", "truth_label": "label_t",
+        "correct_strict_v1": "strict_v1_correct",
+        "correct_strict_v2_display_primary": "strict_v2_correct"})
+    out = out.reindex(columns=cols)
+    out.to_csv(out_csv, index=False)
+
+    import html as _h
+    parts = [_HTML_HEAD,
+             '<div class="bar"><div class="in">',
+             '<button onclick="exportCsv()">Export CSV</button>',
+             '<button onclick="clearAll()">Clear</button>',
+             f'<span class="count" id="cnt">0 / {len(out)} coded</span>',
+             '</div></div>',
+             '<header><h1>strict_v2 high-priority human audit</h1>',
+             f'<p class="sub">{len(out)} items, the tier measured to enrich for '
+             'false passes 2.1&times; over chance. <strong>Your reading of the '
+             'image overrides every automatic label below.</strong> Where the '
+             'display span is richer than the SymPy label, believe the span. '
+             'Labels: <code>true_correct</code>, <code>extraction_issue</code>, '
+             '<code>needs_visual</code>.</p></header>']
+
+    for _, r in out.iterrows():
+        i = int(r["item_id"])
+        chips = ([_chip("rules disagree", True)] if r["rules_disagree"] else [])
+        chips += [_chip(c.replace("_", " ")) for c in flag_cols if bool(r[c])]
+        parts.append(
+            f'<div class="card{" dis" if r["rules_disagree"] else ""}">'
+            f'<div class="hd"><span class="id">item {i}</span>'
+            f'<span class="meta">strict_v1={"correct" if r["strict_v1_correct"] else "wrong"}'
+            f' &middot; strict_v2={"correct" if r["strict_v2_correct"] else "wrong"}</span></div>'
+            f'<div class="chips">{"".join(chips)}</div>'
+            f'<figure><img src="{_h.escape(str(r["image_path"]))}" alt="item {i}" '
+            f'loading="lazy" onerror="this.outerHTML='
+            f'\'&lt;div class=&quot;noimg&quot;&gt;image not exported yet - run notebook 23&lt;/div&gt;\'">'
+            f'</figure>'
+            '<table class="kv">'
+            f'<tr><td>span M</td><td><code>{_h.escape(str(r["span_m_disp"]))}</code></td></tr>'
+            f'<tr><td>span T</td><td><code>{_h.escape(str(r["span_t_disp"]))}</code></td></tr>'
+            f'<tr><td>label M</td><td><code>{_h.escape(str(r["label_m"]))}</code></td></tr>'
+            f'<tr><td>label T</td><td><code>{_h.escape(str(r["label_t"]))}</code></td></tr>'
+            '</table>'
+            f'<div class="fields">'
+            f'<select data-i="{i}" data-f="final_label"><option value=""></option>'
+            '<option>true_correct</option><option>extraction_issue</option>'
+            '<option>needs_visual</option></select>'
+            f'<select data-i="{i}" data-f="confidence"><option value=""></option>'
+            '<option>high</option><option>medium</option><option>low</option></select>'
+            f'<textarea data-i="{i}" data-f="note" placeholder="note"></textarea>'
+            '</div></div>')
+
+    parts.append("""<script>
+const KEY='strict_v2_audit_20260812';
+const S=JSON.parse(localStorage.getItem(KEY)||'{}');
+const els=[...document.querySelectorAll('[data-i]')];
+function count(){const n=new Set(els.filter(e=>e.dataset.f==='final_label'&&e.value)
+  .map(e=>e.dataset.i)).size;document.getElementById('cnt').textContent=
+  n+' / '+document.querySelectorAll('.card').length+' coded';}
+els.forEach(e=>{const k=e.dataset.i+'|'+e.dataset.f;if(S[k])e.value=S[k];
+  e.addEventListener('input',()=>{S[k]=e.value;
+    localStorage.setItem(KEY,JSON.stringify(S));count();});});
+count();
+function q(s){s=(s==null?'':String(s));return /[",\\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+function exportCsv(){const ids=[...new Set(els.map(e=>e.dataset.i))];
+  let out='item_id,final_label,confidence,note\\n';
+  ids.forEach(i=>{const g=f=>(S[i+'|'+f]||'');
+    out+=[i,q(g('final_label')),q(g('confidence')),q(g('note'))].join(',')+'\\n';});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([out],{type:'text/csv'}));
+  a.download='strict_v2_high_priority_coded.csv';a.click();}
+function clearAll(){if(!confirm('Clear all entered labels?'))return;
+  localStorage.removeItem(KEY);location.reload();}
+</script>""")
+    with open(out_html, "w") as fh:
+        fh.write("\n".join(parts))
+    return out

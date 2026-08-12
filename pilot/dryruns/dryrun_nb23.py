@@ -176,4 +176,27 @@ print(f"post-conditions OK: {sum(len(v) for v in written.values())} pages across
       f"2 folders, {sum(len(s[0]) for s in sheets.values())} items")
 print("sample caption:\n" + ns["caption_for"](sheets["extra60"][0].iloc[0]))
 
+# The high-priority sheet: CSV, HTML and one image per referenced row, all in
+# ONE folder because the HTML uses relative image paths.
+hp = ns["hp"]
+hp_dir, hp_img = ns["HP_DIR"], ns["HP_IMG"]
+assert len(hp) == 108, len(hp)
+assert _os.path.exists(f"{hp_dir}/strict_v2_high_priority_human_audit_20260812.csv")
+html_path = f"{hp_dir}/strict_v2_high_priority_human_audit_20260812.html"
+assert _os.path.exists(html_path)
+pngs = [f for f in _os.listdir(hp_img) if f.endswith(".png")]
+assert len(pngs) == len(hp), f"{len(pngs)} images for {len(hp)} rows"
+for i in hp["item_id"].astype(int):
+    assert _os.path.exists(f"{hp_img}/item{i:03d}.png"), i
+html = open(html_path).read()
+for i in hp["item_id"].astype(int):
+    assert f"images/item{i:03d}.png" in html, f"item {i} image not referenced"
+    assert f"item {i}<" in html, f"item {i} heading missing"
+assert html.count('data-f="final_label"') == len(hp)
+assert html.count('data-f="confidence"') == len(hp)
+assert html.count('data-f="note"') == len(hp)
+assert "value=\"true_correct\"" in html or ">true_correct<" in html
+print(f"high-priority sheet OK: {len(hp)} rows, {len(pngs)} images, "
+      f"{len(html)//1024} KB html, all image paths resolve")
+
 shutil.rmtree(ROOT / ".dryrun_scratch", ignore_errors=True)

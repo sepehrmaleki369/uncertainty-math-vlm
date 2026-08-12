@@ -178,3 +178,73 @@ def test_set_and_system_flags_are_not_over_triggering(scored):
     assert S.answer_flags(r"\{1, 2, 3\}", "sympy:1", False)["set_answer"] is True
     assert S.answer_flags("a = b = c", "sympy:eq(a,b)", False)["system_answer"] is False
     assert S.answer_flags("x = 3, y = 1", "sympy:eq(x,3)", False)["system_answer"] is True
+
+
+AUDIT_CSV = (ROOT / "reference" / "audit"
+             / "strict_v2_high_priority_human_audit_20260812.csv")
+AUDIT_HTML = AUDIT_CSV.with_suffix(".html")
+
+
+@pytest.fixture(scope="module")
+def audit_sheet():
+    if not AUDIT_CSV.exists():
+        pytest.skip("audit sheet not built")
+    return pd.read_csv(AUDIT_CSV)
+
+
+def test_the_audit_sheet_has_the_requested_shape(audit_sheet):
+    required = ["item_id", "image_path", "priority", "span_m_disp",
+                "span_t_disp", "label_m", "label_t", "strict_v1_correct",
+                "strict_v2_correct", "rules_disagree", "final_label",
+                "confidence", "note"]
+    for c in required:
+        assert c in audit_sheet.columns, c
+    for f in S.RISK_FLAGS + ("sympy_partial_parse_risk",
+                             "sympy_malformed_derivative",
+                             "multi_answer_collapse"):
+        assert f in audit_sheet.columns, f
+    assert len(audit_sheet) == 108
+    assert (audit_sheet["priority"] == "high").all()
+    assert audit_sheet["item_id"].is_unique
+
+
+def test_the_human_columns_ship_empty(audit_sheet):
+    """Same discipline as every coding sheet here: the automatic proposal and
+    the human verdict stay in separate columns so the scorer's own error rate
+    stays measurable."""
+    for c in ("final_label", "confidence", "note"):
+        assert audit_sheet[c].fillna("").eq("").all(), c
+
+
+def test_the_sort_is_exactly_as_specified(audit_sheet):
+    """rules_disagree, then tiny_suspicious_non_mcq, then
+    sympy_partial_parse_risk, then multi_answer_collapse, all descending,
+    then item_id ascending."""
+    key = audit_sheet[list(S.AUDIT_SORT)].astype(int).apply(
+        lambda r: tuple(-v for v in r), axis=1)
+    rows = list(zip(key, audit_sheet["item_id"]))
+    assert rows == sorted(rows), "sheet is not in the requested order"
+    assert bool(audit_sheet.iloc[0]["rules_disagree"]) is True
+
+
+def test_image_paths_are_relative_and_per_item(audit_sheet):
+    """The HTML sits next to an images/ folder; absolute paths would break the
+    moment the folder is downloaded from Drive."""
+    for _, r in audit_sheet.iterrows():
+        assert r["image_path"] == f"images/item{int(r['item_id']):03d}.png"
+        assert not r["image_path"].startswith("/")
+
+
+def test_the_html_renders_every_row_with_blank_fields():
+    if not AUDIT_HTML.exists():
+        pytest.skip("audit html not built")
+    html = AUDIT_HTML.read_text()
+    sheet = pd.read_csv(AUDIT_CSV)
+    assert html.count('class="card') == len(sheet)
+    for f in ("final_label", "confidence", "note"):
+        assert html.count(f'data-f="{f}"') == len(sheet)
+    for i in sheet["item_id"].astype(int):
+        assert f"images/item{i:03d}.png" in html
+    # the instruction that outranks everything on the page
+    assert "overrides every automatic label" in html
+    assert 'value=""' in html, "the blank option must be selectable"
