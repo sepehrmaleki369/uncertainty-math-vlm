@@ -299,7 +299,15 @@ def test_the_extension_draw_is_disjoint_and_pools_with_the_first(run, spot):
     assert len(ext) == 60
     assert ext["item"].is_unique
     assert not (set(ext["item"]) & set(spot["item"])), "draws must be disjoint"
-    assert ext["final_label"].fillna("").eq("").all(), "ships uncoded"
+    # Shipped uncoded and was coded on 2026-08-12. The assertion is flipped
+    # rather than dropped, so the coding stays pinned: 4 false passes against
+    # 16 in the first 40, which is the p=0.00007 pass-to-pass disagreement
+    # recorded in CLAUDE.md.
+    assert ext["final_label"].fillna("").ne("").all(), "has uncoded rows"
+    assert set(ext["final_label"]) <= {"true_correct", "extraction_issue",
+                                       "needs_visual"}
+    assert int((ext["final_label"] == "extraction_issue").sum()) == 4
+    assert int((ext["final_label"] == "true_correct").sum()) == 56
 
     rebuilt = C.correct_item_spot_check_extension(run, spot, n=60)
     assert rebuilt["item"].tolist() == ext["item"].tolist(), "seeded, reproducible"
