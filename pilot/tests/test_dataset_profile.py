@@ -556,3 +556,38 @@ def test_the_needs_visual_note_does_not_claim_the_model_was_correct():
     note = ex.loc[0, "note"]
     assert "could not decide" in note
     assert "confirms the model was correct" not in note
+
+
+def test_tp_exemplars_must_show_the_answer():
+    """Item 77 is a genuine true pass whose span is the single letter `m`
+    while the page holds two coefficient tables. As an EXEMPLAR it teaches
+    nothing and looks like the collapse cases on the FP sheet. Nine of 95
+    TP-eligible items are like that, so a by-name exclusion alone would let a
+    sibling take its place."""
+    run, v1, v2s, audit = _conf_inputs(["true_correct"] * 12, [True] * 12)
+    # `_conf_inputs` gives spans like "m7", which are themselves below the
+    # threshold, so the good half has to be written explicitly or the fixture
+    # tests nothing.
+    v2s["model_span"] = ["m"] * 6 + [f"x = {i} \\quad y = {i + 1}" for i in range(6)]
+    ex = dp.confusion_examples(run, v1, v2s, audit, n_per_category=6)
+    spans = [" ".join(str(s).split()) for s in ex["span_m_disp"]]
+    assert all(len(s) >= dp.MIN_EXEMPLAR_SPAN for s in spans), spans
+    assert "m" not in spans
+
+
+def test_tiny_spans_are_a_fallback_not_a_ban():
+    """If the pool has nothing else, a short span is still better than an
+    empty sheet -- and those items ARE true passes, so they must not be
+    recategorised out of the population."""
+    run, v1, v2s, audit = _conf_inputs(["true_correct"] * 3, [True] * 3)
+    v2s["model_span"] = "m"
+    ex = dp.confusion_examples(run, v1, v2s, audit, n_per_category=3)
+    assert len(ex) == 3
+    assert dp.confusion_category(True, "true_correct") == "TP"
+
+
+def test_excluded_items_never_appear():
+    run, v1, v2s, audit = _conf_inputs(["true_correct"] * 5, [True] * 5)
+    ex = dp.confusion_examples(run, v1, v2s, audit, n_per_category=5,
+                               exclude=[2, 4])
+    assert not ({2, 4} & set(ex["item_id"])), sorted(ex["item_id"])

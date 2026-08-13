@@ -342,6 +342,17 @@ Renders captioned PNG sheets to
 - Requested cases are forced in and appear first: **180, 289, 291** (FP),
   **144** (FN — prose answer against a collapsed `sympy:2`), **132, 147** (TP),
   **299, 273** (INDETERMINATE, *not* TN, which is what they turned out to be).
+- **TP EXEMPLARS MUST SHOW THE ANSWER (2026-08-13).** Item 77 is a *genuine*
+  true pass — the coder's own note reads *"tiny span but a valid table cell"* —
+  but its span is the single letter `m` while the page holds two coefficient
+  tables, so as an illustration it is indistinguishable from the collapse
+  cases on the FP sheet. **9 of the 95 TP-eligible items are like that**
+  (10, 77, 91, 102, 127, 138, 223, 244, 254), so excluding one by name would
+  leave the draw free to pick a sibling. TP now prefers spans ≥
+  `MIN_EXEMPLAR_SPAN` (4 chars), verified to hold across 8 seeds, with tiny
+  spans kept only as a fallback. **This is a choice of EXAMPLE, not a
+  recategorisation** — those items remain true passes in the population
+  counts. `confusion_examples` also gained `exclude=` for by-name rejections.
 - **Selection round-robins over the HUMAN LABEL, rarest first.** A uniform
   draw on TN returned six `notation_misread` items and hid `copied_wrong_line`
   and `true_wrong` entirely; six copies of one mechanism teach a reviewer

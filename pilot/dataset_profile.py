@@ -1194,24 +1194,41 @@ def _confusion_note(row) -> str:
     return "human confirms the model was correct"
 
 
+#: A TP exemplar must SHOW the answer being matched. Below this span length a
+#: reader cannot see what was compared, so the tile demonstrates nothing even
+#: when the verdict is genuinely right.
+MIN_EXEMPLAR_SPAN = 4
+
+
 def confusion_examples(run: pd.DataFrame, v1: pd.Series, v2s: pd.DataFrame,
                        audit: pd.DataFrame, n_per_category: int = 6,
                        prefer: Optional[dict] = None, seed: int = 20260813,
-                       per_page: int = 6,
+                       per_page: int = 6, exclude: Sequence[int] = (),
                        entropy_col: str = "perception_entropy") -> pd.DataFrame:
     """Examples of every confusion cell, for a reviewer to read by eye.
 
     `audit` is indexed by item with `final_label` and `note`. `prefer` maps a
     category to items to place FIRST, so specifically requested cases are
-    guaranteed on the sheet and appear before the seeded fill.
+    guaranteed on the sheet and appear before the seeded fill. `exclude` drops
+    items outright, for cases a reviewer has rejected by name.
+
+    **TP prefers items whose span actually shows the answer.** Item 77 is a
+    genuine true pass -- the coder wrote "tiny span but a valid table cell" --
+    yet its span is the single letter `m` while the page holds two coefficient
+    tables, so as an EXEMPLAR it teaches a reader nothing and looks
+    indistinguishable from the collapse cases on the FP sheet. Nine of the 95
+    TP-eligible items are like that, so excluding one by name would leave the
+    draw free to pick a sibling. This is a selection preference and NOT a
+    recategorisation: those items remain true passes in the population counts.
     """
     import numpy as np
 
     rng = np.random.default_rng(seed)
     prefer = prefer or {}
+    dropped = set(int(i) for i in exclude)
     rows = []
     for i in audit.index:
-        if i not in v2s.index:
+        if i not in v2s.index or int(i) in dropped:
             continue
         v2 = v2s.loc[i]
         lab = str(audit.loc[i, "final_label"])
@@ -1248,6 +1265,14 @@ def confusion_examples(run: pd.DataFrame, v1: pd.Series, v2s: pd.DataFrame,
             by_label.setdefault(r["human_label"], []).append(int(r["item_id"]))
         for lab in by_label:
             rng.shuffle(by_label[lab])
+            if cat == "TP":
+                # Stable partition AFTER the shuffle: substantive spans first,
+                # tiny ones kept as fallback rather than discarded.
+                spans = dict(zip(pool["item_id"], pool["span_m_disp"]))
+                def _short(i):
+                    return len(" ".join(str(spans.get(i) or "").split())) < MIN_EXEMPLAR_SPAN
+                by_label[lab] = ([i for i in by_label[lab] if not _short(i)]
+                                 + [i for i in by_label[lab] if _short(i)])
         # Rarest label first, so a one-item mechanism is never crowded out.
         order = sorted(by_label, key=lambda k: len(by_label[k]))
         chosen = list(first)
