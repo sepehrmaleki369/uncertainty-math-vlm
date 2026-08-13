@@ -53,6 +53,16 @@ SCORING_LABELS = ("extraction_issue",)
 #: Human label meaning the coder could not decide from the image.
 UNDECIDED_LABELS = ("needs_visual",)
 
+#: Human label meaning the coder positively confirmed the MODEL was right, so
+#: the frozen rule's WRONG verdict is a false fail. Added 2026-08-13 when item
+#: 95 was recoded from `needs_visual`: the census's original vocabulary had no
+#: way to say this, which is exactly why its agreement with the rule used to be
+#: 100% by construction. Stronger than `SCORING_LABELS`, which only says the
+#: pipeline caused the mismatch, so it is deliberately NOT subject to the
+#: parse-failure carve-out below: a coder who read the page and confirmed the
+#: answer outranks a heuristic about the majority label.
+MODEL_CORRECT_LABELS = ("true_correct",)
+
 
 def unrecoverable_items(
     run: pd.DataFrame,
@@ -97,6 +107,8 @@ def human_corrected_correct(
         label = audit.loc[item, "final_label"]
         if label in REAL_ERROR_LABELS:
             vals[item] = False
+        elif label in MODEL_CORRECT_LABELS:
+            vals[item] = True
         elif label in UNDECIDED_LABELS or item in bad:
             vals[item] = None
         elif label in SCORING_LABELS:

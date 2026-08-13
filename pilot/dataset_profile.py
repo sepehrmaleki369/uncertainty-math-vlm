@@ -1106,8 +1106,12 @@ CONFUSION_ORDER = ("TP", "FP", "FN", "TN", "INDETERMINATE", "NEEDS_VISUAL")
 #: contradicts it. This happened: `needs_visual` was routed to INDETERMINATE
 #: regardless of verdict, so item 5 (scorer PASSED, coder could not decide)
 #: appeared under a sheet reading "scorer said WRONG". Asserted at render time.
+#: `None` means the group's title deliberately states NO scorer verdict, so
+#: there is nothing for a caption to contradict. Only NEEDS_VISUAL is like
+#: that: it holds every item the coder could not read, and those arrive with
+#: both verdicts.
 CONFUSION_VERDICT = {"TP": True, "FP": True, "FN": False, "TN": False,
-                     "INDETERMINATE": False, "NEEDS_VISUAL": True}
+                     "INDETERMINATE": False, "NEEDS_VISUAL": None}
 
 CONFUSION_MEANING = {
     "TP": "scorer said CORRECT and the human agrees the model was correct",
@@ -1118,9 +1122,10 @@ CONFUSION_MEANING = {
     "TN": "scorer said WRONG and the human agrees the model was wrong",
     "INDETERMINATE": "scorer said WRONG and the verdict was UNEARNED, so the "
                      "model's own answer is undecided: neither TN nor FN",
-    "NEEDS_VISUAL": "scorer said CORRECT but the coder could not decide from "
-                    "the page, so this is neither a confirmed pass nor a "
-                    "confirmed false pass: it needs a second visual check",
+    "NEEDS_VISUAL": "the coder could not decide from the page at all, so the "
+                    "model's correctness is unknown whatever the scorer said; "
+                    "both scorer verdicts appear here and each tile shows its "
+                    "own",
 }
 
 
@@ -1139,13 +1144,18 @@ def confusion_category(v1_correct: bool, final_label: str) -> str:
         # correct for a reason that does not hold. On a FAIL the same label
         # leaves the model's answer undecided, so it is neither TN nor FN.
         return "FP" if correct else "INDETERMINATE"
-    # `needs_visual` must split by verdict TOO. Routing it to INDETERMINATE
-    # unconditionally put item 5 -- scorer PASSED, coder could not read the
-    # page -- under a sheet titled "scorer said WRONG". And it is not an FP
-    # either: the coder did not find the verdict unearned, they could not
-    # tell, which is a weaker statement and deserves its own group.
+    # ALL `needs_visual` items go here, whatever the scorer said (2026-08-13).
+    # They belong together: the shared fact is that the coder could not read
+    # the page, which is a statement about the evidence rather than about the
+    # verdict. Splitting them by verdict scattered three related items across
+    # two sheets and left a one-tile group.
+    #
+    # This is only safe because the group claims NO verdict in its title --
+    # `CONFUSION_VERDICT["NEEDS_VISUAL"] is None`. The earlier bug was a
+    # heading that asserted "scorer said WRONG" over an item where it had not;
+    # a heading that asserts nothing cannot contradict a caption.
     if final_label == "needs_visual":
-        return "NEEDS_VISUAL" if correct else "INDETERMINATE"
+        return "NEEDS_VISUAL"
     return "INDETERMINATE"
 
 
@@ -1189,8 +1199,9 @@ def _confusion_note(row) -> str:
         # what this group does not know. Falling through to it put "human
         # confirms the model was correct" under a title reading "correctness
         # UNKNOWN" -- the same contradiction the group was created to remove.
-        return ("scorer passed this, but the coder could not decide from the "
-                "page: neither a confirmed pass nor a confirmed false pass")
+        verdict = "passed" if row["strict_v1_correct"] else "failed"
+        return (f"scorer {verdict} it, but the coder could not read the page: "
+                "correctness is unknown either way")
     return "human confirms the model was correct"
 
 
@@ -1466,8 +1477,13 @@ def assert_confusion_groups_match_titles(examples: pd.DataFrame) -> dict:
     """
     bad = []
     for _, r in examples.iterrows():
-        want = CONFUSION_VERDICT.get(r["category"])
-        if want is None or bool(r["strict_v1_correct"]) != want:
+        if r["category"] not in CONFUSION_VERDICT:
+            bad.append((int(r["item_id"]), r["category"], None))
+            continue
+        want = CONFUSION_VERDICT[r["category"]]
+        if want is None:          # the title states no verdict to contradict
+            continue
+        if bool(r["strict_v1_correct"]) != want:
             bad.append((int(r["item_id"]), r["category"],
                         bool(r["strict_v1_correct"])))
     if bad:

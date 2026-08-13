@@ -45,9 +45,14 @@ def test_the_audit_covers_every_genuinely_wrong_item(audit):
     single fact the whole framing rests on."""
     assert len(audit) == 104
     assert audit.index.duplicated().sum() == 0
+    # `true_correct` entered this vocabulary on 2026-08-13 when item 95 was
+    # recoded from `needs_visual`. That is why the census stopped being
+    # one-directional -- see
+    # test_audit_diagnostics.test_the_census_stopped_being_one_directional...
     assert set(audit["final_label"]) <= {
         "extraction_issue", "notation_misread", "needs_visual",
-        "copied_wrong_line", "hallucination"}
+        "copied_wrong_line", "hallucination", "true_correct"}
+    assert (audit["final_label"] == "true_correct").sum() == 1
 
 
 def test_hallucination_is_zero_under_human_coding(audit):
@@ -89,7 +94,8 @@ def test_corrected_accuracy_is_a_range_against_the_strict_v1_baseline(run, audit
     b = C.corrected_accuracy_bounds(run, audit)
     assert b["baseline_correct"] == 141
     assert b["baseline_accuracy"] == pytest.approx(0.470, abs=0.001)
-    assert b["corrected_correct_low"] == 214
+    # 215, not 214: item 95's recode to `true_correct` recovers one more.
+    assert b["corrected_correct_low"] == 215
     assert b["corrected_correct_high"] == 222
     assert b["corrected_accuracy_low"] == pytest.approx(0.713, abs=0.005)
     assert b["corrected_accuracy_high"] == pytest.approx(0.740, abs=0.005)

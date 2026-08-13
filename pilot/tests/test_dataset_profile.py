@@ -401,7 +401,8 @@ def test_the_sensitivity_refuses_to_call_the_number_quotable():
     # THE ASYMMETRY that decides the whole design.
     (True,  "extraction_issue",  "FP"),
     (False, "extraction_issue",  "INDETERMINATE"),
-    (False, "needs_visual",      "INDETERMINATE"),
+    (False, "needs_visual",      "NEEDS_VISUAL"),
+    (True,  "needs_visual",      "NEEDS_VISUAL"),
 ])
 def test_confusion_category(v1_correct, label, expected):
     assert dp.confusion_category(v1_correct, label) == expected
@@ -489,14 +490,40 @@ def test_the_readme_defines_the_groups_before_it_counts_them(tmp_path):
         assert cat in text
 
 
-def test_needs_visual_splits_by_verdict_so_titles_never_contradict_captions():
-    """SHIPPED ONCE. `needs_visual` was routed to INDETERMINATE regardless of
-    verdict, so item 5 -- scorer PASSED, coder could not read the page --
-    rendered under a sheet titled "scorer said WRONG" while its own caption
-    read v1=CORRECT. A reader without context sees a contradiction in the
-    data, not a routing bug."""
-    assert dp.confusion_category(False, "needs_visual") == "INDETERMINATE"
-    assert dp.confusion_category(True, "needs_visual") == "NEEDS_VISUAL"
+def test_every_needs_visual_item_lands_in_one_group():
+    """All of them together, whatever the scorer said: the shared fact is that
+    the coder could not read the PAGE, which is about the evidence rather than
+    the verdict.
+
+    Originally these were routed to INDETERMINATE unconditionally, which put
+    item 5 -- scorer PASSED -- under a heading reading "scorer said WRONG".
+    Splitting by verdict fixed that but scattered three related items over two
+    sheets and left a one-tile group. Grouping them is only safe because this
+    group's title states NO verdict; see the next test."""
+    for v1 in (True, False):
+        assert dp.confusion_category(v1, "needs_visual") == "NEEDS_VISUAL"
+
+
+def test_the_needs_visual_group_claims_no_verdict_so_nothing_can_contradict_it():
+    """`None` is the licence for holding both verdicts. The original bug was a
+    heading ASSERTING a verdict the item did not have; a heading that asserts
+    nothing cannot contradict a caption."""
+    assert dp.CONFUSION_VERDICT["NEEDS_VISUAL"] is None
+    run, v1, v2s, audit = _conf_inputs(["needs_visual"] * 2, [True, False])
+    ex = dp.confusion_examples(run, v1, v2s, audit, n_per_category=2)
+    assert set(ex["category"]) == {"NEEDS_VISUAL"}
+    assert sorted(ex["strict_v1_correct"]) == [False, True]
+    # Mixed verdicts in one group must NOT trip the title invariant.
+    assert dp.assert_confusion_groups_match_titles(ex)["checked"] == 2
+
+
+def test_the_needs_visual_note_states_the_verdict_it_actually_had():
+    """Each tile shows its own verdict, since the heading no longer does."""
+    run, v1, v2s, audit = _conf_inputs(["needs_visual"] * 2, [True, False])
+    ex = dp.confusion_examples(run, v1, v2s, audit, n_per_category=2).set_index("item_id")
+    assert "passed" in ex.loc[0, "note"] and "failed" in ex.loc[1, "note"]
+    for i in (0, 1):
+        assert "could not read the page" in ex.loc[i, "note"]
 
 
 def test_a_passed_undecidable_item_is_not_called_a_false_pass():
@@ -510,7 +537,7 @@ def test_a_passed_undecidable_item_is_not_called_a_false_pass():
 def test_every_group_declares_the_verdict_its_title_states():
     assert set(dp.CONFUSION_VERDICT) == set(dp.CONFUSION_ORDER)
     assert dp.CONFUSION_VERDICT["INDETERMINATE"] is False
-    assert dp.CONFUSION_VERDICT["NEEDS_VISUAL"] is True
+    assert dp.CONFUSION_VERDICT["NEEDS_VISUAL"] is None
 
 
 def test_the_title_invariant_raises_and_names_the_offender():
@@ -554,7 +581,8 @@ def test_the_needs_visual_note_does_not_claim_the_model_was_correct():
     ex = dp.confusion_examples(run, v1, v2s, audit, n_per_category=1)
     assert ex.loc[0, "category"] == "NEEDS_VISUAL"
     note = ex.loc[0, "note"]
-    assert "could not decide" in note
+    assert "could not read the page" in note
+    assert "unknown either way" in note
     assert "confirms the model was correct" not in note
 
 

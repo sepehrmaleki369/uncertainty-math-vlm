@@ -357,17 +357,20 @@ Renders captioned PNG sheets to
   draw on TN returned six `notation_misread` items and hid `copied_wrong_line`
   and `true_wrong` entirely; six copies of one mechanism teach a reviewer
   nothing.
-- **SIX groups, not five (fixed 2026-08-13).** `needs_visual` was routed to
-  INDETERMINATE regardless of verdict, so **item 5 — scorer PASSED, coder
+- **SIX groups, not five (2026-08-13).** `needs_visual` was originally routed
+  to INDETERMINATE regardless of verdict, so **item 5 — scorer PASSED, coder
   could not read the page — rendered under a sheet titled "scorer said
   WRONG" while its own caption read `v1=CORRECT`.** A reader without context
-  sees a contradiction in the DATA, not a routing bug. It now splits by
-  verdict: `needs_visual`+wrong → INDETERMINATE, `needs_visual`+correct →
-  **`NEEDS_VISUAL`** (1 item). It is deliberately **not** FP: nobody found the
-  verdict unearned, the coder could not tell, and calling it a false pass
-  asserts more than the audit does. `CONFUSION_VERDICT` +
-  `assert_confusion_groups_match_titles` enforce that **every sheet title's
-  stated verdict holds for every item on it**, checked before rendering.
+  sees a contradiction in the DATA, not a routing bug.
+- **ALL `needs_visual` items now share ONE group and that group claims NO
+  verdict** (`CONFUSION_VERDICT["NEEDS_VISUAL"] is None`). Splitting them by
+  verdict fixed the contradiction but scattered three related items over two
+  sheets and left a one-tile group. They belong together because the shared
+  fact is about the **evidence** — the page could not be read — not about the
+  verdict. **A heading that asserts nothing cannot contradict a caption**, and
+  each tile prints its own `v1`. Holds items **5, 45, 126**.
+  `assert_confusion_groups_match_titles` skips groups whose declared verdict
+  is `None` and enforces the rest before rendering.
 - **A LEGEND is now drawn once per SHEET** (`CONFUSION_LEGEND`, via a new
   optional `footer=` on `plotting.contact_sheet`, empty by default so
   notebooks 17/23/28 render unchanged). It defines v1/v2, span M/T, label M/T,
@@ -681,7 +684,7 @@ may be derived from this section.**
 
 | audit set | n | determinate | v1 agreement | v2 agreement | ext. issue |
 |---|---|---|---|---|---|
-| `genuinely_wrong` census | 104 | 23 | ~~100%~~ tautological | ~~100%~~ tautological | 77 (74.0%) |
+| `genuinely_wrong` census | 104 | 24 | **95.8%** (see below) | 95.8% | 77 (74.0%) |
 | `v1`-correct spot check | 100 | 79 | ~~100%~~ tautological | **92.4%** | 20 (20.0%) |
 | `v2` high-priority | 108 | 68 | **51.5%** | **48.5%** | 39 (36.1%) |
 
@@ -761,7 +764,7 @@ pass detects what it was built to detect.
   |---|---|
   | `strict_v1` baseline | 47.0% |
   | one-sided (wrong side only) | ~~71.3–74.0%~~ **retracted** |
-  | **two-sided** | **44.2–60.6%, point 51.4%** |
+  | **two-sided** | **44.5–60.6%, point 51.7%** |
 
   The two corrections very nearly cancel: ~73 items recovered from the wrong
   side, ~37–78 false passes removed from the correct side. **The honest
@@ -879,7 +882,7 @@ convenient.**
 
   | rate used | two-sided accuracy |
   |---|---|
-  | first 40 (40.0%) | 44.2–60.6%, point **51.4%** |
+  | first 40 (40.0%) | 44.5–60.6%, point **51.7%** |
   | extra 60 (6.7%) | 63.8–72.8%, point **68.2%** |
   | pooled (20.0%) | 57.2–67.3%, point 61.5% |
 
@@ -934,9 +937,38 @@ confidence. `pilot.failures.LABELS` has no `parse_failure`, so item 126 →
 |---|---|---|
 | `extraction_issue` | 51 | 69.9% |
 | `notation_misread` | 18 | 24.7% |
-| `needs_visual` | 4 | 5.5% |
+| `needs_visual` | 3 | 4.1% |
+| **`true_correct`** | **1** | **1.4%** (recoded 2026-08-13) |
 | `copied_wrong_line` | 0 | 0% |
 | **`hallucination`** | **0** | **0%** |
+
+### 2026-08-13: item 95 RECODED — the census is no longer one-directional
+
+The coder re-read **item 95** and changed `needs_visual` → **`true_correct`**:
+the model span `(2x - y + z)(2x - y + z)` and the truth `(2x - y + z)^2` are
+equivalent and the handwritten answer is right. The truth span is itself
+damaged — `\textcolor{red}{(2x - y + z(2x - y + z)}` is missing a bracket — so
+`label T` fell to the text tier and the comparison failed. Applied at source in
+`coded_73_wrong_on_both_20260811.csv`, so it survives regeneration.
+
+- **It is an FN, not a TP.** `strict_v1` scores item 95 **WRONG**, and TP means
+  *the scorer said correct*. Putting it on the TP sheet would recreate the
+  item-5 contradiction (a caption reading `v1=WRONG` under a heading saying
+  "scorer said CORRECT"); `assert_confusion_groups_match_titles` refuses it.
+- **THE CENSUS IS NO LONGER TAUTOLOGICAL, and this is the interesting part.**
+  The cross-audit finding was that set 1's vocabulary *could not express*
+  disagreement with the rule, forcing 100% agreement. It now contains one
+  `true_correct`, so `v1_tautological` flips **True → False** and agreement
+  reads **23/24 = 95.8%**. **The caveat survives in substance:** the set was
+  *drawn* one-directionally and 103 of 104 items still carry labels that could
+  only agree, so **the pooled agreement figure stays unquotable**. That is
+  asserted separately rather than inferred from the flag.
+- **`corrected.py` gained `MODEL_CORRECT_LABELS`**, deliberately NOT subject to
+  the parse-failure carve-out: a coder who read the page and confirmed the
+  answer outranks a heuristic about the majority label.
+- **The paper's number does not move.** Two-sided corrected accuracy goes
+  44.2–60.6% → **44.5–60.6%** (point 51.4% → 51.7%), and `paper/main.tex` says
+  *"roughly 44–61%"*, which still holds. **`main.tex` was not touched.**
 
 **Pooled with the `only_qwen` pass: ALL 104 of Qwen's `genuinely_wrong`
 items are human-coded (100%). This is a complete census of the bucket, not
@@ -946,8 +978,9 @@ a sample.**
 |---|---|---|
 | `extraction_issue` | 77 | **74.0%** |
 | `notation_misread` | 22 | 21.2% |
-| `needs_visual` | 4 | 3.8% |
+| `needs_visual` | 3 | 2.9% |
 | `copied_wrong_line` | 1 | 1.0% |
+| **`true_correct`** | **1** | **1.0%** (item 95, recoded 2026-08-13) |
 | `hallucination` | 0 | 0% |
 
 - **THE CAVEAT HAS CHANGED SHAPE, AND THIS MATTERS.** At **100% coverage

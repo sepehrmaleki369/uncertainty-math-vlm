@@ -16,7 +16,7 @@ item,final_label,confidence,note
 82,extraction_issue,high,"Model 0.488, truth 0.488000... -- same value, float formatting."
 83,needs_visual,medium,"Bad handwriting, could not be read."
 94,notation_misread,high,Model 5^n + 6^n vs truth 5*n + 6**n -- exponent vs product misread.
-95,needs_visual,medium,"Bad handwriting, could not be read."
+95,true_correct,high,"RECODED 2026-08-13 (was needs_visual, 'bad handwriting, could not be read'): the model span (2x - y + z)(2x - y + z) and the truth span (2x - y + z)^2 are equivalent, and the handwritten final answer is correct on a second read. The truth span is itself damaged -- \textcolor{red}{(2x - y + z(2x - y + z)} is missing a closing paren -- which is why label T fell to the text tier and the comparison failed. strict_v1 says WRONG, so this is a FALSE FAIL (FN), not a TP."
 103,notation_misread,medium,Model output does not match the set/equation answer.
 108,notation_misread,medium,Model equation coefficients do not match truth. (Also the item Math-Verify wrongly accepts -- y^2/(9/4) vs y^2/(11/4).)
 126,needs_visual,medium,"Model failed to parse/give an answer. No parse_failure label exists, so recorded as needs_visual. Supersedes coded_31's extraction_issue. Note: s3 did emit eq(y/4-7,3), matching truth, while s0 and s2 parse-failed."

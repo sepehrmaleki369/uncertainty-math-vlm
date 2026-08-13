@@ -65,22 +65,44 @@ def test_extraction_issue_is_indeterminate_not_wrong(audits):
     assert AD.TRUTH_MAP["true_correct"] == "correct"
 
 
-def test_two_sets_agree_with_v1_by_construction_not_by_measurement(diag):
+def test_the_spotcheck_agrees_with_v1_by_construction_not_by_measurement(diag):
     """THE REASON THERE IS NO POOLED NUMBER.
 
-    Set 1 is items strict_v1 called WRONG and its determinate labels all mean
-    "model wrong". Set 2 is items it called CORRECT and its determinate labels
-    all mean "model correct". Both agreements are 100% definitionally -- the
-    vocabulary in those sheets cannot express disagreement. Averaging them
-    with set 3 produces 80.6%, which is ~60% tautology.
+    Set 2 is items strict_v1 called CORRECT and its determinate labels all
+    mean "model correct", so its 100% agreement is definitional: the
+    vocabulary in that sheet cannot express disagreement. Averaging it with
+    the others manufactures a number that is mostly tautology.
     """
-    for name in ("genuinely_wrong_census", "v1_correct_spotcheck"):
-        assert bool(diag.loc[name, "truth_one_directional"]) is True
-        assert diag.loc[name, "v1_agreement"] == 1.0
-        assert bool(diag.loc[name, "v1_tautological"]) is True
-        assert diag.loc[name, "v1_detectable_error"] == "none"
-    assert diag.loc["genuinely_wrong_census", "n_determinate"] == 23
-    assert diag.loc["v1_correct_spotcheck", "n_determinate"] == 79
+    name = "v1_correct_spotcheck"
+    assert bool(diag.loc[name, "truth_one_directional"]) is True
+    assert diag.loc[name, "v1_agreement"] == 1.0
+    assert bool(diag.loc[name, "v1_tautological"]) is True
+    assert diag.loc[name, "v1_detectable_error"] == "none"
+    assert diag.loc[name, "n_determinate"] == 79
+
+
+def test_the_census_stopped_being_one_directional_when_item_95_was_recoded(diag):
+    """UPDATED 2026-08-13, and the flag flipping is the point.
+
+    The census was DESIGNED one-directionally: it drew only items strict_v1
+    called wrong, and the coding vocabulary in use at the time had no label
+    meaning "the model was actually right". On 2026-08-13 the coder re-read
+    item 95 and recoded it `needs_visual` -> `true_correct`, because the model
+    span `(2x - y + z)(2x - y + z)` and the truth `(2x - y + z)^2` are
+    equivalent. That is one genuine disagreement, so the set now technically
+    CAN express one and `v1_tautological` is False.
+
+    **The caveat it supported has not gone away.** One late recode does not
+    make a one-directional draw into a two-directional audit: 103 of 104 items
+    still carry labels that could only ever agree with the rule. The pooled
+    agreement figure remains unquotable for the same reason as before, which
+    is why that is asserted separately rather than inferred from this flag.
+    """
+    d = diag.loc["genuinely_wrong_census"]
+    assert bool(d["truth_one_directional"]) is False
+    assert bool(d["v1_tautological"]) is False
+    assert d["n_determinate"] == 24
+    assert d["v1_agreement"] == pytest.approx(23 / 24, abs=0.005)
 
 
 def test_only_the_high_priority_set_can_disagree_in_both_directions(diag):

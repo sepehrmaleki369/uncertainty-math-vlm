@@ -153,14 +153,27 @@ assert dp.confusion_category(False, "notation_misread") == "TN"
 # appeared under "scorer said WRONG".
 dp.assert_confusion_groups_match_titles(ex)
 for _, r in ex.iterrows():
-    assert bool(r["strict_v1_correct"]) is dp.CONFUSION_VERDICT[r["category"]], (
+    want = dp.CONFUSION_VERDICT[r["category"]]
+    if want is None:      # NEEDS_VISUAL states no verdict and holds both
+        continue
+    assert bool(r["strict_v1_correct"]) is want, (
         f"item {r['item_id']} in {r['category']} has "
         f"v1={'CORRECT' if r['strict_v1_correct'] else 'WRONG'}")
-assert dp.confusion_category(True, "needs_visual") == "NEEDS_VISUAL", (
-    "a needs_visual item the scorer PASSED is neither INDETERMINATE (whose "
-    "title says the scorer said WRONG) nor FP (nobody found the verdict "
-    "unearned; the coder could not tell)")
+
+# EVERY needs_visual item belongs to that one group, whatever the scorer said.
+for verdict in (True, False):
+    assert dp.confusion_category(verdict, "needs_visual") == "NEEDS_VISUAL"
+_nv = sorted(i for i in audit.index if audit.loc[i, "final_label"] == "needs_visual")
+_on_sheet = set(ex.loc[ex["category"] == "NEEDS_VISUAL", "item_id"])
+assert set(_nv) <= _on_sheet, (
+    f"needs_visual items missing from the sheet: {sorted(set(_nv) - _on_sheet)}")
+assert dp.CONFUSION_VERDICT["NEEDS_VISUAL"] is None, (
+    "the group holds both verdicts, so its title must claim neither")
 assert 5 not in set(ex.loc[ex["category"] == "INDETERMINATE", "item_id"])
+# Item 95 was recoded true_correct on 2026-08-13; strict_v1 says WRONG, so it
+# is a FALSE FAIL, not a TP.
+assert 95 in set(ex.loc[ex["category"] == "FN", "item_id"])
+assert 95 not in set(ex.loc[ex["category"] == "TP", "item_id"])
 
 # Requested items present, and FIRST in their group.
 for cat, wanted in ns["PREFER"].items():
