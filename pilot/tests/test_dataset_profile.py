@@ -383,3 +383,107 @@ def test_the_sensitivity_refuses_to_call_the_number_quotable():
     assert s["n_candidate_missed"] == 1
     assert s["quotable"] is False
     assert s["range"][0] <= s["as_reported"]["accuracy"] <= s["range"][1]
+
+
+# --- scorer-vs-human confusion examples ------------------------------------
+#
+# The risk here is presenting a clean 2x2 to a reader who will take it at face
+# value, when the audit's largest group does not belong in any of the four
+# cells.
+
+@pytest.mark.parametrize("v1_correct,label,expected", [
+    (True,  "true_correct",      "TP"),
+    (False, "true_correct",      "FN"),
+    (False, "notation_misread",  "TN"),
+    (False, "copied_wrong_line", "TN"),
+    (False, "true_wrong",        "TN"),
+    (True,  "notation_misread",  "FP"),
+    # THE ASYMMETRY that decides the whole design.
+    (True,  "extraction_issue",  "FP"),
+    (False, "extraction_issue",  "INDETERMINATE"),
+    (False, "needs_visual",      "INDETERMINATE"),
+])
+def test_confusion_category(v1_correct, label, expected):
+    assert dp.confusion_category(v1_correct, label) == expected
+
+
+def test_an_unearned_FAIL_is_never_a_true_negative():
+    """`extraction_issue` says the verdict was not earned, NOT that the model
+    was wrong. On a fail it leaves the model's answer undecided, so folding it
+    into TN would inflate the scorer's apparent accuracy on the largest group
+    in the audit (71 of 234 items)."""
+    assert dp.confusion_category(False, "extraction_issue") != "TN"
+    assert dp.confusion_category(False, "extraction_issue") != "FN"
+
+
+def _conf_inputs(labels, v1_flags):
+    n = len(labels)
+    run = pd.DataFrame({"has_error": [i % 2 == 0 for i in range(n)],
+                        "perception_entropy": [0.5] * n}, index=range(n))
+    v2s = pd.DataFrame([{
+        "correct_strict_v2_display_primary": v1_flags[i],
+        "model_span": f"m{i}", "truth_span": f"t{i}",
+        "model_label": f"text:m{i}", "truth_label": f"text:t{i}",
+    } for i in range(n)], index=range(n))
+    audit = pd.DataFrame({"final_label": labels,
+                          "note": [f"note {i}" for i in range(n)]},
+                         index=range(n))
+    return run, pd.Series(v1_flags, index=range(n)), v2s, audit
+
+
+def test_requested_items_are_forced_in_and_come_first():
+    labels = ["extraction_issue"] * 10
+    run, v1, v2s, audit = _conf_inputs(labels, [True] * 10)
+    ex = dp.confusion_examples(run, v1, v2s, audit, n_per_category=4,
+                               prefer={"FP": [7, 3]})
+    got = ex.loc[ex["category"] == "FP", "item_id"].tolist()
+    assert got[:2] == [7, 3], got
+
+
+def test_selection_spreads_across_mechanisms():
+    """A uniform draw on TN returns six `notation_misread` items and hides
+    `copied_wrong_line` and `true_wrong` entirely. The rarest label goes
+    first so a one-item mechanism is never crowded out."""
+    labels = ["notation_misread"] * 20 + ["copied_wrong_line"] + ["true_wrong"] * 3
+    run, v1, v2s, audit = _conf_inputs(labels, [False] * len(labels))
+    ex = dp.confusion_examples(run, v1, v2s, audit, n_per_category=6)
+    assert len(set(ex["human_label"])) == 3, sorted(set(ex["human_label"]))
+    assert "copied_wrong_line" in set(ex["human_label"])
+
+
+def test_the_caption_carries_every_requested_field():
+    run, v1, v2s, audit = _conf_inputs(["true_correct"] * 3, [True] * 3)
+    cap = dp.confusion_caption(dp.confusion_examples(
+        run, v1, v2s, audit, n_per_category=3).iloc[0])
+    for token in ("item ", "err=", "H=", "scorer v1=", "v2=", "human=",
+                  "span M:", "span T:", "label M:", "label T:", "why:"):
+        assert token in cap, f"{token!r} missing:\n{cap}"
+
+
+def test_the_why_line_wraps_instead_of_truncating():
+    """It was cut mid-word ('the match is vacu...') and only a rendered page
+    showed it. That line is what a reader outside this project needs."""
+    run, v1, v2s, audit = _conf_inputs(["true_correct"], [False])
+    row = dp.confusion_examples(run, v1, v2s, audit, n_per_category=1).iloc[0]
+    row = row.copy()
+    row["note"] = ("a deliberately long explanation of why this item sits in "
+                   "this cell, easily longer than one caption line")
+    lines = dp.confusion_caption(row).splitlines()
+    why = [x for x in lines[6:]]
+    assert len(why) == 2, why
+    assert not why[-1].endswith("..."), why
+
+
+def test_the_readme_defines_the_groups_before_it_counts_them(tmp_path):
+    run, v1, v2s, audit = _conf_inputs(
+        ["true_correct", "extraction_issue", "notation_misread"],
+        [True, False, False])
+    ex = dp.confusion_examples(run, v1, v2s, audit, n_per_category=2)
+    pop = pd.DataFrame({"item_id": [0, 1, 2],
+                        "category": ["TP", "INDETERMINATE", "TN"]})
+    text = dp.write_confusion_readme(str(tmp_path / "R.md"), ex, population=pop)
+    assert "describe the SCORER, not the model" in text
+    assert text.index("| **TP** |") < text.index("items audited")
+    assert "not a population rate" in text
+    for cat in dp.CONFUSION_ORDER:
+        assert cat in text

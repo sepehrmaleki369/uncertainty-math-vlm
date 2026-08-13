@@ -318,6 +318,43 @@ Manifest: `reference/audit/mcq_like_review_20260812.csv` (77 rows).
   `strict_v1`, H, both spans, both labels, flags and the weak-trigger match.
   Code `confirmed_mcq` = yes/no/unclear in the manifest.
 
+### 2026-08-13: BUILT, NOT RUN — notebook 29, scorer-vs-human examples for review
+
+`pilot/29_confusion_examples_for_professor.ipynb`, `dataset_profile`
+(`confusion_category` / `confusion_examples` / `confusion_caption` /
+`write_confusion_readme`), `dryruns/dryrun_nb29.py`, 8 tests.
+**Supplementary review material, not an experiment and not a measurement.**
+Renders captioned PNG sheets to
+`Drive/uncertainty-math-vlm/figures/confusion_examples_for_professor/`.
+
+- **The prediction is the SCORER's verdict, the truth is the human read, so
+  TP/FP/FN/TN describe the SCORER and not the model.** Audited population
+  (234 of 300, precedence-deduplicated): **TP 95, INDETERMINATE 71, FN 33,
+  TN 20, FP 15**.
+- **FIVE GROUPS, NOT FOUR, AND THIS IS THE LOAD-BEARING DECISION.**
+  `extraction_issue` cuts two ways: on a **pass** it is a **false pass (FP)**;
+  on a **fail** it leaves the model's answer **undecided**, so it is neither
+  TN nor FN. **Folding those 71 into TN would inflate the scorer's apparent
+  accuracy on the largest audited group** — and they are the project's own
+  headline finding. Pinned in
+  `test_an_unearned_FAIL_is_never_a_true_negative`, and the dry run asserts
+  `extraction_issue` lands on BOTH sides of the matrix.
+- Requested cases are forced in and appear first: **180, 289, 291** (FP),
+  **144** (FN — prose answer against a collapsed `sympy:2`), **132, 147** (TP),
+  **299, 273** (INDETERMINATE, *not* TN, which is what they turned out to be).
+- **Selection round-robins over the HUMAN LABEL, rarest first.** A uniform
+  draw on TN returned six `notation_misread` items and hid `copied_wrong_line`
+  and `true_wrong` entirely; six copies of one mechanism teach a reviewer
+  nothing.
+- **Two things only rendering a page could have caught**, both fixed: the
+  `why:` line was truncated mid-word (`the match is vacu...`) and is now
+  wrapped to two lines, and the FN note was one generic sentence repeated on
+  every tile — it now names the mechanism (prose-vs-collapsed-symbol, trailing
+  punctuation, LaTeX spacing, residual `\textcolor`). **Render and LOOK at a
+  sheet; the asserts passed both times.**
+- **TO RUN: notebook 29 in Colab** (no GPU). Writes 5 sheets + `manifest.csv`
+  + `README.md`, the last defining the groups before showing any count.
+
 ### RUN 2026-08-12: notebook 27 — LiveMath n=300 VALID, Omni n=300 VOID (decoder)
 
 `pilot/27_open_judges_all300.ipynb`, all 7 cells completed, no errors.

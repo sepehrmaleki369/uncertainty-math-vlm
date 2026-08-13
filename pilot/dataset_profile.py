@@ -1076,3 +1076,300 @@ def mcq_accuracy_sensitivity(profile: pd.DataFrame,
                 "(MCQ far above free response) is stable across every "
                 "variant, the MAGNITUDE is not"),
     }
+
+
+# ---------------------------------------------------------------------------
+# SCORER-vs-HUMAN CONFUSION EXAMPLES, for review by eye.
+#
+# The "prediction" is the frozen scorer's verdict; the "truth" is the human
+# audit label. So TP/FP/FN/TN describe THE SCORER, never the model.
+#
+# **`extraction_issue` is INDETERMINATE and that is why there are five groups,
+# not four.** It says the verdict was not earned, which leaves the model's own
+# answer undecided. On a PASS that is a false pass. On a FAIL it is neither a
+# true negative nor a false negative -- nobody knows what the model answered.
+# Folding those 67 items into TN would inflate the scorer's apparent accuracy
+# on the largest single group in the audit, and they are the project's
+# headline finding (~74% of `genuinely_wrong` is the pipeline), so a 2x2 that
+# silently drops them would misrepresent the data to a reader.
+# ---------------------------------------------------------------------------
+
+#: Audit labels that positively assert the MODEL was wrong. `extraction_issue`
+#: and `needs_visual` are deliberately absent.
+_MODEL_WRONG_LABELS = ("notation_misread", "copied_wrong_line", "true_wrong",
+                       "hallucination")
+
+CONFUSION_ORDER = ("TP", "FP", "FN", "TN", "INDETERMINATE")
+
+CONFUSION_MEANING = {
+    "TP": "scorer said CORRECT and the human agrees the model was correct",
+    "FP": "scorer said CORRECT but the human found the verdict UNEARNED "
+          "(extraction_issue): a false pass",
+    "FN": "scorer said WRONG but the human found the model actually correct: "
+          "a false fail",
+    "TN": "scorer said WRONG and the human agrees the model was wrong",
+    "INDETERMINATE": "scorer said WRONG and the verdict was UNEARNED, so the "
+                     "model's own answer is undecided: neither TN nor FN",
+}
+
+
+def confusion_category(v1_correct: bool, final_label: str) -> str:
+    """One cell of the scorer-vs-human matrix, or `INDETERMINATE`."""
+    correct = bool(v1_correct)
+    if final_label == "true_correct":
+        return "TP" if correct else "FN"
+    if final_label in _MODEL_WRONG_LABELS:
+        # A human-confirmed model error that the scorer PASSED is also a false
+        # pass, and a stronger one than an unearned verdict.
+        return "FP" if correct else "TN"
+    if final_label == "extraction_issue":
+        # THE ASYMMETRY, and it is the whole reason there are five groups.
+        # An unearned verdict on a PASS is a false pass: the item was scored
+        # correct for a reason that does not hold. On a FAIL the same label
+        # leaves the model's answer undecided, so it is neither TN nor FN.
+        return "FP" if correct else "INDETERMINATE"
+    return "INDETERMINATE"
+
+
+def _confusion_note(row) -> str:
+    """Why this item sits in its cell, in one line a reader can check."""
+    cat, lab = row["category"], row["human_label"]
+    m, t = str(row["label_m"] or ""), str(row["label_t"] or "")
+    tiny = len(str(row["span_m_disp"] or "").strip()) <= 3
+    if cat == "FP":
+        if m == t and len(m.split(":", 1)[-1]) <= 2:
+            return "both labels collapse to one symbol; the match is vacuous"
+        if tiny:
+            return "the extractor picked a 1-3 character span; a match is cheap"
+        return "scored correct on a span that is not the page's answer"
+    if cat == "FN":
+        # Name the actual mechanism. A single generic sentence repeated on
+        # every false fail tells a reader nothing about WHY the comparison
+        # broke, and these four causes are visibly different on the sheet.
+        sm = " ".join(str(row["span_m_disp"] or "").split())
+        st = " ".join(str(row["span_t_disp"] or "").split())
+        if m.startswith("text:") and t.startswith("sympy:"):
+            return ("model answered in prose, truth collapsed to a bare "
+                    "symbol, so the two never compare")
+        if r"\textcolor" in st:
+            return ("the truth span still carries LaTeX colour markup the "
+                    "model had no way to reproduce")
+        if sm.rstrip(".,;") == st.rstrip(".,;") and sm != st:
+            return "spans differ only by trailing punctuation"
+        if sm.replace("\\,", "").replace(" ", "") == st.replace("\\,", "").replace(" ", ""):
+            return "spans differ only by LaTeX spacing"
+        return "the page's answer is right; the label comparison is what failed"
+    if cat == "TN":
+        return {"notation_misread": "genuine misread of the handwriting",
+                "copied_wrong_line": "copied a different line of the page",
+                "true_wrong": "model answer is wrong on the page's own terms",
+                }.get(lab, "human confirms the model was wrong")
+    if cat == "INDETERMINATE":
+        return "verdict unearned; what the model actually answered is unknown"
+    return "human confirms the model was correct"
+
+
+def confusion_examples(run: pd.DataFrame, v1: pd.Series, v2s: pd.DataFrame,
+                       audit: pd.DataFrame, n_per_category: int = 6,
+                       prefer: Optional[dict] = None, seed: int = 20260813,
+                       per_page: int = 6,
+                       entropy_col: str = "perception_entropy") -> pd.DataFrame:
+    """Examples of every confusion cell, for a reviewer to read by eye.
+
+    `audit` is indexed by item with `final_label` and `note`. `prefer` maps a
+    category to items to place FIRST, so specifically requested cases are
+    guaranteed on the sheet and appear before the seeded fill.
+    """
+    import numpy as np
+
+    rng = np.random.default_rng(seed)
+    prefer = prefer or {}
+    rows = []
+    for i in audit.index:
+        if i not in v2s.index:
+            continue
+        v2 = v2s.loc[i]
+        lab = str(audit.loc[i, "final_label"])
+        rows.append({
+            "item_id": int(i),
+            "category": confusion_category(v1.loc[i], lab),
+            "has_error": bool(run.loc[i, "has_error"]),
+            "strict_v1_correct": bool(v1.loc[i]),
+            "strict_v2_correct": bool(v2["correct_strict_v2_display_primary"]),
+            "entropy": float(run.loc[i, entropy_col]),
+            "span_m_disp": v2["model_span"],
+            "span_t_disp": v2["truth_span"],
+            "label_m": v2["model_label"],
+            "label_t": v2["truth_label"],
+            "human_label": lab,
+            "human_note": " ".join(str(audit.loc[i, "note"] or "").split())[:180],
+        })
+    all_rows = pd.DataFrame(rows)
+    all_rows["note"] = [_confusion_note(r) for _, r in all_rows.iterrows()]
+
+    picked = []
+    for cat in CONFUSION_ORDER:
+        pool = all_rows[all_rows["category"] == cat]
+        first = [i for i in prefer.get(cat, []) if i in set(pool["item_id"])]
+        # Round-robin over the HUMAN LABEL, so a category built from several
+        # mechanisms shows several. A uniform draw on TN returns six
+        # `notation_misread` items and hides `copied_wrong_line` and
+        # `true_wrong` entirely, which teaches a reviewer less than the same
+        # six slots spread across the causes.
+        by_label = {}
+        for _, r in pool.iterrows():
+            if int(r["item_id"]) in first:
+                continue
+            by_label.setdefault(r["human_label"], []).append(int(r["item_id"]))
+        for lab in by_label:
+            rng.shuffle(by_label[lab])
+        # Rarest label first, so a one-item mechanism is never crowded out.
+        order = sorted(by_label, key=lambda k: len(by_label[k]))
+        chosen = list(first)
+        while len(chosen) < n_per_category and any(by_label.values()):
+            for lab in order:
+                if len(chosen) >= n_per_category:
+                    break
+                if by_label[lab]:
+                    chosen.append(by_label[lab].pop(0))
+        picked.extend(chosen[:n_per_category])
+
+    out = all_rows[all_rows["item_id"].isin(picked)].copy()
+    out["_c"] = out["category"].map({c: n for n, c in enumerate(CONFUSION_ORDER)})
+    # Preferred items keep their requested order inside the category.
+    rank = {}
+    for cat in CONFUSION_ORDER:
+        for n, i in enumerate(prefer.get(cat, [])):
+            rank[i] = n
+    out["_r"] = out["item_id"].map(lambda i: rank.get(i, 99))
+    out = out.sort_values(["_c", "_r", "item_id"]).drop(columns=["_c", "_r"])
+    out = out.reset_index(drop=True)
+
+    pos, files, cells = {}, [], []
+    for _, r in out.iterrows():
+        n = pos.get(r["category"], 0)
+        files.append(f"confusion_{r['category']}_p{n // per_page + 1}.png")
+        cells.append(n % per_page + 1)
+        pos[r["category"]] = n + 1
+    out["contact_sheet_file"] = files
+    out["contact_sheet_cell"] = cells
+    return out
+
+
+def confusion_caption(row, width: int = 58) -> str:
+    """Burned-in caption. Category first, because that is what is being shown.
+
+    The `why:` line is WRAPPED rather than truncated. Rendering a page and
+    looking at it showed the explanation cut mid-word ("the match is vacu..."),
+    and that line is the one a reviewer who is not steeped in this pipeline
+    actually needs. The spans are still clipped, because their full text is in
+    the manifest CSV and a span can run to hundreds of characters.
+    """
+    import textwrap
+
+    def z(x, n=width):
+        s = " ".join(str(x).split())
+        return s[:n] + ("..." if len(s) > n else "")
+
+    v1 = "CORRECT" if row["strict_v1_correct"] else "WRONG"
+    v2 = "correct" if row["strict_v2_correct"] else "wrong"
+    lines = [
+        z(f"[{row['category']}]  item {int(row['item_id'])}   "
+          f"err={int(bool(row['has_error']))}   H={float(row['entropy']):.2f}"),
+        z(f"scorer v1={v1}  v2={v2}   human={row['human_label']}"),
+        z(f"span  M: {row['span_m_disp']}"),
+        z(f"span  T: {row['span_t_disp']}"),
+        z(f"label M: {row['label_m']}"),
+        z(f"label T: {row['label_t']}"),
+    ]
+    why = textwrap.wrap(f"why: {' '.join(str(row['note']).split())}",
+                        width=width)[:2]
+    return "\n".join(lines + why)
+
+
+def write_confusion_readme(path: str, examples: pd.DataFrame,
+                           population: Optional[pd.DataFrame] = None) -> str:
+    """The README that makes the sheets readable without this codebase.
+
+    Written for someone who has not seen the pipeline, so it defines the
+    prediction and the truth before showing any count, and states plainly that
+    the matrix scores the SCORER and not the model.
+    """
+    L = ["# Scorer-vs-human examples, for review\n",
+         "Supplementary review material. **No experiment was run to make "
+         "this**: every item, verdict and label already existed, and these "
+         "sheets only put them next to the handwritten page.\n",
+         "## What is being classified\n",
+         "The **prediction** is the automatic scorer's verdict (`strict_v1`) "
+         "on one item. The **truth** is a human reading of the handwritten "
+         "page. So **TP/FP/FN/TN describe the SCORER, not the model.** An "
+         "item can be a false pass while the model was fine, and a false fail "
+         "while the model was fine too.\n",
+         "| group | meaning |", "|---|---|"]
+    for cat in CONFUSION_ORDER:
+        L.append(f"| **{cat}** | {CONFUSION_MEANING[cat]} |")
+
+    L.append("\n## Why there are five groups and not four\n")
+    L.append("The audit's `extraction_issue` label means *the verdict was not "
+             "earned*, which is **not** the same as *the model was wrong*. It "
+             "cuts two ways:\n")
+    L.append("- on a **pass**, an unearned verdict is a **false pass** (FP): "
+             "the item was scored correct for a reason that does not hold;")
+    L.append("- on a **fail**, the same label leaves the model's own answer "
+             "**undecided**. It is neither a true negative nor a false "
+             "negative, so it sits in **INDETERMINATE**.\n")
+    L.append("Folding those items into TN would inflate the scorer's apparent "
+             "accuracy on the largest single group in the audit. They are "
+             "also the project's main finding, so a clean 2x2 that quietly "
+             "dropped them would misrepresent the data.\n")
+
+    if population is not None:
+        L.append("## The audited population these examples come from\n")
+        L.append("| group | items audited |")
+        L.append("|---|---|")
+        counts = population["category"].value_counts()
+        for cat in CONFUSION_ORDER:
+            L.append(f"| {cat} | {int(counts.get(cat, 0))} |")
+        L.append(f"| **total audited** | **{len(population)}** of 300 |")
+        L.append("\n**These counts are not a population rate.** The audit sets "
+                 "are targeted, and two of the three are one-directional by "
+                 "construction, so the mix above reflects what was chosen for "
+                 "review, not what the corpus contains.\n")
+
+    L.append("## Reading a tile\n")
+    L.append("```")
+    L.append("[FN] item 144  err=0  H=1.33          <- group, item id, has_error, entropy")
+    L.append("scorer v1=WRONG v2=wrong human=true_correct")
+    L.append("span  M: The mode of this data is 2...  <- what the extractor took from the MODEL")
+    L.append("span  T: 2                              <- what it took from the TRUTH")
+    L.append("label M: text:the mode of this data...  <- what the comparison actually used")
+    label_t = "label T: sympy:2"
+    L.append(label_t)
+    L.append("why: model answered in prose, truth collapsed to a bare symbol")
+    L.append("```")
+    L.append("\n**`span` versus `label` is the distinction to watch.** The "
+             "span is the text pulled off the page; the label is what the "
+             "comparison used after normalisation. Most failures here are "
+             "visible as a mismatch between those two lines rather than "
+             "between the model and the page.\n")
+    L.append("`H` is the entropy over five independent samples: `0.00` means "
+             "all five agreed, `1.61` means all five differed.\n")
+
+    L.append("## Files\n")
+    for cat in CONFUSION_ORDER:
+        sub = examples[examples["category"] == cat]
+        if not len(sub):
+            continue
+        pages = sorted(sub["contact_sheet_file"].unique())
+        L.append(f"- `{', '.join(pages)}` — {len(sub)} {cat} examples")
+    L.append("- `manifest.csv` — one row per example, with the full untruncated "
+             "spans, labels and the coder's own note\n")
+    L.append("## What these sheets are not\n")
+    L.append("They are **not** a measurement. Items were chosen to show each "
+             "group and each mechanism, preferring specific cases that had "
+             "already been discussed, so nothing here should be counted. The "
+             "measured figures live in the audit record.\n")
+    text = "\n".join(L)
+    with open(path, "w") as fh:
+        fh.write(text)
+    return text
