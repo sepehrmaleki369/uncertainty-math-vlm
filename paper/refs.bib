@@ -1,3 +1,10 @@
+% CASING: proper nouns and acronyms are brace-protected because
+% `ieeenat_fullname.bst` applies sentence case, which correctly
+% lowercases ordinary words but would otherwise render MathVista as
+% "Mathvista", ErrorRadar as "Errorradar" and Qwen2.5-VL as
+% "Qwen2.5-vl". Only genuine names are protected; "vision-language"
+% and "selective prediction" are left to be lowercased by the style.
+%
 % Every entry below was VERIFIED against its official page (arXiv abs,
 % OpenReview, ACL Anthology, or the HuggingFace model card) on 2026-08-12.
 % Titles, author lists and years are transcribed from the fetched page, not
@@ -25,7 +32,7 @@
 }
 
 @article{errorradar,
-  title   = {ErrorRadar: Benchmarking Complex Mathematical Reasoning of
+  title   = {{ErrorRadar}: Benchmarking Complex Mathematical Reasoning of
              Multimodal Large Language Models Via Error Detection},
   author  = {Yan, Yibo and Wang, Shen and Huo, Jiahao and Li, Hang and
              Li, Boyan and Su, Jiamin and Gao, Xiong and Zhang, Yi-Fan and
@@ -36,18 +43,23 @@
   year    = {2024}
 }
 
-% No paper, no stated author and no stated release year on the dataset page
-% (checked 2026-08-12). `key` is supplied so bibtex can sort the entry; the
-% year is genuinely unknown and is left out rather than guessed.
+% Re-checked 2026-08-13 against the dataset card. Still NO paper, NO arXiv id,
+% NO stated author beyond the uploader handle, and NO release year. `key` is
+% supplied so bibtex can sort the entry; the year is left out rather than
+% guessed -- the upload timestamp is not a publication year and citing it as
+% one would be an invention. The URL is the only stable, checkable pointer
+% this artifact has, so it is given in place of the missing metadata.
 @misc{scratchmath,
   key   = {ScratchMath},
-  title = {ScratchMath},
-  howpublished = {HuggingFace dataset \texttt{songdj/ScratchMath}},
-  note  = {No accompanying paper located; cited as a dataset artifact}
+  title = {{ScratchMath}},
+  howpublished = {HuggingFace dataset \texttt{songdj/ScratchMath},
+                  \url{https://huggingface.co/datasets/songdj/ScratchMath}},
+  note  = {CC-BY-NC-SA-4.0. No accompanying paper, stated author or release
+           year on the dataset card; cited as a dataset artifact}
 }
 
 @inproceedings{mathvista,
-  title     = {MathVista: Evaluating Mathematical Reasoning of Foundation
+  title     = {{MathVista}: Evaluating Mathematical Reasoning of Foundation
                Models in Visual Contexts},
   author    = {Lu, Pan and Bansal, Hritik and Xia, Tony and Liu, Jiacheng and
                Li, Chunyuan and Hajishirzi, Hannaneh and Cheng, Hao and
@@ -58,7 +70,7 @@
 
 % ------------------------------------------------------------------ models
 @article{qwen25vl,
-  title   = {Qwen2.5-VL Technical Report},
+  title   = {{Qwen2.5-VL} Technical Report},
   author  = {Bai, Shuai and Chen, Keqin and Liu, Xuejing and Wang, Jialin and
              Ge, Wenbin and Song, Sibo and Dang, Kai and Wang, Peng and
              Wang, Shijie and Tang, Jun and others},
@@ -67,7 +79,7 @@
 }
 
 @article{pixtral,
-  title   = {Pixtral 12B},
+  title   = {Pixtral 12{B}},
   author  = {Agrawal, Pravesh and Antoniak, Szymon and Bou Hanna, Emma and
              Bout, Baptiste and Chaplot, Devendra and Chudnovsky, Jessica and
              Costa, Diogo and De Monicault, Baudouin and Garg, Saurabh and
@@ -104,11 +116,20 @@
 }
 
 % ------------------------------------------ selective prediction/abstention
-@article{selectiveclassification,
-  title   = {Selective Classification for Deep Neural Networks},
-  author  = {Geifman, Yonatan and El-Yaniv, Ran},
-  journal = {arXiv preprint arXiv:1705.08500},
-  year    = {2017}
+% Year 2017 confirmed twice over: arXiv 1705.08500 v1 23 May 2017 / v2 1 Jun
+% 2017, and the paper appeared at NIPS 2017. arXiv carries NO journal-ref
+% field, so the venue was verified independently against DBLP
+% (conf/nips/GeifmanE17) and the official proceedings page. Cited at the
+% peer-reviewed venue rather than as a preprint, matching how every other
+% published paper in this file is cited. `pages` is omitted deliberately:
+% the official NeurIPS BibTeX leaves it empty, and DBLP's 4878--4887 is not
+% reproduced by the publisher's own record.
+@inproceedings{selectiveclassification,
+  title     = {Selective Classification for Deep Neural Networks},
+  author    = {Geifman, Yonatan and El-Yaniv, Ran},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {30},
+  year      = {2017}
 }
 
 @inproceedings{recoverr,
@@ -150,7 +171,7 @@
 }
 
 @article{biasintheloop,
-  title   = {Bias in the Loop: Auditing LLM-as-a-Judge for Software
+  title   = {Bias in the Loop: Auditing {LLM-as-a-Judge} for Software
              Engineering},
   author  = {Zhao, Zixiao and Esmaeili, Amirreza and Fard, Fatemeh},
   journal = {arXiv preprint arXiv:2604.16790},
@@ -165,7 +186,7 @@
 % version "...University Level Mathematics Exams" (plural). The journal form
 % is used here because that is the version cited.
 @article{asaghandwritten,
-  title   = {AI-assisted automated short answer grading of handwritten
+  title   = {{AI}-assisted automated short answer grading of handwritten
              university-level mathematics exam},
   author  = {Liu, Tianyi and Chatain, Julia and Kobel-Keller, Laura and
              Kortemeyer, Gerd and Willwacher, Thomas and Sachan, Mrinmaya},

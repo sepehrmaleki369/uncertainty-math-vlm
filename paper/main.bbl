@@ -10,14 +10,14 @@
 Pravesh Agrawal, Szymon Antoniak, Emma Bou~Hanna, Baptiste Bout, Devendra
   Chaplot, Jessica Chudnovsky, Diogo Costa, Baudouin De~Monicault, Saurabh
   Garg, Theophile Gervet, et~al.
-\newblock Pixtral 12b.
+\newblock Pixtral 12{B}.
 \newblock \emph{arXiv preprint arXiv:2410.07073}, 2024.
 
 \bibitem[Bai et~al.(2025)Bai, Chen, Liu, Wang, Ge, Song, Dang, Wang, Wang,
   Tang, et~al.]{qwen25vl}
 Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin Ge, Sibo Song, Kai
   Dang, Peng Wang, Shijie Wang, Jun Tang, et~al.
-\newblock Qwen2.5-vl technical report.
+\newblock {Qwen2.5-VL} technical report.
 \newblock \emph{arXiv preprint arXiv:2502.13923}, 2025.
 
 \bibitem[Blecher et~al.(2023)Blecher, Cucurull, Scialom, and Stojnic]{nougat}
@@ -28,7 +28,8 @@ Lukas Blecher, Guillem Cucurull, Thomas Scialom, and Robert Stojnic.
 \bibitem[Geifman and El-Yaniv(2017)]{selectiveclassification}
 Yonatan Geifman and Ran El-Yaniv.
 \newblock Selective classification for deep neural networks.
-\newblock \emph{arXiv preprint arXiv:1705.08500}, 2017.
+\newblock In \emph{Advances in Neural Information Processing Systems
+  (NeurIPS)}, 2017.
 
 \bibitem[Kadavath et~al.(2022)Kadavath, Conerly, Askell, Henighan, Drain,
   Perez, et~al.]{kadavath}
@@ -55,7 +56,7 @@ Hunter Lightman, Vineet Kosaraju, Yura Burda, Harri Edwards, Bowen Baker, Teddy
   and Sachan]{asaghandwritten}
 Tianyi Liu, Julia Chatain, Laura Kobel-Keller, Gerd Kortemeyer, Thomas
   Willwacher, and Mrinmaya Sachan.
-\newblock Ai-assisted automated short answer grading of handwritten
+\newblock {AI}-assisted automated short answer grading of handwritten
   university-level mathematics exam.
 \newblock \emph{Teaching Mathematics and its Applications: An International
   Journal of the IMA}, 45\penalty0 (1):\penalty0 84--105, 2026.
@@ -64,8 +65,8 @@ Tianyi Liu, Julia Chatain, Laura Kobel-Keller, Gerd Kortemeyer, Thomas
   Galley, and Gao]{mathvista}
 Pan Lu, Hritik Bansal, Tony Xia, Jiacheng Liu, Chunyuan Li, Hannaneh
   Hajishirzi, Hao Cheng, Kai-Wei Chang, Michel Galley, and Jianfeng Gao.
-\newblock Mathvista: Evaluating mathematical reasoning of foundation models in
-  visual contexts.
+\newblock {MathVista}: Evaluating mathematical reasoning of foundation models
+  in visual contexts.
 \newblock In \emph{International Conference on Learning Representations
   (ICLR)}, 2024.
 
@@ -82,9 +83,11 @@ Rylan Schaeffer, Brando Miranda, and Sanmi Koyejo.
 
 \bibitem[ScratchMath()]{scratchmath}
 ScratchMath.
-\newblock Scratchmath.
-\newblock HuggingFace dataset \texttt{songdj/ScratchMath}.
-\newblock No accompanying paper located; cited as a dataset artifact.
+\newblock {ScratchMath}.
+\newblock HuggingFace dataset \texttt{songdj/ScratchMath},
+  \url{https://huggingface.co/datasets/songdj/ScratchMath}.
+\newblock CC-BY-NC-SA-4.0. No accompanying paper, stated author or release year
+  on the dataset card; cited as a dataset artifact.
 
 \bibitem[Srinivasan et~al.(2024)Srinivasan, Hessel, Gupta, Lin, Choi, Thomason,
   and Chandu]{recoverr}
@@ -109,13 +112,13 @@ Xuezhi Wang, Jason Wei, Dale Schuurmans, Quoc Le, Ed Chi, Sharan Narang,
 Yibo Yan, Shen Wang, Jiahao Huo, Hang Li, Boyan Li, Jiamin Su, Xiong Gao,
   Yi-Fan Zhang, Tianlong Xu, Zhendong Chu, Aoxiao Zhong, Kun Wang, Hui Xiong,
   Philip~S. Yu, Xuming Hu, and Qingsong Wen.
-\newblock Errorradar: Benchmarking complex mathematical reasoning of multimodal
-  large language models via error detection.
+\newblock {ErrorRadar}: Benchmarking complex mathematical reasoning of
+  multimodal large language models via error detection.
 \newblock \emph{arXiv preprint arXiv:2410.04509}, 2024.
 
 \bibitem[Zhao et~al.(2026)Zhao, Esmaeili, and Fard]{biasintheloop}
 Zixiao Zhao, Amirreza Esmaeili, and Fatemeh Fard.
-\newblock Bias in the loop: Auditing llm-as-a-judge for software engineering.
+\newblock Bias in the loop: Auditing {LLM-as-a-Judge} for software engineering.
 \newblock \emph{arXiv preprint arXiv:2604.16790}, 2026.
 
 \end{thebibliography}
