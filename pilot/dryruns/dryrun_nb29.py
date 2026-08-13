@@ -7,9 +7,14 @@ captioning and paging code runs against them.
 
 What is worth asserting, given a professor will read these at face value:
 
-  * **the five groups are all rendered.** Dropping INDETERMINATE would present
+  * **the six groups are all rendered.** Dropping INDETERMINATE would present
     a clean 2x2 that silently omits the largest audited group and inflates the
     scorer's apparent accuracy.
+  * **every sheet title matches every caption on it.** A `needs_visual` item
+    the scorer PASSED once rendered under a heading reading "scorer said
+    WRONG", which a reader without context reads as a contradiction in the
+    data rather than a routing bug.
+  * the legend is drawn once per sheet and does not collide with the tiles.
   * **`extraction_issue` lands on the correct side of the matrix**: FP when
     the scorer passed, INDETERMINATE when it failed. Collapsing the two is the
     single easiest way to misrepresent this audit.
@@ -125,10 +130,10 @@ import pilot.dataset_profile as dp  # noqa: E402
 ex, sheet_dir, pop = ns["examples"], ns["SHEET_DIR"], ns["population"]
 v1, audit = ns["v1"], ns["audit"]
 
-# All five groups, and INDETERMINATE is not silently dropped.
+# All six groups, and INDETERMINATE is not silently dropped.
 groups = set(ex["category"])
 assert groups == set(dp.CONFUSION_ORDER), (
-    f"expected all five groups, got {sorted(groups)}. Omitting INDETERMINATE "
+    f"expected all six groups, got {sorted(groups)}. Omitting INDETERMINATE "
     "presents a clean 2x2 that drops the largest audited group and inflates "
     "the scorer's apparent accuracy.")
 
@@ -142,6 +147,20 @@ assert dp.confusion_category(True, "extraction_issue") == "FP"
 assert dp.confusion_category(False, "extraction_issue") == "INDETERMINATE"
 assert dp.confusion_category(False, "true_correct") == "FN"
 assert dp.confusion_category(False, "notation_misread") == "TN"
+
+# THE TITLE INVARIANT. Every sheet heading states a scorer verdict, so every
+# item on that sheet must have it. Item 5 (`needs_visual`, scorer PASSED) once
+# appeared under "scorer said WRONG".
+dp.assert_confusion_groups_match_titles(ex)
+for _, r in ex.iterrows():
+    assert bool(r["strict_v1_correct"]) is dp.CONFUSION_VERDICT[r["category"]], (
+        f"item {r['item_id']} in {r['category']} has "
+        f"v1={'CORRECT' if r['strict_v1_correct'] else 'WRONG'}")
+assert dp.confusion_category(True, "needs_visual") == "NEEDS_VISUAL", (
+    "a needs_visual item the scorer PASSED is neither INDETERMINATE (whose "
+    "title says the scorer said WRONG) nor FP (nobody found the verdict "
+    "unearned; the coder could not tell)")
+assert 5 not in set(ex.loc[ex["category"] == "INDETERMINATE", "item_id"])
 
 # Requested items present, and FIRST in their group.
 for cat, wanted in ns["PREFER"].items():
@@ -186,9 +205,17 @@ for name in ("manifest.csv", "README.md"):
     assert _os.path.exists(_os.path.join(sheet_dir, name)), name
 assert len(pd.read_csv(_os.path.join(sheet_dir, "manifest.csv"))) == len(ex)
 
+# The legend must appear once per sheet, not inside every tile.
+for _, r in ex.iterrows():
+    assert "LEGEND" not in dp.confusion_caption(r), (
+        "the legend belongs on the sheet, not in each caption")
+for frag in ("scorer v1", "scorer v2", "span M", "span T", "label M",
+             "label T", "sympy:", "text:", "human ="):
+    assert frag in dp.CONFUSION_LEGEND, f"legend missing {frag!r}"
+
 readme = open(_os.path.join(sheet_dir, "README.md")).read()
 assert "describe the SCORER, not the model" in readme
-assert "five groups" in readme.lower()
+assert "six groups" in readme.lower()
 assert "not a population rate" in readme
 # Bold markers sit inside this sentence (`**not** a measurement`), so match
 # the surrounding words rather than the phrase.
@@ -198,8 +225,8 @@ assert readme.index("| **TP** |") < readme.index("items audited"), (
     "the README shows counts before defining what they count")
 
 print("\n" + "=" * 74)
-print("DRY RUN PASSED -- five groups, extraction_issue split correctly, "
-      "captions intact")
+print("DRY RUN PASSED -- six groups, titles match captions, legend once "
+      "per sheet")
 print("=" * 74)
 print(pd.crosstab(ex["category"], ex["human_label"]).to_string())
 print(f"\nsheets: {sorted(_os.listdir(sheet_dir))}")

@@ -487,3 +487,72 @@ def test_the_readme_defines_the_groups_before_it_counts_them(tmp_path):
     assert "not a population rate" in text
     for cat in dp.CONFUSION_ORDER:
         assert cat in text
+
+
+def test_needs_visual_splits_by_verdict_so_titles_never_contradict_captions():
+    """SHIPPED ONCE. `needs_visual` was routed to INDETERMINATE regardless of
+    verdict, so item 5 -- scorer PASSED, coder could not read the page --
+    rendered under a sheet titled "scorer said WRONG" while its own caption
+    read v1=CORRECT. A reader without context sees a contradiction in the
+    data, not a routing bug."""
+    assert dp.confusion_category(False, "needs_visual") == "INDETERMINATE"
+    assert dp.confusion_category(True, "needs_visual") == "NEEDS_VISUAL"
+
+
+def test_a_passed_undecidable_item_is_not_called_a_false_pass():
+    """`needs_visual` on a pass is weaker than `extraction_issue` on a pass:
+    nobody found the verdict unearned, the coder could not tell. Calling it FP
+    would assert more than the audit does."""
+    assert dp.confusion_category(True, "needs_visual") != "FP"
+    assert dp.confusion_category(True, "extraction_issue") == "FP"
+
+
+def test_every_group_declares_the_verdict_its_title_states():
+    assert set(dp.CONFUSION_VERDICT) == set(dp.CONFUSION_ORDER)
+    assert dp.CONFUSION_VERDICT["INDETERMINATE"] is False
+    assert dp.CONFUSION_VERDICT["NEEDS_VISUAL"] is True
+
+
+def test_the_title_invariant_raises_and_names_the_offender():
+    run, v1, v2s, audit = _conf_inputs(["true_correct"], [True])
+    ex = dp.confusion_examples(run, v1, v2s, audit, n_per_category=1)
+    assert dp.assert_confusion_groups_match_titles(ex)["checked"] == 1
+    broken = ex.copy()
+    broken.loc[0, "strict_v1_correct"] = False      # TP with v1=WRONG
+    with pytest.raises(AssertionError, match="contradicts their sheet title"):
+        dp.assert_confusion_groups_match_titles(broken)
+
+
+def test_the_legend_defines_every_field_the_captions_use():
+    for frag in ("scorer v1", "scorer v2", "span M", "span T", "label M",
+                 "label T", "sympy:", "text:", "human ="):
+        assert frag in dp.CONFUSION_LEGEND, frag
+
+
+def test_the_legend_is_not_repeated_inside_every_tile():
+    """Once per sheet. The fields are identical on every cell, so repeating
+    them would triple the text before a reader reaches the item."""
+    run, v1, v2s, audit = _conf_inputs(["true_correct"] * 2, [True] * 2)
+    ex = dp.confusion_examples(run, v1, v2s, audit, n_per_category=2)
+    for _, r in ex.iterrows():
+        assert "LEGEND" not in dp.confusion_caption(r)
+
+
+def test_contact_sheet_footer_is_optional_and_off_by_default():
+    """Existing callers (notebooks 17, 23, 28) must render unchanged."""
+    import inspect
+
+    import pilot.plotting as P
+    assert inspect.signature(P.contact_sheet).parameters["footer"].default == ""
+
+
+def test_the_needs_visual_note_does_not_claim_the_model_was_correct():
+    """The generic fallback asserted 'human confirms the model was correct',
+    which contradicts a sheet titled 'correctness UNKNOWN'. Caught by
+    rendering the single-tile sheet and reading it."""
+    run, v1, v2s, audit = _conf_inputs(["needs_visual"], [True])
+    ex = dp.confusion_examples(run, v1, v2s, audit, n_per_category=1)
+    assert ex.loc[0, "category"] == "NEEDS_VISUAL"
+    note = ex.loc[0, "note"]
+    assert "could not decide" in note
+    assert "confirms the model was correct" not in note

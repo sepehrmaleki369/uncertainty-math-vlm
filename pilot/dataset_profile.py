@@ -1099,7 +1099,15 @@ def mcq_accuracy_sensitivity(profile: pd.DataFrame,
 _MODEL_WRONG_LABELS = ("notation_misread", "copied_wrong_line", "true_wrong",
                        "hallucination")
 
-CONFUSION_ORDER = ("TP", "FP", "FN", "TN", "INDETERMINATE")
+CONFUSION_ORDER = ("TP", "FP", "FN", "TN", "INDETERMINATE", "NEEDS_VISUAL")
+
+#: The `strict_v1` verdict every item in a group MUST have. Each sheet title
+#: states the verdict, so a mismatch puts a caption under a heading that
+#: contradicts it. This happened: `needs_visual` was routed to INDETERMINATE
+#: regardless of verdict, so item 5 (scorer PASSED, coder could not decide)
+#: appeared under a sheet reading "scorer said WRONG". Asserted at render time.
+CONFUSION_VERDICT = {"TP": True, "FP": True, "FN": False, "TN": False,
+                     "INDETERMINATE": False, "NEEDS_VISUAL": True}
 
 CONFUSION_MEANING = {
     "TP": "scorer said CORRECT and the human agrees the model was correct",
@@ -1110,6 +1118,9 @@ CONFUSION_MEANING = {
     "TN": "scorer said WRONG and the human agrees the model was wrong",
     "INDETERMINATE": "scorer said WRONG and the verdict was UNEARNED, so the "
                      "model's own answer is undecided: neither TN nor FN",
+    "NEEDS_VISUAL": "scorer said CORRECT but the coder could not decide from "
+                    "the page, so this is neither a confirmed pass nor a "
+                    "confirmed false pass: it needs a second visual check",
 }
 
 
@@ -1123,11 +1134,18 @@ def confusion_category(v1_correct: bool, final_label: str) -> str:
         # pass, and a stronger one than an unearned verdict.
         return "FP" if correct else "TN"
     if final_label == "extraction_issue":
-        # THE ASYMMETRY, and it is the whole reason there are five groups.
+        # THE ASYMMETRY, and it is the reason the groups outnumber the cells.
         # An unearned verdict on a PASS is a false pass: the item was scored
         # correct for a reason that does not hold. On a FAIL the same label
         # leaves the model's answer undecided, so it is neither TN nor FN.
         return "FP" if correct else "INDETERMINATE"
+    # `needs_visual` must split by verdict TOO. Routing it to INDETERMINATE
+    # unconditionally put item 5 -- scorer PASSED, coder could not read the
+    # page -- under a sheet titled "scorer said WRONG". And it is not an FP
+    # either: the coder did not find the verdict unearned, they could not
+    # tell, which is a weaker statement and deserves its own group.
+    if final_label == "needs_visual":
+        return "NEEDS_VISUAL" if correct else "INDETERMINATE"
     return "INDETERMINATE"
 
 
@@ -1166,6 +1184,13 @@ def _confusion_note(row) -> str:
                 }.get(lab, "human confirms the model was wrong")
     if cat == "INDETERMINATE":
         return "verdict unearned; what the model actually answered is unknown"
+    if cat == "NEEDS_VISUAL":
+        # The default below asserts the model was CORRECT, which is exactly
+        # what this group does not know. Falling through to it put "human
+        # confirms the model was correct" under a title reading "correctness
+        # UNKNOWN" -- the same contradiction the group was created to remove.
+        return ("scorer passed this, but the coder could not decide from the "
+                "page: neither a confirmed pass nor a confirmed false pass")
     return "human confirms the model was correct"
 
 
@@ -1309,7 +1334,7 @@ def write_confusion_readme(path: str, examples: pd.DataFrame,
     for cat in CONFUSION_ORDER:
         L.append(f"| **{cat}** | {CONFUSION_MEANING[cat]} |")
 
-    L.append("\n## Why there are five groups and not four\n")
+    L.append("\n## Why there are six groups and not four\n")
     L.append("The audit's `extraction_issue` label means *the verdict was not "
              "earned*, which is **not** the same as *the model was wrong*. It "
              "cuts two ways:\n")
@@ -1322,6 +1347,16 @@ def write_confusion_readme(path: str, examples: pd.DataFrame,
              "accuracy on the largest single group in the audit. They are "
              "also the project's main finding, so a clean 2x2 that quietly "
              "dropped them would misrepresent the data.\n")
+    L.append("**NEEDS_VISUAL** is the sixth group and holds items the coder "
+             "could not decide from the page *while the scorer passed them*. "
+             "That is weaker than a false pass: nobody found the verdict "
+             "unearned, they could not tell. There is exactly one such item "
+             "and it is kept visible rather than dropped, because a suspected "
+             "false pass that could not be confirmed is worth a second look.\n")
+    L.append("**Every sheet title states a scorer verdict, and every item on "
+             "that sheet has it.** This is asserted before the sheets are "
+             "written, after one item was rendered under a heading that "
+             "contradicted its own caption.\n")
 
     if population is not None:
         L.append("## The audited population these examples come from\n")
@@ -1373,3 +1408,46 @@ def write_confusion_readme(path: str, examples: pd.DataFrame,
     with open(path, "w") as fh:
         fh.write(text)
     return text
+
+
+#: One legend per SHEET, never per tile. The fields are the same on every
+#: cell, so repeating them inside each caption would triple the text a reader
+#: has to skip before reaching the item.
+CONFUSION_LEGEND = (
+    "LEGEND   scorer v1 = frozen strict_v1 automatic verdict (the one all "
+    "reported numbers use)   |   scorer v2 = diagnostic display-primary "
+    "verdict, shown for comparison only\n"
+    "         span M / span T = the answer span the extractor pulled from "
+    "the MODEL's output / from the reference answer\n"
+    "         label M / label T = what the comparison actually used after "
+    "normalisation.  `sympy:` = parsed symbolically;  `text:` = plain-text "
+    "normalisation, used when symbolic parsing was not applicable\n"
+    "         human = the human audit label read from the handwritten page, "
+    "which overrides every automatic field above   |   H = entropy over 5 "
+    "samples (0.00 all agreed, 1.61 all differed)\n"
+    "         err = the page carries a deliberately injected error.  A "
+    "mismatch between `span` and `label` is usually where a verdict goes "
+    "wrong."
+)
+
+
+def assert_confusion_groups_match_titles(examples: pd.DataFrame) -> dict:
+    """Every item's `strict_v1` verdict must match what its sheet title says.
+
+    Cheap, and it catches the exact defect that shipped once: a `needs_visual`
+    item where the scorer PASSED was rendered under a heading reading "scorer
+    said WRONG". Raises rather than warns, because the sheets are read by
+    someone without the context to notice.
+    """
+    bad = []
+    for _, r in examples.iterrows():
+        want = CONFUSION_VERDICT.get(r["category"])
+        if want is None or bool(r["strict_v1_correct"]) != want:
+            bad.append((int(r["item_id"]), r["category"],
+                        bool(r["strict_v1_correct"])))
+    if bad:
+        raise AssertionError(
+            "items whose strict_v1 verdict contradicts their sheet title: "
+            + ", ".join(f"item {i} in {c} has v1={'CORRECT' if v else 'WRONG'}"
+                        for i, c, v in bad))
+    return {"checked": len(examples), "groups": sorted(set(examples["category"]))}

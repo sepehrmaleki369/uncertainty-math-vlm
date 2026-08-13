@@ -346,12 +346,31 @@ Renders captioned PNG sheets to
   draw on TN returned six `notation_misread` items and hid `copied_wrong_line`
   and `true_wrong` entirely; six copies of one mechanism teach a reviewer
   nothing.
-- **Two things only rendering a page could have caught**, both fixed: the
-  `why:` line was truncated mid-word (`the match is vacu...`) and is now
-  wrapped to two lines, and the FN note was one generic sentence repeated on
-  every tile — it now names the mechanism (prose-vs-collapsed-symbol, trailing
-  punctuation, LaTeX spacing, residual `\textcolor`). **Render and LOOK at a
-  sheet; the asserts passed both times.**
+- **SIX groups, not five (fixed 2026-08-13).** `needs_visual` was routed to
+  INDETERMINATE regardless of verdict, so **item 5 — scorer PASSED, coder
+  could not read the page — rendered under a sheet titled "scorer said
+  WRONG" while its own caption read `v1=CORRECT`.** A reader without context
+  sees a contradiction in the DATA, not a routing bug. It now splits by
+  verdict: `needs_visual`+wrong → INDETERMINATE, `needs_visual`+correct →
+  **`NEEDS_VISUAL`** (1 item). It is deliberately **not** FP: nobody found the
+  verdict unearned, the coder could not tell, and calling it a false pass
+  asserts more than the audit does. `CONFUSION_VERDICT` +
+  `assert_confusion_groups_match_titles` enforce that **every sheet title's
+  stated verdict holds for every item on it**, checked before rendering.
+- **A LEGEND is now drawn once per SHEET** (`CONFUSION_LEGEND`, via a new
+  optional `footer=` on `plotting.contact_sheet`, empty by default so
+  notebooks 17/23/28 render unchanged). It defines v1/v2, span M/T, label M/T,
+  `sympy:`/`text:`, `human`, `H` and `err`. **Not per tile** — the fields are
+  identical on every cell.
+- **FOUR defects only RENDERING A PAGE AND LOOKING AT IT caught; the asserts
+  passed every time.** (1) the `why:` line truncated mid-word (`the match is
+  vacu...`), now wrapped; (2) the FN note was one generic sentence on every
+  tile, now names the mechanism (prose-vs-collapsed-symbol, trailing
+  punctuation, LaTeX spacing, residual `\textcolor`); (3) item 5 under a
+  contradicting title; (4) **the NEEDS_VISUAL note fell through to "human
+  confirms the model was correct" under a title reading "correctness
+  UNKNOWN"** — the same contradiction the group existed to remove.
+  **Render the sheet and read it.**
 - **TO RUN: notebook 29 in Colab** (no GPU). Writes 5 sheets + `manifest.csv`
   + `README.md`, the last defining the groups before showing any count.
 

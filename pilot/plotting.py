@@ -1468,6 +1468,7 @@ def contact_sheet(
     title: str = "",
     cell_height: float = 3.6,
     caption_fontsize: float = 7.0,
+    footer: str = "",
 ):
     """A grid of handwritten pages with captions, paged. Returns a list of figures.
 
@@ -1520,7 +1521,16 @@ def contact_sheet(
             suffix = f"  ({page + 1}/{n_pages})" if n_pages > 1 else ""
             fig.suptitle(title + suffix, fontsize=11, color=INK_SECONDARY,
                          x=0.01, ha="left")
-        fig.tight_layout(rect=(0, 0, 1, 0.97 if title else 1))
+        # Reserve space for the footer BEFORE tight_layout, or the legend is
+        # drawn over the bottom row of captions. Optional and empty by
+        # default, so every existing caller renders byte-identically.
+        bottom = 0.0
+        if footer:
+            n_lines = footer.count("\n") + 1
+            bottom = min(0.22, 0.016 * n_lines + 0.02)
+            fig.text(0.01, bottom * 0.55, footer, fontsize=caption_fontsize,
+                     color=INK_SECONDARY, ha="left", va="center", linespacing=1.5)
+        fig.tight_layout(rect=(0, bottom, 1, 0.97 if title else 1))
         figures.append(fig)
     return figures
 
