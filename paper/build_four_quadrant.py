@@ -79,12 +79,27 @@ PANELS = (
 # the canvas near the column width keeps the labels legible: at 6.5in the scale
 # is 0.5, so 14pt and 11pt print at 7pt and 5.5pt.
 FIG_W, FIG_H = 6.5, 5.6
-TITLE_PT, SUB_PT = 14, 11
+TITLE_PT, SUB_PT = 13, 9.5
+
+# Text sits ABOVE each axes box, so the top margin and the row gap must both be
+# wide enough to hold it. The first render clipped the top row's headline and
+# ran it into the sub-line: 0.945 left ~22pt of headroom for a ~36pt stack, and
+# a 16pt title pad sat inside the sub-line's 4-15pt band.
+SUB_GAP = 3                                   # sub-line above the cell top
+TITLE_PAD = SUB_GAP + SUB_PT + 6              # headline clear of the sub-line
+BREATH = 7                                    # gap under the page above
+TEXT_STACK_PT = TITLE_PAD + TITLE_PT + BREATH  # total height to reserve
+
+
+def pt(points: float) -> float:
+    """Points to figure fraction, vertically."""
+    return (points / 72.0) / FIG_H
 
 
 def main() -> str:
     man = pd.read_csv(MANIFEST).set_index("item_id")
     fig, axes = plt.subplots(2, 2, figsize=(FIG_W, FIG_H))
+    labelled = []
 
     for ax, (item, headline, provenance, exp_h, exp_ok) in zip(
             axes.ravel(), PANELS):
@@ -113,19 +128,53 @@ def main() -> str:
             s.set_edgecolor("#bbbbbb")
             s.set_linewidth(0.8)
 
-        # imshow shrinks the axes box to the image aspect, so a title and a
-        # transAxes label both anchor to the same edge and overlap. Offset both
-        # in points from that edge instead.
-        ax.set_title(headline, fontsize=TITLE_PT, pad=16, color="#111111")
-        ax.annotate(provenance, xy=(0.5, 1.0), xycoords="axes fraction",
-                    xytext=(0, 4), textcoords="offset points",
-                    ha="center", va="bottom", fontsize=SUB_PT, color="#555555")
+        labelled.append((ax, headline, provenance))
 
-    fig.subplots_adjust(left=0.012, right=0.988, top=0.945, bottom=0.012,
-                        wspace=0.05, hspace=0.14)
+    # Reserve the text stack explicitly rather than guessing a fraction: the
+    # pages have aspect ratios from 0.56 to 2.12, so the row height moves a lot
+    # between builds and a hard-coded gap does not survive a panel swap.
+    stack_frac = (TEXT_STACK_PT / 72.0) / FIG_H
+    top = 1.0 - (stack_frac + 0.012)
+    row_h = (top - 0.012) / 2.0
+    fig.subplots_adjust(left=0.012, right=0.988, top=top, bottom=0.012,
+                        wspace=0.05, hspace=stack_frac / row_h)
+
+    # Labels go on last, and on the GRID CELL rather than the axes. Two reasons.
+    # The cell geometry is only final after subplots_adjust, so reading it inside
+    # the loop above gave the pre-adjustment defaults and the text landed on top
+    # of the pages. And imshow shrinks each axes to its image aspect, which here
+    # ranges from 0.56 to 2.12, so text centred on the axes drifts with the page
+    # shape: item 251 is narrow and its sub-line ran into the next panel.
+    for ax, headline, provenance in labelled:
+        cell = ax.get_subplotspec().get_position(fig)
+        x = cell.x0 + cell.width / 2.0
+        fig.text(x, cell.y1 + pt(SUB_GAP), provenance, ha="center",
+                 va="bottom", fontsize=SUB_PT, color="#555555")
+        fig.text(x, cell.y1 + pt(TITLE_PAD), headline, ha="center",
+                 va="bottom", fontsize=TITLE_PT, color="#111111")
+    # Both layout bugs this figure actually shipped were invisible to every
+    # assert and only showed up on the rendered page: the headline was clipped
+    # off the top and ran into the sub-line, and a narrow page pushed its
+    # sub-line into the neighbouring panel. Check the drawn geometry rather than
+    # trusting the constants, since a panel swap changes every page aspect.
+    fig.canvas.draw()
+    rend = fig.canvas.get_renderer()
+    boxes = [(t.get_text(), t.get_window_extent(renderer=rend)) for t in fig.texts]
+    for a in range(len(boxes)):
+        for b in range(a + 1, len(boxes)):
+            assert not boxes[a][1].overlaps(boxes[b][1]), (
+                f"labels collide: {boxes[a][0]!r} and {boxes[b][0]!r}")
+    for text, box in boxes:
+        for ax in axes.ravel():
+            assert not box.overlaps(ax.get_window_extent(renderer=rend)), (
+                f"label {text!r} overlaps a page")
+
     # 220 dpi over a 6.5in canvas is ~440 effective dpi once scaled into the
     # 3.25in column. Higher only inflates the upload.
-    fig.savefig(OUT, dpi=220, facecolor="white")
+    # bbox_inches="tight" is the backstop: if a headline still overhangs, the
+    # saved area grows to include it instead of cropping it away silently.
+    fig.savefig(OUT, dpi=220, facecolor="white", bbox_inches="tight",
+                pad_inches=0.05)
     plt.close(fig)
     print(f"wrote {os.path.relpath(OUT, ROOT)}")
     for item, headline, provenance, _, _ in PANELS:
