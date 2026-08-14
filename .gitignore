@@ -40,3 +40,9 @@ reference/wacv_evaluation_artifact/second_rater_blinding_key_PRIVATE.csv
 # carries ids, hashes and derived numbers but no gated text.
 results/
 .dryrun_scratch/
+
+# Figure 2 source pages: gated FERMAT content, same reason as results/ above.
+# The composed figure (paper/figures/four_quadrant.png) IS committed, as any
+# paper figure of a dataset must be; the unrendered pages are not. Export with
+# pilot/31_export_figure2_pages.ipynb -- see paper/figures/pages/README.md.
+paper/figures/pages/*.jpg
