@@ -1,0 +1,49 @@
+{
+  "artifact": "binary-stratification null stress test",
+  "auroc": "pilot.plotting.compute_auroc, entropy predicts ERROR",
+  "base_seed": 20260814,
+  "conditions": [
+    "y=1",
+    "y=0",
+    "pooled_balanced"
+  ],
+  "entropy_fold": "folded on the integer count so s and K-s tie exactly",
+  "entropy_units": "nats",
+  "k_values": [
+    3,
+    5,
+    7,
+    9,
+    15
+  ],
+  "n_items": 650,
+  "n_sims": 2000,
+  "p_values": [
+    0.05,
+    0.1,
+    0.15,
+    0.2,
+    0.25,
+    0.3,
+    0.35,
+    0.4,
+    0.45,
+    0.5,
+    0.55,
+    0.6,
+    0.65,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9,
+    0.95
+  ],
+  "platform": "macOS-26.5-arm64-arm-64bit-Mach-O",
+  "python": "3.13.3",
+  "runtime_s": 181.9,
+  "seed_scheme": "sha256(base|condition|p|k)[:4] per cell, independent",
+  "smoke": false,
+  "undefined_policy": "one-class replicates counted invalid, never replaced by 0.5",
+  "what_this_is": "signal-free responder with NO item-level information; every AUROC is voting arithmetic"
+}
