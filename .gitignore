@@ -21,3 +21,10 @@ paper/*.log
 paper/*.blg
 paper/*.out
 paper/*.brf
+
+# WACV artifact: the PRIVATE half. This repository is public (every notebook
+# clones it with no credentials), and these two files hold gated FERMAT text
+# and the second-rater blinding key. The artifact's own README says they are
+# excluded from release, so committing them here would contradict it.
+reference/wacv_evaluation_artifact/fermat_n300_private_manifest.csv
+reference/wacv_evaluation_artifact/second_rater_blinding_key_PRIVATE.csv
