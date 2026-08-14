@@ -2607,8 +2607,17 @@ Two kinds, for two failure modes. **Read `reference/README.md` first.**
   contains a real secret. If a real token ever appears in a diff, chat, or
   notebook output, treat it as compromised — tell the user to revoke it
   immediately, don't just quietly fix the code.
-- **`results/` is intentionally untracked in git** (not gitignored, just
-  never `git add`ed) — CSVs come from Google Drive, downloaded manually by
+- **`results/` is gitignored as of 2026-08-15, and the earlier claim here that
+  it was "intentionally untracked" was FACTUALLY WRONG.** 19 run CSVs, ~26 MB,
+  were tracked from `5ebc218` onward, and they carry FERMAT's `orig_q` and
+  `pert_a` verbatim plus raw generations derived from gated pages. FERMAT is
+  gated (`gated=auto`), so that was a public redistribution of gated text.
+  Untracked before submission; **local copies are untouched**, and the
+  releasable substitute is
+  `reference/wacv_evaluation_artifact/fermat_n300_public_manifest.csv` (ids,
+  hashes, derived numbers, no gated text). **The git HISTORY still contains
+  the files** — removing them there needs a rewrite and a force push, which is
+  a separate decision. CSVs come from Google Drive, downloaded manually by
   the user into `results/` when needed for local analysis. Large/expensive
   reproducible outputs (`figures/` at repo root) genuinely are gitignored;
   `report/figures/` is not (anchored `/figures/` pattern in `.gitignore` —
