@@ -29,7 +29,7 @@ item_id,stratum,first_audit_sources,queue,selection_prob,review_order,review_id,
 246,v1_wrong|clean|H_mid|genuinely_wrong_census|v2_high_priority,genuinely_wrong_census|v2_high_priority,core,0.5,27,R0027,second_rater_v1_20260814,20260814
 155,v1_wrong|clean|H_high|genuinely_wrong_census,genuinely_wrong_census,extension,,28,R0028,second_rater_v1_20260814,20260814
 104,v1_correct|err|H=0|v1_correct_spotcheck,v1_correct_spotcheck,core,0.5,29,R0029,second_rater_v1_20260814,20260814
-116,v1_correct|clean|H_low|v2_high_priority,v2_high_priority,extension,,30,R0030,second_rater_v1_20260814,20260814
+116,v1_correct|clean|H_low|v2_high_priority,v2_high_priority,core,1.0,30,R0030,second_rater_v1_20260814,20260814
 30,v1_wrong|err|H_mid|genuinely_wrong_census,genuinely_wrong_census,core,0.5,31,R0031,second_rater_v1_20260814,20260814
 184,v1_wrong|clean|H_mid|genuinely_wrong_census,genuinely_wrong_census,core,0.545455,32,R0032,second_rater_v1_20260814,20260814
 7,v1_correct|clean|H_low|v1_correct_spotcheck,v1_correct_spotcheck,extension,,33,R0033,second_rater_v1_20260814,20260814
@@ -37,14 +37,14 @@ item_id,stratum,first_audit_sources,queue,selection_prob,review_order,review_id,
 94,v1_wrong|err|H_mid|genuinely_wrong_census,genuinely_wrong_census,core,0.5,35,R0035,second_rater_v1_20260814,20260814
 202,v1_wrong|clean|H_high|genuinely_wrong_census,genuinely_wrong_census,core,0.5,36,R0036,second_rater_v1_20260814,20260814
 172,v1_wrong|err|H_mid|v2_high_priority,v2_high_priority,core,0.5,37,R0037,second_rater_v1_20260814,20260814
-218,v1_wrong|err|H=0|genuinely_wrong_census,genuinely_wrong_census,core,1.0,38,R0038,second_rater_v1_20260814,20260814
+218,v1_wrong|err|H=0|genuinely_wrong_census,genuinely_wrong_census,extension,,38,R0038,second_rater_v1_20260814,20260814
 204,v1_correct|err|H_mid|v1_correct_spotcheck|v2_high_priority,v1_correct_spotcheck|v2_high_priority,core,0.666667,39,R0039,second_rater_v1_20260814,20260814
 177,v1_wrong|err|H_mid|genuinely_wrong_census|v2_high_priority,genuinely_wrong_census|v2_high_priority,core,0.533333,40,R0040,second_rater_v1_20260814,20260814
 28,v1_correct|clean|H_mid|v1_correct_spotcheck,v1_correct_spotcheck,extension,,41,R0041,second_rater_v1_20260814,20260814
 85,v1_correct|clean|H=0|v1_correct_spotcheck,v1_correct_spotcheck,extension,,42,R0042,second_rater_v1_20260814,20260814
 173,v1_wrong|err|H_low|genuinely_wrong_census,genuinely_wrong_census,core,0.666667,43,R0043,second_rater_v1_20260814,20260814
 130,v1_wrong|clean|H_mid|genuinely_wrong_census,genuinely_wrong_census,extension,,44,R0044,second_rater_v1_20260814,20260814
-206,v1_correct|clean|H_high|v2_high_priority,v2_high_priority,extension,,45,R0045,second_rater_v1_20260814,20260814
+206,v1_correct|clean|H_high|v2_high_priority,v2_high_priority,core,1.0,45,R0045,second_rater_v1_20260814,20260814
 263,v1_wrong|err|H_mid|genuinely_wrong_census|v2_high_priority,genuinely_wrong_census|v2_high_priority,core,0.533333,46,R0046,second_rater_v1_20260814,20260814
 276,v1_wrong|clean|H_mid|genuinely_wrong_census|v2_high_priority,genuinely_wrong_census|v2_high_priority,core,0.5,47,R0047,second_rater_v1_20260814,20260814
 176,v1_wrong|err|H=0|genuinely_wrong_census|v2_high_priority,genuinely_wrong_census|v2_high_priority,extension,,48,R0048,second_rater_v1_20260814,20260814
@@ -56,7 +56,7 @@ item_id,stratum,first_audit_sources,queue,selection_prob,review_order,review_id,
 97,v1_correct|clean|H_low|v1_correct_spotcheck,v1_correct_spotcheck,core,0.5,54,R0054,second_rater_v1_20260814,20260814
 149,v1_wrong|err|H_mid|genuinely_wrong_census|v2_high_priority,genuinely_wrong_census|v2_high_priority,challenge,,55,R0055,second_rater_v1_20260814,20260814
 120,v1_wrong|err|H_low|genuinely_wrong_census|v2_high_priority,genuinely_wrong_census|v2_high_priority,extension,,56,R0056,second_rater_v1_20260814,20260814
-10,v1_correct|clean|H_mid|v2_high_priority,v2_high_priority,extension,,57,R0057,second_rater_v1_20260814,20260814
+10,v1_correct|clean|H_mid|v2_high_priority,v2_high_priority,core,1.0,57,R0057,second_rater_v1_20260814,20260814
 198,v1_wrong|clean|H_high|v2_high_priority,v2_high_priority,extension,,58,R0058,second_rater_v1_20260814,20260814
 280,v1_wrong|err|H_mid|v2_high_priority,v2_high_priority,extension,,59,R0059,second_rater_v1_20260814,20260814
 60,v1_wrong|err|H_high|genuinely_wrong_census,genuinely_wrong_census,core,0.5,60,R0060,second_rater_v1_20260814,20260814
@@ -113,7 +113,7 @@ item_id,stratum,first_audit_sources,queue,selection_prob,review_order,review_id,
 194,v1_correct|clean|H_low|v1_correct_spotcheck,v1_correct_spotcheck,extension,,111,R0111,second_rater_v1_20260814,20260814
 265,v1_wrong|clean|H_mid|genuinely_wrong_census|v2_high_priority,genuinely_wrong_census|v2_high_priority,core,0.5,112,R0112,second_rater_v1_20260814,20260814
 232,v1_wrong|err|H_mid|v2_high_priority,v2_high_priority,extension,,113,R0113,second_rater_v1_20260814,20260814
-77,v1_correct|clean|H=0|v2_high_priority,v2_high_priority,extension,,114,R0114,second_rater_v1_20260814,20260814
+77,v1_correct|clean|H=0|v2_high_priority,v2_high_priority,core,1.0,114,R0114,second_rater_v1_20260814,20260814
 113,v1_correct|clean|H_low|v1_correct_spotcheck,v1_correct_spotcheck,core,0.5,115,R0115,second_rater_v1_20260814,20260814
 217,v1_wrong|clean|H_mid|genuinely_wrong_census|v2_high_priority,genuinely_wrong_census|v2_high_priority,extension,,116,R0116,second_rater_v1_20260814,20260814
 215,v1_correct|err|H_low|v1_correct_spotcheck|v2_high_priority,v1_correct_spotcheck|v2_high_priority,extension,,117,R0117,second_rater_v1_20260814,20260814
@@ -165,12 +165,12 @@ item_id,stratum,first_audit_sources,queue,selection_prob,review_order,review_id,
 211,v1_wrong|err|H_high|genuinely_wrong_census,genuinely_wrong_census,core,0.5,163,R0163,second_rater_v1_20260814,20260814
 245,v1_wrong|err|H_mid|genuinely_wrong_census|v2_high_priority,genuinely_wrong_census|v2_high_priority,core,0.533333,164,R0164,second_rater_v1_20260814,20260814
 81,v1_wrong|err|H_high|genuinely_wrong_census,genuinely_wrong_census,extension,,165,R0165,second_rater_v1_20260814,20260814
-294,v1_wrong|err|H_high|v1_correct_spotcheck|v2_high_priority,v1_correct_spotcheck|v2_high_priority,core,1.0,166,R0166,second_rater_v1_20260814,20260814
+294,v1_wrong|err|H_high|v1_correct_spotcheck|v2_high_priority,v1_correct_spotcheck|v2_high_priority,extension,,166,R0166,second_rater_v1_20260814,20260814
 209,v1_wrong|err|H_mid|v2_high_priority,v2_high_priority,extension,,167,R0167,second_rater_v1_20260814,20260814
 216,v1_correct|clean|H_mid|v1_correct_spotcheck,v1_correct_spotcheck,extension,,168,R0168,second_rater_v1_20260814,20260814
 93,v1_wrong|err|H_mid|genuinely_wrong_census,genuinely_wrong_census,extension,,169,R0169,second_rater_v1_20260814,20260814
 65,v1_wrong|clean|H_high|genuinely_wrong_census|v2_high_priority,genuinely_wrong_census|v2_high_priority,extension,,170,R0170,second_rater_v1_20260814,20260814
-244,v1_correct|err|H_mid|v2_high_priority,v2_high_priority,core,1.0,171,R0171,second_rater_v1_20260814,20260814
+244,v1_correct|err|H_mid|v2_high_priority,v2_high_priority,extension,,171,R0171,second_rater_v1_20260814,20260814
 264,v1_wrong|err|H_mid|genuinely_wrong_census|v2_high_priority,genuinely_wrong_census|v2_high_priority,core,0.533333,172,R0172,second_rater_v1_20260814,20260814
 14,v1_wrong|clean|H_mid|genuinely_wrong_census,genuinely_wrong_census,core,0.545455,173,R0173,second_rater_v1_20260814,20260814
 148,v1_wrong|err|H_low|genuinely_wrong_census|v2_high_priority,genuinely_wrong_census|v2_high_priority,core,0.666667,174,R0174,second_rater_v1_20260814,20260814
@@ -195,7 +195,7 @@ item_id,stratum,first_audit_sources,queue,selection_prob,review_order,review_id,
 55,v1_wrong|err|H_mid|genuinely_wrong_census,genuinely_wrong_census,extension,,193,R0193,second_rater_v1_20260814,20260814
 285,v1_wrong|clean|H_mid|v2_high_priority,v2_high_priority,core,0.5,194,R0194,second_rater_v1_20260814,20260814
 4,v1_correct|clean|H_mid|v1_correct_spotcheck,v1_correct_spotcheck,extension,,195,R0195,second_rater_v1_20260814,20260814
-271,v1_wrong|err|H=0|v2_high_priority,v2_high_priority,core,1.0,196,R0196,second_rater_v1_20260814,20260814
+271,v1_wrong|err|H=0|v2_high_priority,v2_high_priority,extension,,196,R0196,second_rater_v1_20260814,20260814
 137,v1_correct|err|H_mid|v1_correct_spotcheck,v1_correct_spotcheck,core,0.538462,197,R0197,second_rater_v1_20260814,20260814
 199,v1_wrong|clean|H_mid|genuinely_wrong_census|v2_high_priority,genuinely_wrong_census|v2_high_priority,extension,,198,R0198,second_rater_v1_20260814,20260814
 185,v1_wrong|err|H_low|genuinely_wrong_census,genuinely_wrong_census,core,0.666667,199,R0199,second_rater_v1_20260814,20260814

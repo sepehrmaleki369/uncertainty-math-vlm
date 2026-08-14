@@ -230,3 +230,22 @@ def test_indeterminate_is_a_first_class_answer():
     assert "not_applicable" in SR.FAILURE_CATEGORY
     text = SR.rater_instructions()
     assert "not" in text.lower() and "indeterminate" in text
+
+
+def test_the_core_allocation_does_not_depend_on_row_order(manifests, audit_long, run):
+    """CROSS-PLATFORM REPRODUCIBILITY. 18 of the 120 core seats are handed out
+    by largest remainder, the remainder takes only 13 distinct values, and the
+    cut falls inside an eight-way tie. With pandas' default (unstable)
+    quicksort the tie order followed the pandas version, so Colab and a local
+    machine produced different cores from the same seed and the queue file
+    hash differed. Shuffling the input rows simulates a different groupby
+    order; the core must not move."""
+    public, _ = manifests
+    a = SR.build_queue(public, audit_long, run)
+    shuffled = audit_long.sample(frac=1.0, random_state=7).reset_index(drop=True)
+    b = SR.build_queue(public, shuffled, run)
+    core_a = sorted(a.loc[a["queue"] == "core", "item_id"])
+    core_b = sorted(b.loc[b["queue"] == "core", "item_id"])
+    assert core_a == core_b, (
+        f"core moved under a row reorder: {len(set(core_a) ^ set(core_b))} items differ")
+    assert len(core_a) == SR.N_CORE

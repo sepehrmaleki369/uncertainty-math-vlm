@@ -101,7 +101,16 @@ def build_queue(public: pd.DataFrame, audit_long: pd.DataFrame,
     sizes = pool.groupby("stratum").size()
     want = (sizes / sizes.sum() * n_core)
     take = np.floor(want).astype(int)
-    for s in want.sub(take).sort_values(ascending=False).index:
+    remainder = want.sub(take)
+    # DETERMINISTIC TIE-BREAK, and it is not cosmetic. 48 strata floor to 102
+    # seats, so 18 are handed out by largest remainder -- and the remainder
+    # takes only 13 distinct values, with the cut falling inside an EIGHT-WAY
+    # tie. `sort_values` defaults to quicksort, which is not stable, so the
+    # order within a tie group depended on the pandas version: the same seed
+    # produced a different core on Colab than locally, and the queue file
+    # hash differed. Sorting by (-remainder, stratum name) makes the
+    # allocation a function of the data alone.
+    for s in sorted(remainder.index, key=lambda st: (-float(remainder[st]), str(st))):
         if take.sum() >= n_core:
             break
         take[s] += 1
