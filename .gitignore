@@ -28,3 +28,15 @@ paper/*.brf
 # excluded from release, so committing them here would contradict it.
 reference/wacv_evaluation_artifact/fermat_n300_private_manifest.csv
 reference/wacv_evaluation_artifact/second_rater_blinding_key_PRIVATE.csv
+
+# GATED DATASET TEXT -- must not be in a public release.
+# FERMAT is gated (ai4bharat/FERMAT, gated=auto) and these run CSVs carry its
+# `orig_q` and `pert_a` verbatim, plus raw generations derived from gated
+# pages. 19 such files, ~26 MB, were tracked here from 5ebc218 onward; the
+# CLAUDE.md note claiming `results/` was untracked was simply wrong. Untracked
+# 2026-08-15 before submission. Local copies are untouched: only the public
+# release changes. The releasable substitute is
+# reference/wacv_evaluation_artifact/fermat_n300_public_manifest.csv, which
+# carries ids, hashes and derived numbers but no gated text.
+results/
+.dryrun_scratch/
