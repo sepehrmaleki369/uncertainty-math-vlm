@@ -69,6 +69,54 @@ def test_a_full_alignment_verifies(run):
     assert out["verified"] is True and out["n_aligned"] == 300
 
 
+def test_an_order_insensitive_match_is_rejected(run):
+    """Finding all 300 contents somewhere is insufficient: the declared
+    sampler must reproduce the exact row order used by the frozen run."""
+    src = run[["orig_q", "pert_a", "has_error"]].iloc[::-1].reset_index(drop=True)
+    out = W.verify_reconstruction(run, source=src, revision="abc123")
+    assert out["verified"] is False
+    assert out["alignment_status"] == "FAILED"
+
+
+def test_reconstruction_exactly_mirrors_the_frozen_balanced_loader():
+    """Stage B must reproduce the selection code, not merely find all items.
+
+    The source-row metadata may be added, but the ordered selected contents
+    must be byte-for-byte the same as ``load_fermat_balanced``.
+    """
+    from datasets import Dataset
+    import pilot.data as D
+
+    source = Dataset.from_dict({
+        "orig_q": [f"question {i}" for i in range(24)],
+        "pert_a": [f"answer {i}" for i in range(24)],
+        "has_error": [i % 3 != 0 for i in range(24)],
+    })
+    expected = D.load_fermat_balanced(
+        n=12, seed=42, target_error_frac=0.5,
+        _loader=lambda *args, **kwargs: source,
+    ).to_pandas()
+    actual = W.reconstruct_balanced_source(
+        source, n=12, seed=42, target_error_frac=0.5)
+
+    cols = ["orig_q", "pert_a", "has_error"]
+    pd.testing.assert_frame_equal(actual[cols], expected[cols])
+    assert actual["source_row_index"].is_unique
+    for row in actual.itertuples(index=False):
+        i = int(row.source_row_index)
+        assert row.orig_q == source[i]["orig_q"]
+        assert row.pert_a == source[i]["pert_a"]
+
+
+def test_frozen_generation_temperature_is_recorded_exactly():
+    assert W.RUN_PROTOCOL["temperature"] == 0.7
+
+
+def test_public_manifest_records_the_frozen_temperature(manifests):
+    public, _ = manifests
+    assert public["temperature"].eq(0.7).all()
+
+
 def test_the_revision_is_pinnable_without_auth_even_though_data_is_not():
     """Metadata and data have different access levels here; the manifest can
     pin the commit offline. Tolerates a network-free environment."""

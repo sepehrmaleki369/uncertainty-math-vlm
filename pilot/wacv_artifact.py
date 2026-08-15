@@ -39,7 +39,7 @@ SELECTION = {"loader": "pilot.data.load_fermat_balanced", "n": 300,
                       "alongside the ids; an index alone does not reproduce")}
 
 #: Generation settings behind the frozen run.
-RUN_PROTOCOL = {"k_transcription": 5, "k_grading": 5, "temperature": 1.0,
+RUN_PROTOCOL = {"k_transcription": 5, "k_grading": 5, "temperature": 0.7,
                 "frozen_scorer": "strict_v1",
                 "scorer_note": ("stored columns are authoritative; any local "
                                 "rescore is a separately named diagnostic")}
@@ -53,7 +53,7 @@ PUBLIC_COLUMNS = (
     "question_sha256", "reference_answer_sha256", "item_content_sha256",
     "perception_entropy", "reasoning_entropy", "transcription_correct",
     "grading_correct", "n_transcription_parse_failures",
-    "n_grading_parse_failures", "k_transcription", "model_id",
+    "n_grading_parse_failures", "k_transcription", "temperature", "model_id",
     "transcription_prompt_sha256", "grading_prompt_sha256",
     "dataset_id", "dataset_revision", "dataset_split", "selection_seed",
     "source_row_index", "alignment_status", "in_audit_union",
@@ -138,15 +138,26 @@ def verify_reconstruction(run: pd.DataFrame, source: Optional[pd.DataFrame] = No
                            "load_dataset requires authentication. Run this "
                            "stage in an authenticated session to complete it."),
                 "revision": revision}
-    src = {sha256_text(f"{r['orig_q']}\x1f{r['pert_a']}\x1f{int(bool(r['has_error']))}"): n
-           for n, r in enumerate(source.to_dict("records"))}
+    # `source` must be the sample reconstructed by the declared selection
+    # procedure, in its final order. Looking each run row up anywhere in the
+    # full dataset would only prove that the content exists; it would not prove
+    # that seed=42 and the balanced sampler reproduce this evaluation subset.
+    src_records = source.to_dict("records")
+    run_records = run.to_dict("records")
     rows = []
-    for i in run.index:
-        h = sha256_text(f"{run.loc[i, 'orig_q']}\x1f{run.loc[i, 'pert_a']}"
-                        f"\x1f{int(bool(run.loc[i, 'has_error']))}")
-        rows.append(src.get(h))
-    n_ok = sum(r is not None for r in rows)
-    ok = n_ok == len(run)
+    n_ok = 0
+    for pos, (got, expected) in enumerate(zip(src_records, run_records)):
+        got_hash = sha256_text(
+            f"{got['orig_q']}\x1f{got['pert_a']}\x1f{int(bool(got['has_error']))}")
+        expected_hash = sha256_text(
+            f"{expected['orig_q']}\x1f{expected['pert_a']}"
+            f"\x1f{int(bool(expected['has_error']))}")
+        if got_hash == expected_hash:
+            n_ok += 1
+            rows.append(int(got.get("source_row_index", pos)))
+        else:
+            rows.append(None)
+    ok = len(source) == len(run) and n_ok == len(run)
     return {"alignment_status": "VERIFIED" if ok else "FAILED",
             "verified": bool(ok), "n_aligned": int(n_ok),
             "n_expected": len(run), "source_row_index": rows,
@@ -154,6 +165,49 @@ def verify_reconstruction(run: pd.DataFrame, source: Optional[pd.DataFrame] = No
             "reason": "" if ok else
                       f"only {n_ok}/{len(run)} rows aligned; refusing to claim "
                       "reconstruction. Do not guess the revision."}
+
+
+def reconstruct_balanced_source(dataset, n: int = 300, seed: int = 42,
+                                target_error_frac: float = 0.5) -> pd.DataFrame:
+    """Rebuild the frozen balanced sample while preserving original row ids.
+
+    This deliberately mirrors :func:`pilot.data.load_fermat_balanced`: shuffle
+    the full pinned dataset, take the requested number from each truth pool,
+    concatenate, then shuffle the selected rows again with the same seed. The
+    extra ``source_row_index`` column is metadata only and lets an authorized
+    user locate the gated row without publishing its contents.
+    """
+    if not 0.0 < target_error_frac < 1.0:
+        raise ValueError("target_error_frac must be in (0, 1)")
+    required = {"orig_q", "pert_a", "has_error"}
+    columns = set(getattr(dataset, "column_names", []))
+    if not required <= columns:
+        raise ValueError(f"source dataset missing fields: {sorted(required - columns)}")
+
+    tagged = dataset.add_column("source_row_index", list(range(len(dataset))))
+    shuffled = tagged.shuffle(seed=seed)
+    error_idx, clean_idx = [], []
+    for i, has_error in enumerate(shuffled["has_error"]):
+        (error_idx if bool(has_error) else clean_idx).append(i)
+
+    want_error = round(n * target_error_frac)
+    want_clean = n - want_error
+    scale = min(
+        1.0,
+        len(error_idx) / want_error if want_error else 1.0,
+        len(clean_idx) / want_clean if want_clean else 1.0,
+    )
+    take_error = int(want_error * scale)
+    take_clean = int(want_clean * scale)
+    if take_error + take_clean != n:
+        raise ValueError(
+            f"pinned dataset cannot supply n={n} at fraction={target_error_frac}; "
+            f"would return {take_error + take_clean}")
+
+    selected = error_idx[:take_error] + clean_idx[:take_clean]
+    sample = shuffled.select(selected).shuffle(seed=seed)
+    keep = ["orig_q", "pert_a", "has_error", "source_row_index"]
+    return sample.select_columns(keep).to_pandas()
 
 
 # --- audit long form -------------------------------------------------------
@@ -238,6 +292,7 @@ def build_manifests(run: pd.DataFrame, run_csv: str,
             "n_transcription_parse_failures": int(run.loc[i, "n_transcription_parse_failures"]),
             "n_grading_parse_failures": int(run.loc[i, "n_grading_parse_failures"]),
             "k_transcription": int(run.loc[i, "k_transcription"]),
+            "temperature": float(RUN_PROTOCOL["temperature"]),
             "model_id": str(run.loc[i, "model_id"]),
             "transcription_prompt_sha256": ph["transcription_user"]["sha256"],
             "grading_prompt_sha256": ph["grading_user"]["sha256"],
