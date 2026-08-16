@@ -21,3 +21,23 @@ can.
 The claim-bearing snapshot is `reference/parameter_sensitivity_20260816.json`,
 which carries the artifact controls as well and is asserted by
 `pilot/tests/test_parameter_sensitivity_run.py`.
+
+## The two figures, and why there are two
+
+`real_parameter_sensitivity_full.png` is the figure the notebook drew. It plots
+**uncontrolled** AUROC against temperature and it rises, peaking at 0.892 at
+T=1.0, K=5. Nothing in it is wrong, but read alone it argues for hotter
+sampling, which is the opposite of the finding it belongs to.
+
+`real_parameter_sensitivity_controls.png` puts that panel beside the same grid
+after removing parse failures and ceiling-entropy items, on one shared y-axis.
+The rise flattens: at K=5 the controlled figures are 0.741, 0.749 and 0.722, and
+the intervals overlap. The correction tracks the artifacts rather than the
+temperature, since the parse-failure rate runs 0.5% -> 4.8% -> 12.7% and the
+controls delete two thirds of the items at T=1.0.
+
+Both are kept. The first is what the run produced and is the honest record of
+it; the second is what a reader should take away, and the paper reports no
+temperature effect. Regenerate the second with
+`python reference/wacv_evaluation_artifact/build_sensitivity_controls_figure.py`,
+which reads only the committed snapshot.
