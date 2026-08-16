@@ -77,13 +77,13 @@ Sampling a vision--language model repeatedly and measuring its
 self-disagreement yields a cheap, label-free uncertainty signal. We
 evaluate this signal on handwritten mathematics and report a positive
 result, a negative result, and a mechanism by which the evaluation itself
-manufactures an effect that is not present. On transcription the signal is
-effective: AUROC $0.835$, replicated at $0.828$ on a second,
-architecturally independent model family, robust in both cases to every
-artifact control we apply, and superior by resolved margins to both the
+manufactures an effect that is not present. Against the frozen transcription
+scorer, the signal reaches AUROC $0.835$, replicated at $0.828$ on a second,
+architecturally independent model family. It survives the parser and
+ceiling controls we apply and is superior by resolved margins to both the
 model's own token confidence and to simpler reductions of the same
-samples. A rule that abstains whenever all five samples disagree
-identifies a genuinely incorrect transcription $57$ times out of $61$. On
+samples. A rule that abstains whenever all five samples disagree marks
+$57$ of $61$ items as incorrect under that scorer. On
 grading the signal is absent: AUROC $0.520$ on a balanced sample,
 statistically indistinguishable from chance. The methodological risk lies
 between these two results. Stratifying the grading task by its
@@ -96,11 +96,11 @@ measure computed from those answers predicts correctness almost by
 construction; a signal-free biased coin attains a \emph{higher} AUROC than
 any model evaluated here. We report the result we initially accepted, the
 diagnostic that retired it, and the property of the transcription task
-under which the same measure remains sound. Finally, a complete human
-audit of the scorer's own verdicts introduces a third caution:
-approximately three-quarters of the items it marks incorrect are
-attributable to the scoring pipeline rather than to the model, so the
-correctness label against which these AUROCs are measured is itself noisy.
+under which the same arithmetic collapse does not occur. Finally, an exploratory
+single-reader audit of all $104$ items the scorer marks incorrect introduces
+a third caution: approximately three-quarters are attributable to the scoring
+pipeline rather than to the model, so the correctness label against which
+these AUROCs are measured is itself noisy.
 \end{abstract}
 
 % =====================================================================
@@ -128,18 +128,21 @@ valuable than a marginal gain in average accuracy, and unlike accuracy it
 is directly actionable.
 
 Repeated sampling, combined with a measure of the resulting
-self-disagreement, is the natural candidate for such a signal. It requires
-no training, no labels and no access to model weights, and therefore
-applies to closed models served behind an
-API~\cite{selfconsistency,semanticentropy}. Whether it is effective
-remains an empirical question. We address that question on
-FERMAT~\cite{fermat}, a benchmark of authentic student solutions rendered
-as handwritten pages, each carrying a deliberately injected error.
+self-disagreement, is the natural candidate for such a signal. Our
+output-only score requires no task-specific training, labelled
+calibration data or access to model weights, and therefore applies to
+closed models served behind an API. It is motivated by self-consistency
+and semantic entropy~\cite{selfconsistency,semanticentropy}; whether it is
+effective here remains an empirical question. We address that question on
+FERMAT~\cite{fermat}, a benchmark built from textbook and competitive-exam
+solutions that are systematically perturbed and then manually transcribed
+and photographed. Its perturbations include both error-inducing and
+correctness-preserving changes.
 
 Effectiveness proves to be task-dependent, and, more importantly for
 evaluation practice, the headline figure is easy to misestimate in either
-direction. On transcription the signal is genuine and survives every
-control we apply. On grading it is absent. Between these two findings lies
+direction. On transcription the association with the frozen scorer survives
+our parser and ceiling controls. On grading it is absent. Between these two findings lies
 a methodological trap. Confronted with a model whose grading verdict is
 heavily biased toward a single answer, the natural response is to
 stratify by the ground-truth label. Doing so appears to recover a
@@ -155,12 +158,13 @@ statistical power did not, since both strata were adequately powered; and
 replication did not, since it reproduced the artifact three times.
 
 A second and more easily overlooked failure underlies both arms. The
-automatic scorer that assigns correctness is itself unreliable. A complete
-human audit of every item it marked incorrect finds that approximately
-three-quarters of those verdicts are attributable to the scoring pipeline
-rather than to the model, while a random audit of the items it marked
-correct reveals unearned passes in the opposite direction. We quantify the
-consequences of this label noise, and delimit what it does not affect.
+automatic scorer that assigns correctness is itself unreliable. An
+exploratory single-reader audit of every item it marked incorrect finds that
+approximately three-quarters of those verdicts are attributable to the
+scoring pipeline rather than to the model, while targeted checks of items it
+marked correct reveal unearned passes in the opposite direction. We report
+sensitivity bounds under explicit recoding assumptions, not corrected
+population estimates.
 
 This is an evaluation paper rather than a method paper. We propose no new
 uncertainty estimator. Instead, we establish where a standard estimator is
@@ -186,14 +190,16 @@ evaluation of it can yield a confident figure that carries no information.
 \paragraph{Sampling-based uncertainty.}
 Repeated sampling turns a generator into an ensemble, and disagreement
 among the samples is used as a confidence signal. Self-consistency
-aggregates sampled chains by majority vote and improves accuracy without
-any confidence estimate~\cite{selfconsistency}; semantic entropy makes the
-uncertainty explicit by clustering samples that mean the same thing and
-taking the entropy over clusters~\cite{semanticentropy}. We inherit the
-resampling and the entropy, but not the clustering: our clusters are
-exact-match over an \emph{extracted answer span}, not
-entailment-based. That choice is not an oversight. On this data an
-NLI-plus-union-find implementation merged opposed clusters through a
+aggregates sampled chains by majority vote and was introduced primarily
+as an accuracy-improving decoding method, although its vote distribution
+can also provide an uncertainty estimate~\cite{selfconsistency}. Semantic
+entropy makes uncertainty explicit by aggregating likelihoods within
+bidirectional-entailment clusters and taking the entropy over the
+resulting meanings~\cite{semanticentropy}. Our estimator keeps the
+resampling and the entropy but replaces both likelihood weighting and
+semantic grouping with empirical frequencies over exact-match clusters of
+an \emph{extracted answer span}. That choice is not an oversight. On these
+data, an NLI-plus-union-find implementation merged opposed clusters through a
 single false-positive transitive link and degraded as $K$ grew, so the
 simpler rule is the one that survives (\S\ref{sec:limitations}). A
 separate line asks the model to report its own confidence, either as a
@@ -205,50 +211,60 @@ with (\S\ref{sec:q2}).
 The decision this signal supports is deferral, not correction, which
 places the work in selective prediction: a model may abstain, and the
 question is the risk--coverage trade-off it achieves~
-\cite{selectiveclassification}. We report the same currency, AURC against
-a random-deferral baseline, and add coverage at a target
-risk. Abstention has been studied in vision--language models
-directly~\cite{recoverr}, the closest prior work to ours in setting: it
-reduces unnecessary abstention on visual question answering over natural
-images. The task here differs in a way that matters for the metric: we
-score dense transcription of a handwritten page against a reference that
-is itself deliberately perturbed, so ``correct'' means faithful to a page
-that may be wrong, not mathematically true.
+\cite{selectiveclassification}. We summarize this trade-off with AURC
+against a random-deferral baseline and additionally report coverage at a
+target risk. In vision--language reasoning, ReCoVERR reduces unnecessary
+abstention on A-OKVQA and VQAv2~\cite{recoverr}. More directly for OCR,
+latent-representation probes have been used to abstain from VLM-generated
+OCR errors~\cite{ocrabstentionprobes}, and uncertainty-aware OCR has been
+trained to mark unreliable spans in degraded
+documents~\cite{uncertaintyawareocr}.
+Our setting instead asks whether output-only resampling supports selective
+dense transcription of handwritten mathematics. We score against the
+page-faithful perturbed target, so ``correct'' means faithful to what is
+written on the page, not necessarily mathematically true.
 
 \paragraph{Vision--language models on handwritten and mathematical content.}
-Visual mathematics benchmarks have grown quickly, but most evaluate
-\emph{answer accuracy} on typeset figures~\cite{mathvista}, and document
-transcription is usually treated as a solved sub-problem with a single
-reference output~\cite{nougat}. FERMAT~\cite{fermat} is the exception we
-build on: it renders real student solutions as handwritten pages and
-injects a controlled error into each, so the reference answer is
-deliberately wrong in a known way. ErrorRadar~\cite{errorradar} and
-ScratchMath~\cite{scratchmath} share the error-detection framing; neither
-contains correct solutions, which (\S\ref{sec:trap}) makes both
-single-label strata on which our measurement degenerates. What all three
-measure is whether a model finds the error. What none measures is whether
-the model \emph{knows when it has failed to read the page}, which is the
-question here. Applied work grading handwritten university mathematics
-meets the same two obstacles from the other direction, reporting that
-extracting the student's answer is the binding difficulty and that its
-confidence measure admits enough false positives to leave human
-verification necessary~\cite{asaghandwritten}.
+MathVista scores answer accuracy across diverse visual contexts, including
+natural images, diagrams, charts and scientific figures~\cite{mathvista}.
+Document OCR systems such as Nougat instead map pages to source-derived
+markup and compare against a reference, while noting both reference
+artifacts and rendering-equivalent formulae~\cite{nougat}.
+FERMAT~\cite{fermat}, the benchmark used here, begins with textbook and
+competitive-exam solutions, applies controlled perturbations, and has
+annotators hand-copy and photograph the resulting pages. It supplies both
+the original correct solution and the page-faithful perturbed version;
+about $15\%$ of the perturbations preserve correctness. ErrorRadar
+evaluates first-error localization and categorization~\cite{errorradar},
+whereas ScratchMath evaluates error-cause explanation and
+classification on authentic student scratchwork~\cite{scratchmath}.
+Neither includes an error-free student-response class, although both
+include correct reference solutions. Thus all three concern the diagnosis
+of erroneous or perturbed work, but none benchmarks calibrated uncertainty
+or selective deferral after visual transcription. On real handwritten
+mathematics exams, GPT-4o grading remains below the reliability needed for
+deployment~\cite{gpt4handwrittengrading}; a separate university study
+reports substantial answer-extraction difficulty and confidence
+false-positive rates that leave human verification
+necessary~\cite{asaghandwritten}.
 
 \paragraph{Evaluation artifacts.}
 Our central negative result is that a metric can manufacture a signal
-from nothing, and this has precedent worth naming plainly.
-Apparent emergent abilities have been shown to be an artifact of the
-metric rather than the model~\cite{mirage}. Our case is narrower and, we think,
+from nothing, and similar failures have appeared in prior work.
+Some reported emergent abilities can arise from discontinuous metrics
+rather than model behaviour~\cite{mirage}. Our case is narrower and, we think,
 sharper: within a stratum where the true label is constant, correctness
 becomes the same column as the model's own verdict, so a signal-free
 biased coin outscores every model we tested (\S\ref{sec:trap}). The
-scoring machinery is a second source of artifacts. Step-level verification
-of mathematical solutions is an active area~\cite{verifystepbystep}, and
-automatic judges are increasingly used in place of exact match. Such
-judges, however, inherit biases of their own~\cite{biasintheloop}. We find a
-specific failure of that kind: on a perturbed-answer benchmark, judges
-reconstruct the mathematically correct answer and grade against
-\emph{that} rather than against the reference they were given
+scoring machinery is a second source of artifacts. Process-supervised
+reward models have been trained to score individual steps of mathematical
+solutions~\cite{verifystepbystep}. Math-specific evaluations of LLM judges
+also find that they can favour stronger candidate models even when their
+answers are wrong and can be persuaded to inflate incorrect
+solutions~\cite{mathllmjudges,trickthegrader}. We observe a different
+failure mode in one tested judge: on a perturbed-answer benchmark, it
+reconstructed the mathematically correct answer and graded against
+\emph{that} rather than against the reference it was given
 (\S\ref{sec:limitations}).
 
 % =====================================================================
@@ -256,11 +272,14 @@ reconstruct the mathematically correct answer and grade against
 \label{sec:setup}
 
 \paragraph{Data.}
-FERMAT~\cite{fermat} contains ${\sim}2{,}200$ photographed handwritten
-solutions to middle- and high-school problems, in which errors were
-deliberately introduced by the dataset authors and annotated by type.
-Each image contains a complete question and its answer, and $15\%$ of
-items are error-free. That last property is load-bearing for this paper:
+FERMAT~\cite{fermat} contains $2{,}244$ photographed handwritten
+solutions to middle- and high-school problems. The dataset authors apply
+controlled perturbations to textbook and competitive-exam solutions, and
+annotators manually transcribe and photograph the results. Each image
+contains a complete question and solution. Of the $2{,}244$ pages, $340$
+($15.2\%$) have only superficial, correctness-preserving modifications;
+we call these items error-free. That property is load-bearing for this
+paper:
 \S\ref{sec:q5} shows the analysis in \S\ref{sec:q3} is impossible on
 datasets that lack it. Unless stated otherwise we use a balanced $n=300$
 sample ($150$ with an error, $150$ without), drawn once with a fixed seed.
@@ -270,11 +289,12 @@ We evaluate two distinct tasks on the same images.
 \emph{Perception} asks the model to
 ``explicitly perform OCR on the handwritten text and extract the content
 in \LaTeX{} format''; it is correct when the extracted final answer
-matches the reference after canonicalisation.
+matches the released page-faithful \texttt{pert\_a} field after
+canonicalisation.
 \emph{Reasoning} asks it to ``analyze the Answer to determine whether
 there is any error'' and emit a binary judgement; it is correct when that
-judgement matches the annotation. The model is never shown the reference
-answer.
+judgement matches \texttt{has\_error}. Neither released field is provided
+directly as text to the model.
 
 \paragraph{Uncertainty measure.}
 For each item we draw $K=5$ samples at temperature $0.7$, reduce each to
@@ -298,6 +318,14 @@ minority-class size of $30$ and, for the stratified reasoning hypothesis,
 an AUROC threshold of $0.70$; verdicts below are assigned by a pure
 function of those thresholds, not by inspection.
 
+\paragraph{Artifacts.}
+The anonymous supplementary artifact provides the evaluation code and tests,
+exact prompt hashes, a hash-only manifest for the $300$-item sample, and an
+authenticated reconstruction check against a pinned FERMAT revision. Because
+FERMAT is gated, the public artifact excludes its page images, released text,
+and model generations derived from those pages; authorized users can
+reconstruct and verify the sample without redistributing those fields.
+
 % =====================================================================
 \section{Results}
 % ~3 pages. Organised as questions, following FERMAT's Section 5.
@@ -312,14 +340,16 @@ interval that includes chance, and the paired difference is
 $+0.297$ \ci{+0.214}{+0.380}, resolved. The signal is therefore not
 recoverable from information the model already exposes.
 
-Read as a deferral rule the result is directly usable: of the $61$ items
-on which all five transcriptions disagree, $57$ are wrong ($93.4\%$
+Against the frozen labels, the corresponding deferral rule marks $57$ of the
+$61$ items on which all five transcriptions disagree as wrong ($93.4\%$
 precision, $31.3\%$ recall). Over the full risk--coverage curve this
-gives AURC~$0.410$ against a $0.607$ random-deferral baseline.
+gives AURC~$0.410$ against a $0.607$ random-deferral baseline
+(Fig.~\ref{fig:riskcoverage}).
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{figures/risk_coverage_n300.png}
-  \caption{Risk--coverage for perception entropy, Qwen2.5-VL-3B,
+  \caption{Risk--coverage against the frozen transcription scorer for
+  perception entropy, Qwen2.5-VL-3B,
   $n=300$. Deferring the highest-entropy items first traces
   AURC~$0.410$ against a $0.607$ random-deferral baseline. The curve is
   the practitioner-facing form of the result: at a $10\%$ risk target the
@@ -391,12 +421,20 @@ from $0$ to $100$ alongside each transcription, it reports a median of
 $95$ while that self-report carries no signal at all: AUROC $0.528$
 \ci{0.463}{0.593}, against $0.807$ \ci{0.757}{0.854} for entropy on the
 same items, a paired difference of $+0.279$ \ci{0.194}{0.359}. The
-self-report is not degenerate, comprising $37$ distinct values spanning
+self-report is not constant, comprising $37$ distinct values spanning
 $68$ to $100$. The model therefore does vary its stated confidence; it
-simply varies it uninformatively, which is the more damaging finding. Two independent
+simply varies it without tracking errors, which is the more damaging finding. Two independent
 cheap-confidence baselines, token log-probability and verbalized
 confidence, therefore land in the same place, and both are beaten by a
 resolved margin.
+
+The conclusion is not tied only to five samples. In a matched $K=10$ run,
+entropy remains predictive against its frozen label at AUROC $0.806$
+\ci{0.756}{0.854}. Holding that $K=10$ label fixed, using all ten samples
+rather than the first five changes AUROC by $+0.045$
+\ci{+0.005}{+0.087} and expands the observed entropy grid from $7$ to $34$
+values. The main practical gain is therefore finer deferral control; this is
+a sensitivity check, not a post-hoc choice of a better headline $K$.
 
 \subsection{Does the signal survive artifact controls?}
 \label{sec:q2}
@@ -427,6 +465,31 @@ the harshest simultaneous cut with an interval excluding chance.
 \label{tab:sensitivity}
 \end{table}
 
+\paragraph{Is the reported operating point a tuned one?}
+The sampling temperature and the number of samples are free parameters, so
+a single setting invites the objection that it was chosen after seeing the
+result. We regenerated the full transcription arm over a declared grid of
+three temperatures $\{0.3, 0.7, 1.0\}$ and three sample budgets
+$\{3, 5, 10\}$, $9{,}000$ fresh generations under a different seed from the
+frozen run, and applied the controls of Table~\ref{tab:sensitivity} to each
+of the nine conditions. The signal is present in all nine: every interval
+excludes chance after removing both parse failures and ceiling-entropy
+items. At the reported protocol the regenerated figure is $0.830$
+\ci{0.784}{0.874}, reproducing the locked $0.835$ \ci{0.787}{0.879} on
+independent draws.
+
+The grid also supplies a caution against reading raw numbers across
+protocols. Uncontrolled AUROC increases with temperature, reaching $0.892$
+\ci{0.857}{0.924} at $T{=}1.0, K{=}5$, which would appear to argue for
+hotter sampling. It does not survive the controls: the same condition falls
+to $0.722$ \ci{0.621}{0.815}, against $0.741$ \ci{0.684}{0.795} at
+$T{=}0.3$, and the two intervals overlap. The correction grows with
+temperature because the artifacts do; the parse-failure rate rises from
+$0.5\%$ to $12.7\%$, transcription accuracy falls, and at $T{=}1.0$ the
+controls remove roughly two thirds of the items. The apparent gain is the
+artifact the controls exist to remove, not a better uncertainty estimate,
+and we therefore report no temperature effect.
+
 \subsection{Does the same signal work for grading?}
 \label{sec:q3}
 No. On the same $300$ images, reasoning entropy predicts grading error
@@ -446,9 +509,10 @@ why we did not initially believe it.
 A model with a strong answer bias makes a pooled statistic hard to read,
 and the natural response is to stratify by ground truth and analyse each
 label separately. Doing so appears to recover a large effect from the null
-above. Within the erroneous-solution stratum, entropy predicts grading
-error at $0.801$ \ci{0.751}{0.846}; within the correct-solution stratum it
-predicts in the opposite direction at $0.280$ \ci{0.200}{0.366}. Both
+above. Within the \texttt{has\_error}=1 stratum, entropy predicts grading
+error at $0.801$ \ci{0.751}{0.846}; within the \texttt{has\_error}=0
+(correctness-preserving) stratum it predicts in the opposite direction at
+$0.280$ \ci{0.200}{0.366}. Both
 strata are adequately powered, both intervals exclude chance, the sign
 reversal has an appealing mechanistic story, and the effect reproduces
 across three independently trained model families
@@ -462,7 +526,7 @@ $7$B run they agree on $100\%$ of items, and the AUROC against correctness
 is numerically identical to the AUROC against the model's own verdict.
 Entropy is computed from precisely the votes that produce that verdict, so
 the measurement is near-circular. The sign reversal follows by the same
-identity: in the correct-solution stratum correctness is the exact
+identity: in the \texttt{has\_error}=0 stratum correctness is the exact
 \emph{complement} of the verdict, so anything correlating with the verdict
 must invert. The two stratum AUROCs sum to $1$.
 
@@ -488,10 +552,17 @@ separated signal from arithmetic.}
 \label{tab:trap}
 \end{table}
 
-The mechanism is arithmetic rather than behavioural. On an all-erroneous
-stratum the majority vote is wrong only when most samples dissent from the
-model's default, and dissent is exactly what raises entropy. Nothing about
-the model's competence is required for the association to appear.
+The effect is not specific to the frozen $K=5$ protocol. A grid over
+$K\in\{3,5,7,9,15\}$ and response bias $p=0.05,\ldots,0.95$ shows the
+same pattern: the artifact vanishes at $p=0.5$, grows as the response
+bias increases, and is removed by balanced pooling.
+
+The mechanism is arithmetic rather than behavioural. On the
+error-containing response subset, the majority vote is wrong only when
+most samples differ from the model's default, and those minority votes
+are exactly what raise entropy.
+Nothing about the model's competence is required for the association to
+appear.
 
 Three things would have caught this earlier, and none of them is
 specialised. Comparing against a signal-free null rather than against
@@ -519,31 +590,33 @@ both ends of the entropy range.
 It is worth being precise about which ingredient does the damage. The
 collapse is caused by \emph{stratifying} rather than by the label type;
 grouping transcription items by their exact reference answer would
-degenerate in exactly the same manner. Low cardinality is what makes stratification both
+collapse in exactly the same manner. Low cardinality is what makes stratification both
 tempting and total: with a binary label it is the natural response to class
-imbalance, and it yields precisely two groups, each fully degenerate. With
+imbalance, and it yields precisely two single-label groups. With
 hundreds of distinct answers nobody would stratify, because the groups
 would have one member each. The trap is therefore specific to
 binary-decision tasks, which is where it is most likely to be walked into.
 
 Consistent with this, \S\ref{sec:q1b} shows transcription entropy
 outperforming simpler summaries of the same votes; a measure that were
-merely counting dissent could not.
+merely counting minority votes could not.
 
 \subsection{What happens on a second dataset?}
 \label{sec:q5}
-The analysis in \S\ref{sec:q3} requires a dataset containing correct
-solutions, and the two public alternatives we examined do not have any:
-in ErrorRadar~\cite{errorradar} no item is annotated error-free, and in
-ScratchMath~\cite{scratchmath} the student answer never equals the
-reference. Neither can be balanced, and neither can exhibit the
-inversion.
+The analysis in \S\ref{sec:q3} requires both error-containing and
+error-free evaluated solutions. ErrorRadar~\cite{errorradar} supplies
+correct and incorrect solutions as paired fields, but every evaluated
+candidate solution contains an annotated error.
+ScratchMath~\cite{scratchmath} includes correct answer and solution fields,
+but every evaluated student answer is labelled incorrect. Neither
+therefore supplies an error-free response stratum for our binary grading protocol, so neither
+can support a balanced replication or exhibit the inversion.
 
 On ScratchMath, which is the only one of the two with handwriting to
 grade, the measurement fails for a second and more instructive reason.
-Grading accuracy reads $96.0\%$, but every item contains an error and the
-model answers ``error'' for $90\%$ of them, so it scores well by
-construction. In $24\%$ of readings ($120/500$) the model explicitly
+Grading accuracy reads $96.0\%$, but every evaluated student answer is
+erroneous and the model answers ``error'' for $90\%$ of them, so it scores
+well by construction. In $24\%$ of readings ($120/500$) the model explicitly
 states it cannot read the image, and in $82\%$ of those ($98/120$) it
 answers ``error'' regardless. Excluding those readings does not clean the
 estimate: all four misgraded items lie among them, so the retained subset
@@ -569,16 +642,12 @@ would have been the strongest number in this paper.
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{figures/four_quadrant.png}
-  \caption{The four quadrants of entropy $\times$ correctness, on real
-  pages, Qwen2.5-VL-3B. Top left is the signal working: five identical
-  transcriptions, correct. Bottom left is it working in the other
-  direction. Top right is a false alarm, in which the samples disagree
-  while the majority remains correct, which is the cost of any deferral
-  rule. Bottom right is
-  the bound on the method: five identical transcriptions, all wrong. That
-  quadrant is invisible to self-disagreement by construction, and it is
-  where the audit of \S\ref{sec:limitations} finds the unearned passes
-  concentrate.}
+  \caption{Four perception cases. Self-disagreement helps when wrong
+  answers produce varied samples, but it is weakest when the samples mostly
+  agree on the same wrong reading. The top panels were scored correct and
+  the bottom panels were scored wrong; the left panels have low entropy and
+  the right panels have high entropy. Each panel gives its item, entropy and
+  human-audit verdict.}
   \label{fig:quadrants}
 \end{figure}
 
@@ -596,10 +665,10 @@ would have been the strongest number in this paper.
 %   (b) it pattern-matches a stated result instead of recomputing, it
 %       accepted 19 x -18 x 23 = -7966 (correct: -7866);
 %   (c) confidently-wrong items are structurally invisible to the method.
-To move past anecdote we read and coded every item the frozen rule marked
-wrong on Qwen2.5-VL-3B, a complete census of that bucket comprising $104$
-of $104$ items, working from the handwritten pages rather than from the
-extracted text. The
+For an exploratory failure analysis, one reader inspected and coded every
+item the frozen rule marked wrong on Qwen2.5-VL-3B, a complete census of that
+bucket comprising $104$ of $104$ items, working from the handwritten pages
+rather than from the extracted text. The
 distribution is not what the aggregate number suggests:
 
 \begin{center}\small
@@ -616,17 +685,17 @@ copied a different line & $1$ & $1.0\%$ \\
 \end{tabular}
 \end{center}
 
-Three things follow. First, \textbf{the model never invents content
-unrelated to the page}: zero hallucinations across the census, which is
-the failure a reviewer most expects from a VLM asked to transcribe.
+Three things follow. First, the reader assigned \textbf{zero hallucination
+labels in this $104$-item bucket}; this is evidence about the audited set,
+not a population-level claim that the model never hallucinates.
 Second, roughly three-quarters of what the scorer calls model error is
 attributable to the scoring pipeline, either through the extractor
 selecting a wrong or partial span, or through normalization collapsing a
 long answer onto a single symbol. Third, and this is the constraint on the method rather than on
 the model, \emph{the errors that remain are not the ones entropy can
-flag}: a confidently wrong item is one where all five samples agree, so
-self-disagreement is silent on it by construction
-(Fig.~\ref{fig:quadrants}, bottom right).
+  flag}: a low-entropy wrong item is one where the samples mostly agree, so
+self-disagreement has little to use, whichever way the label happens to
+fall (Fig.~\ref{fig:quadrants}, bottom-left panel).
 
 Two mechanisms recur in the coded notes and both concern the final
 answer statement rather than the mathematics. The model verifies a
@@ -638,9 +707,9 @@ pattern-matches a stated result instead of recomputing it, accepting
 $19 \times -18 \times 23 = -7966$ where the correct value is $-7866$.
 
 The coding is a single reader's, which is its main weakness. We have no
-second-rater agreement. We do have an intra-rater measurement: $47$ items
-were coded twice in independent passes with different sheets, and $4$
-received determinate labels pointing opposite ways.
+second-rater agreement. We do have an intra-rater measurement: $78$ items
+were coded twice in independent passes with different sheets; $47$ received
+determinate labels in both passes, and $4$ of those pointed opposite ways.
 
 % =====================================================================
 \section{Limitations}
@@ -651,13 +720,13 @@ sits at a transcription floor of $0.8\%$, and one fails the artifact
 control of \S\ref{sec:q2}. Two of four attempts producing a usable
 measurement is itself worth stating, since the result requires a model
 with genuine dense-OCR competence, which is not the common case among
-open-weight VLMs. Of the two alternative datasets,
-neither contains correct solutions, so neither admits a balanced sample.
-Moreover, by \S\ref{sec:trap}, an all-erroneous dataset constitutes a
-single-label stratum, on which the measurement degenerates for the same
-reason.
+open-weight VLMs. Of the two alternative datasets, neither supplies
+error-free evaluated responses, so neither admits a balanced
+error-presence sample. Moreover, by \S\ref{sec:trap}, a
+\texttt{has\_error}=1 response set constitutes a single-label stratum, on
+which the measurement collapses for the same reason.
 
-We report the retraction of \S\ref{sec:trap} as a finding, but it was
+We report the correction to \S\ref{sec:trap} as a finding, but it was
 found late. It was not caught by the pre-registration, which set a
 threshold the null clears; nor by adequate power, which both strata had;
 nor by replication, which reproduced the artifact three times. Cross-model
@@ -677,20 +746,19 @@ is why two-thirds of conformal calibration splits cannot reach a $30\%$
 risk target.
 
 \paragraph{The correctness label is noisy in both directions.}
-Every AUROC above is measured against a frozen string-matching rule, and
-human audit shows that rule has substantial label noise. The census of
+Every AUROC above is measured against a frozen string-matching rule, and a
+single-reader audit indicates that rule has substantial label noise. The census of
 \S\ref{sec:failures} finds unearned \emph{failures}; a seeded random
 audit of the items the rule marked \emph{correct} finds unearned passes
-as well. Correcting both directions leaves transcription accuracy an
-audit-sensitive range, roughly $44$--$61\%$ under conservative false-pass
-assumptions, rather than a single figure. The two corrections act in
-opposing directions, and where the range settles depends on a coding
-judgement that the pages alone cannot resolve. The corrected AUROC is
-likewise a range, $0.57$--$0.73$, depending on whether an unearned pass
-is treated as a model error or as undecidable. We report both as ranges
-because that is what the evidence supports.
+as well. Under alternative recoding assumptions applied to these audits,
+transcription accuracy ranges from roughly $44$--$61\%$, and AUROC from
+$0.57$--$0.73$, depending in part on whether an unearned pass is treated as
+a model error or as undecidable. These are \emph{sensitivity bounds}, not
+corrected population estimates: the audit sets overlap, two are targeted in
+one direction, and all coding is from one reader. Table~\ref{tab:audit}
+summarizes the audited sets and their sampling restrictions.
 
-This does not withdraw the perception result, and it is worth being
+This does not erase the frozen-scorer association, and it is worth being
 precise about what it does. The distinct-answers relationship and the
 cross-family replication rest on the frozen rule's stored columns, which
 are unchanged. What is now in question is how well that rule's labels
@@ -699,14 +767,15 @@ predicts frozen-scorer failures; predicting human truth is harder}, and
 that the automatic scorer is least reliable exactly where answers are
 long, multi-part, set-valued, or stated as prose.
 
-\paragraph{No automatic scorer we tried is safe here, including judges.}
-We evaluated four. The frozen rule is brittle in the ways above. A
+\paragraph{No automatic scorer we tried was reliable on our probes, including judges.}
+We evaluated four alternatives to the frozen rule. The frozen rule is
+brittle in the ways above. A
 span-primary variant that demotes symbolic normalization to a warning
 does not eliminate the unearned passes, because where both sides extract
 the same incorrect span, span matching agrees exactly as the normalizer
-did; its risk flags do, however, concentrate them. A symbolic equivalence checker is unsafe
-by construction on this benchmark, because the injected errors are often
-units, coefficients or notation, exactly what an equivalence checker is
+did; its risk flags do, however, concentrate them. A symbolic equivalence
+checker is unsafe by construction on this benchmark, because the injected
+errors are often units, coefficients or notation, exactly what an equivalence checker is
 designed to erase. Two open math judges failed differently: one rejected
 a valid probe outright, and the other returned the correct verdict on
 both probes while its own justification showed it had reconstructed a
@@ -716,7 +785,8 @@ misattributing the reference's answer to the model in the process. That
 last case is the more instructive: \textbf{a verdict-only check cannot
 detect it}, and on a judge that emits no reasoning it would have been
 recorded as a clean pass. Grading a perturbed-answer benchmark asks a
-judge to compare rather than to solve, and these judges solve.
+judge to compare rather than to solve; in our probes, one judge instead
+attempted to reconstruct and solve the problem.
 
 \begin{table}[t]\centering\small
 \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}Xrr>{\raggedright\arraybackslash}X@{}}
@@ -728,24 +798,26 @@ rule said correct & $100$ & $4$--$16$ & two passes disagree \\
 flagged tier      & $108$ & $39$ & high-risk by construction \\
 \bottomrule
 \end{tabularx}
-\caption{Human audit of the frozen scorer. \textbf{These rows must not be
+\caption{Exploratory single-reader audit of the frozen scorer.
+\textbf{These rows must not be
 summed or pooled.} $78$ items are shared between sets (union $234$, not
 $312$), and two of the three sets can only find errors in one direction
 by construction, so a pooled agreement figure would be largely
 tautological. The correct-side range spans two independent passes over
 disjoint random draws which disagree at $p=0.00007$. That disagreement,
-rather than either endpoint, is what makes the corrected accuracy a
-range.}
+rather than either endpoint, is why accuracy is reported only as a
+sensitivity range.}
 \label{tab:audit}
 \end{table}
 
 % =====================================================================
 \section{Conclusion}
-On handwritten transcription, self-disagreement across repeated samples is
-a usable error signal: it survives every control we apply, beats the
-model's own confidence and simpler summaries of the same samples, and
-yields a deferral rule that is right $57$ times in $61$. On grading, the
-same measure carries no signal at all.
+On handwritten transcription, self-disagreement across repeated samples
+predicts failures of the frozen scorer: it survives the parser and ceiling
+controls, beats the model's own confidence and simpler summaries of the same
+samples, and marks $57$ of $61$ maximum-entropy items as wrong under that
+scorer. The single-reader audit shows why this must not be equated with human
+truth. On grading, the same measure carries no signal at all.
 
 The distance between those two sentences is where the work is. Stratifying
 the grading task by ground truth, an ordinary response to a biased model,
@@ -760,16 +832,17 @@ We therefore recommend, for any evaluation of sampling-based uncertainty
 on a binary decision task: check whether the correctness label is a
 relabelling of the prediction before computing anything, and compare
 against a signal-free null rather than against $0.5$. Neither is
-expensive. Both would have saved us a result we believed for three weeks.
+expensive. Together they expose failures that aggregate AUROC can hide.
 
 A third caution follows from the audit in \S\ref{sec:limitations} and
 applies more broadly than to uncertainty work. On a benchmark whose
-reference answers are deliberately perturbed, the scorer is part of the
-experiment: string matching, symbolic equivalence and open math judges
-each fail in a different direction, and the judges fail by solving the
-problem rather than comparing to the reference they were handed. Where a
-correctness label is itself estimated, it deserves the same scrutiny as
-the quantity being estimated against it.
+page-faithful answers may be deliberately perturbed, the scorer is part of
+the experiment. In our tests, the frozen string matcher, a symbolic
+equivalence checker and two open math judges failed in different ways: one
+judge rejected a valid probe, while another reconstructed a mathematically
+correct answer instead of comparing against the supplied reference. Where
+a correctness label is itself estimated, it deserves the same careful
+validation as the quantity being estimated against it.
 
 {
     \small

@@ -13,9 +13,9 @@ mistaken. Details under "Rejected candidates".
 
 ## Final panels
 
-Laid out as a contingency table: left column low entropy (the samples agree),
-right column high entropy (they disagree), top row what the scorer passed,
-bottom row what it failed.
+Laid out as a contingency table: left column low entropy, right column high
+entropy, top row what the scorer passed, bottom row what it failed. Low entropy
+does not always mean unanimous agreement: item 160 is a four-of-five split.
 
 | position | item | H | `strict_v1` | audit verdict | headline | sub-line |
 |---|---:|---:|---|---|---|---|
@@ -148,9 +148,9 @@ panel is the lowest-entropy *real* failure at `H = 0.50` rather than a `H = 0`
 case.
 
 This does not contradict the paper's argument at
-\S"Failure Analysis", which is a statement about construction: an item all five
-samples agree on cannot be flagged by self-disagreement, whichever way its label
-falls. It does mean the run contains no worked example of that construction, and
+\S"Failure Analysis", which is a statement about construction: as the samples
+concentrate on one wrong answer, self-disagreement has less to use. It does mean
+the run contains no worked example of a genuine all-five-agree model failure, and
 the three items that look like one are all scorer failures. Worth stating rather
 than leaving a reviewer to discover it.
 
@@ -161,8 +161,17 @@ than leaving a reviewer to discover it.
   item, entropy and audit line beneath each.
 - Panels reordered into a contingency table, so the caption and the body can
   refer to the low-entropy *column* rather than to a diagonal.
-- Caption shortened; the per-panel analysis lives in this file instead.
-- `paper/main.tex` body pointer changed from "bottom right" to "left column".
+- Caption shortened; the per-panel analysis lives in this file instead. Two
+  wordings were then corrected against the final panels: "cannot flag unanimous
+  failures" became "weakest when the samples mostly agree on the same wrong
+  reading", because the bottom-left panel is a four-of-five split rather than a
+  unanimous one, and "human-audit notes are shown where available" became "each
+  panel gives its item, entropy and human-audit verdict", because all four are
+  now audited.
+- `paper/main.tex` body pointer changed from "bottom right" to "left column",
+  and "a confidently wrong item is one where all five samples agree" became "a
+  low-entropy wrong item is one where the samples mostly agree", for the same
+  four-of-five reason.
 - Figure canvas resized from 12in to 6.5in. At `\linewidth` in a single column
   every font is scaled by `3.25/FIG_W`, so the old 13pt titles printed at 3.5pt
   and the sub-lines at 2.6pt, which is unreadable.

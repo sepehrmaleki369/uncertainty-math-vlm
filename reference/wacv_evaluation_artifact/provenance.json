@@ -1,75 +1,75 @@
 {
-  "alignment": {
-    "alignment_status": "PENDING_AUTHENTICATED_RUN",
-    "n_aligned": 0,
-    "n_expected": 300,
-    "reason": "FERMAT is gated: dataset_info is anonymous but load_dataset requires authentication. Run this stage in an authenticated session to complete it.",
-    "revision": null,
-    "verified": false
-  },
-  "audit": {
-    "coverage_note": "three TARGETED sets, two of them one-directional by construction; rates here are not estimates for all 300 items and must not be quoted as such",
-    "hard_contradictions": [
-      108,
-      149,
-      222,
-      230
-    ],
-    "is_population_estimate": false,
-    "n_items_coded_twice": 78,
-    "n_overlap_rows": 78,
-    "n_rows": 312,
-    "n_unique_items": 234
-  },
-  "claims_not_supported": [
-    "human-level accuracy",
-    "reliable inter-rater agreement",
-    "a representative error rate for all of FERMAT",
-    "a corrected benchmark score",
-    "that the 234 audited items are an IID evaluation set"
+ "alignment": {
+  "alignment_status": "VERIFIED",
+  "n_aligned": 300,
+  "n_expected": 300,
+  "reason": "",
+  "revision": "80ff9934c38615bb8d3a33c24252db02e21774f0",
+  "verified": true
+ },
+ "audit": {
+  "coverage_note": "three TARGETED sets, two of them one-directional by construction; rates here are not estimates for all 300 items and must not be quoted as such",
+  "hard_contradictions": [
+   108,
+   149,
+   222,
+   230
   ],
-  "dataset": {
-    "dataset_id": "ai4bharat/FERMAT",
-    "gated": "auto",
-    "revision": "80ff9934c38615bb8d3a33c24252db02e21774f0",
-    "source": "huggingface_hub.dataset_info (anonymous)"
+  "is_population_estimate": false,
+  "n_items_coded_twice": 78,
+  "n_overlap_rows": 78,
+  "n_rows": 312,
+  "n_unique_items": 234
+ },
+ "claims_not_supported": [
+  "human-level accuracy",
+  "reliable inter-rater agreement",
+  "a representative error rate for all of FERMAT",
+  "a corrected benchmark score",
+  "that the 234 audited items are an IID evaluation set"
+ ],
+ "dataset": {
+  "dataset_id": "ai4bharat/FERMAT",
+  "gated": "auto",
+  "revision": "80ff9934c38615bb8d3a33c24252db02e21774f0",
+  "source": "authenticated pinned load_dataset"
+ },
+ "frozen_run": {
+  "n_rows": 300,
+  "run_csv": "scaleup_n300_bal50_qwen25-vl-3b-instruct_20260802T163202Z.csv",
+  "run_csv_sha256": "f8ffc23fbc2c038f98d0fa82fc96edfbe516fce5466de90d741a2a8e3e9a1336"
+ },
+ "prompts": {
+  "grading_system": {
+   "n_chars": 487,
+   "sha256": "5ae2b844ac826daf900a20e23493c69625739f384910c6ac116e601a85074be6"
   },
-  "frozen_run": {
-    "n_rows": 300,
-    "run_csv": "scaleup_n300_bal50_qwen25-vl-3b-instruct_20260802T163202Z.csv",
-    "run_csv_sha256": "f8ffc23fbc2c038f98d0fa82fc96edfbe516fce5466de90d741a2a8e3e9a1336"
+  "grading_user": {
+   "n_chars": 791,
+   "sha256": "ed27c4a599e03e72ea0bccc031f47be869c59a538f72e21e9ea3e80a2b64db13"
   },
-  "prompts": {
-    "grading_system": {
-      "n_chars": 487,
-      "sha256": "5ae2b844ac826daf900a20e23493c69625739f384910c6ac116e601a85074be6"
-    },
-    "grading_user": {
-      "n_chars": 791,
-      "sha256": "ed27c4a599e03e72ea0bccc031f47be869c59a538f72e21e9ea3e80a2b64db13"
-    },
-    "transcription_system": {
-      "n_chars": 520,
-      "sha256": "91ae507f08d679bca8d9c1f5a2189234f74ca5c175633481ee0130b7f72c1939"
-    },
-    "transcription_user": {
-      "n_chars": 568,
-      "sha256": "68b63e0a618ab7814fbd951c9dd513b8eeca5d04f70a87f4310234c5952f3f07"
-    }
+  "transcription_system": {
+   "n_chars": 520,
+   "sha256": "91ae507f08d679bca8d9c1f5a2189234f74ca5c175633481ee0130b7f72c1939"
   },
-  "protocol": {
-    "frozen_scorer": "strict_v1",
-    "k_grading": 5,
-    "k_transcription": 5,
-    "scorer_note": "stored columns are authoritative; any local rescore is a separately named diagnostic",
-    "temperature": 0.7
-  },
-  "selection": {
-    "loader": "pilot.data.load_fermat_balanced",
-    "n": 300,
-    "note": "shuffle(seed) is NOT stable across dataset revisions, which is why per-item content hashes are published alongside the ids; an index alone does not reproduce",
-    "seed": 42,
-    "target_error_frac": 0.5
-  },
-  "split": "train"
+  "transcription_user": {
+   "n_chars": 568,
+   "sha256": "68b63e0a618ab7814fbd951c9dd513b8eeca5d04f70a87f4310234c5952f3f07"
+  }
+ },
+ "protocol": {
+  "frozen_scorer": "strict_v1",
+  "k_grading": 5,
+  "k_transcription": 5,
+  "scorer_note": "stored columns are authoritative; any local rescore is a separately named diagnostic",
+  "temperature": 0.7
+ },
+ "selection": {
+  "loader": "pilot.data.load_fermat_balanced",
+  "n": 300,
+  "note": "shuffle(seed) is NOT stable across dataset revisions, which is why per-item content hashes are published alongside the ids; an index alone does not reproduce",
+  "seed": 42,
+  "target_error_frac": 0.5
+ },
+ "split": "train"
 }

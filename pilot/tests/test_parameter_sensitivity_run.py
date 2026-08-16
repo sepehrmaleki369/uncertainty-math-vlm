@@ -126,8 +126,12 @@ def test_the_frozen_protocol_reproduces_the_papers_headline(snap):
     f = snap["conditions"]["T0.7_K5"]["full"]
     assert abs(f["auroc"] - 0.835) < 0.02, f["auroc"]
     assert f["ci_low"] < 0.835 < f["ci_high"]
-    assert snap["frozen_protocol"] == {"temperature": 0.7, "k": 5,
-                                       **snap["frozen_protocol"]}
+    # Check the two fields separately. Comparing against
+    # {"temperature": 0.7, "k": 5, **snap["frozen_protocol"]} asserts nothing:
+    # the expansion comes last, so it overwrites both literals and the dict is
+    # compared to itself. It passed with temperature 999.
+    assert snap["frozen_protocol"]["temperature"] == 0.7
+    assert snap["frozen_protocol"]["k"] == 5
 
 
 def test_the_snapshot_records_which_run_it_came_from(snap):

@@ -6,7 +6,7 @@
 % and "selective prediction" are left to be lowercased by the style.
 %
 % Every entry below was VERIFIED against its official page (arXiv abs,
-% OpenReview, ACL Anthology, or the HuggingFace model card) on 2026-08-12.
+% OpenReview, ACL Anthology, or the publisher record) on 2026-08-14.
 % Titles, author lists and years are transcribed from the fetched page, not
 % recalled.
 %
@@ -23,39 +23,61 @@
 % reference is dropped rather than guessed.
 
 % ---------------------------------------------------------------- datasets
-@article{fermat,
-  title   = {Can Vision-Language Models Evaluate Handwritten Math?},
-  author  = {Nath, Oikantik and Bathina, Hanani and
-             Khan, Mohammed Safi Ur Rahman and Khapra, Mitesh M.},
-  journal = {arXiv preprint arXiv:2501.07244},
-  year    = {2025}
+@inproceedings{fermat,
+  title     = {Can Vision-Language Models Evaluate Handwritten Math?},
+  author    = {Nath, Oikantik and Bathina, Hanani and
+               Khan, Mohammed Safi Ur Rahman and Khapra, Mitesh M.},
+  booktitle = {Proceedings of the 63rd Annual Meeting of the Association for
+               Computational Linguistics (Volume 1: Long Papers)},
+  month     = jul,
+  year      = {2025},
+  address   = {Vienna, Austria},
+  publisher = {Association for Computational Linguistics},
+  pages     = {14784--14814},
+  doi       = {10.18653/v1/2025.acl-long.720},
+  url       = {https://aclanthology.org/2025.acl-long.720/}
 }
 
-@article{errorradar,
-  title   = {{ErrorRadar}: Benchmarking Complex Mathematical Reasoning of
-             Multimodal Large Language Models Via Error Detection},
-  author  = {Yan, Yibo and Wang, Shen and Huo, Jiahao and Li, Hang and
-             Li, Boyan and Su, Jiamin and Gao, Xiong and Zhang, Yi-Fan and
-             Xu, Tianlong and Chu, Zhendong and Zhong, Aoxiao and
-             Wang, Kun and Xiong, Hui and Yu, Philip S. and Hu, Xuming and
-             Wen, Qingsong},
-  journal = {arXiv preprint arXiv:2410.04509},
-  year    = {2024}
+@inproceedings{errorradar,
+  title     = {{ErrorRadar}: Benchmarking Complex Mathematical Reasoning of
+               Multimodal Large Language Models via Error Detection},
+  author    = {Yan, Yibo and Wang, Shen and Huo, Jiahao and Li, Hang and
+               Li, Boyan and Su, Jiamin and Gao, Xiong and Zhang, YiFan and
+               Xu, Tianlong and Chu, Zhendong and Zhong, Aoxiao and
+               Wang, Kun and Xiong, Hui and Yu, Philip S. and Hu, Xuming and
+               Wen, Qingsong},
+  booktitle = {Findings of the Association for Computational Linguistics:
+               ACL 2026},
+  month     = jul,
+  year      = {2026},
+  address   = {San Diego, California, United States},
+  publisher = {Association for Computational Linguistics},
+  pages     = {24297--24334},
+  doi       = {10.18653/v1/2026.findings-acl.1217},
+  url       = {https://aclanthology.org/2026.findings-acl.1217/}
 }
 
-% Re-checked 2026-08-13 against the dataset card. Still NO paper, NO arXiv id,
-% NO stated author beyond the uploader handle, and NO release year. `key` is
-% supplied so bibtex can sort the entry; the year is left out rather than
-% guessed -- the upload timestamp is not a publication year and citing it as
-% one would be an invention. The URL is the only stable, checkable pointer
-% this artifact has, so it is given in place of the missing metadata.
-@misc{scratchmath,
-  key   = {ScratchMath},
-  title = {{ScratchMath}},
-  howpublished = {HuggingFace dataset \texttt{songdj/ScratchMath},
-                  \url{https://huggingface.co/datasets/songdj/ScratchMath}},
-  note  = {CC-BY-NC-SA-4.0. No accompanying paper, stated author or release
-           year on the dataset card; cited as a dataset artifact}
+% Springer assigns the archival volume to 2027, although it records AIED 2026
+% and a first-online date of 27 June 2026. The publisher's canonical citation
+% year is used here and the conference year is retained in the note.
+@inproceedings{scratchmath,
+  title     = {Can {MLLMs} Read Students' Minds? Unpacking Multimodal Error
+               Analysis in Handwritten Math},
+  author    = {Song, Dingjie and Xu, Tianlong and Zhang, Yi-Fan and
+               Li, Hang and Yan, Zhiling and Fan, Xing and Li, Haoyang and
+               Sun, Lichao and Wen, Qingsong},
+  editor    = {Blanchard, Emmanuel G. and Chen, Guanliang and Chi, Min and
+               Isotani, Seiji},
+  booktitle = {Artificial Intelligence in Education},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {16581},
+  pages     = {110--124},
+  publisher = {Springer},
+  address   = {Cham},
+  year      = {2027},
+  doi       = {10.1007/978-3-032-29744-0_8},
+  url       = {https://link.springer.com/chapter/10.1007/978-3-032-29744-0_8},
+  note      = {Proceedings of AIED 2026; first published online 27 June 2026}
 }
 
 @inproceedings{mathvista,
@@ -116,20 +138,15 @@
 }
 
 % ------------------------------------------ selective prediction/abstention
-% Year 2017 confirmed twice over: arXiv 1705.08500 v1 23 May 2017 / v2 1 Jun
-% 2017, and the paper appeared at NIPS 2017. arXiv carries NO journal-ref
-% field, so the venue was verified independently against DBLP
-% (conf/nips/GeifmanE17) and the official proceedings page. Cited at the
-% peer-reviewed venue rather than as a preprint, matching how every other
-% published paper in this file is cited. `pages` is omitted deliberately:
-% the official NeurIPS BibTeX leaves it empty, and DBLP's 4878--4887 is not
-% reproduced by the publisher's own record.
 @inproceedings{selectiveclassification,
   title     = {Selective Classification for Deep Neural Networks},
   author    = {Geifman, Yonatan and El-Yaniv, Ran},
-  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  booktitle = {Advances in Neural Information Processing Systems},
   volume    = {30},
-  year      = {2017}
+  pages     = {4878--4887},
+  publisher = {Curran Associates, Inc.},
+  year      = {2017},
+  url       = {https://proceedings.neurips.cc/paper/2017/hash/4a8423d5e91fda00bb7e46540e2b0cf1-Abstract.html}
 }
 
 @inproceedings{recoverr,
@@ -137,45 +154,117 @@
                Abstention in Vision-Language Reasoning},
   author    = {Srinivasan, Tejas and Hessel, Jack and Gupta, Tanmay and
                Lin, Bill Yuchen and Choi, Yejin and Thomason, Jesse and
-               Chandu, Khyathi Raghavi},
-  booktitle = {Findings of the Association for Computational Linguistics
-               (ACL Findings)},
-  year      = {2024}
+               Chandu, Khyathi},
+  booktitle = {Findings of the Association for Computational Linguistics:
+               ACL 2024},
+  month     = aug,
+  year      = {2024},
+  address   = {Bangkok, Thailand},
+  publisher = {Association for Computational Linguistics},
+  pages     = {12935--12948},
+  doi       = {10.18653/v1/2024.findings-acl.767},
+  url       = {https://aclanthology.org/2024.findings-acl.767/}
 }
 
 % ------------------------------------------------- document/handwritten OCR
-@article{nougat,
-  title   = {Nougat: Neural Optical Understanding for Academic Documents},
-  author  = {Blecher, Lukas and Cucurull, Guillem and Scialom, Thomas and
-             Stojnic, Robert},
-  journal = {arXiv preprint arXiv:2308.13418},
-  year    = {2023}
+@inproceedings{nougat,
+  title     = {{Nougat}: Neural Optical Understanding for Academic Documents},
+  author    = {Blecher, Lukas and Cucurull, Guillem and Scialom, Thomas and
+               Stojnic, Robert},
+  booktitle = {The Twelfth International Conference on Learning
+               Representations},
+  year      = {2024},
+  url       = {https://openreview.net/forum?id=fUtxNAKpdV}
+}
+
+@article{ocrabstentionprobes,
+  title   = {Reading Between the Lines: Abstaining from {VLM}-Generated
+             {OCR} Errors via Latent Representation Probes},
+  author  = {Yao, Jihan and Kulshrestha, Achin and Rauschmayr, Nathalie and
+             Roberts, Reed and Zhu, Banghua and Tsvetkov, Yulia and
+             Tombari, Federico},
+  journal = {arXiv preprint arXiv:2511.19806},
+  year    = {2025},
+  url     = {https://arxiv.org/abs/2511.19806}
+}
+
+@inproceedings{uncertaintyawareocr,
+  title     = {Teaching {VLMs} to Admit Uncertainty in {OCR} from Lossy
+               Visual Inputs},
+  author    = {Guan, Shuhao and Lin, Moule and Xu, Cheng and Zhao, Jinman and
+               Greene, Derek},
+  booktitle = {The Fourteenth International Conference on Learning
+               Representations},
+  year      = {2026},
+  url       = {https://openreview.net/forum?id=zyCjizqOxB}
 }
 
 % ------------------------------------------------------ evaluation artifacts
-@article{mirage,
-  title   = {Are Emergent Abilities of Large Language Models a Mirage?},
-  author  = {Schaeffer, Rylan and Miranda, Brando and Koyejo, Sanmi},
-  journal = {arXiv preprint arXiv:2304.15004},
-  year    = {2023}
+@inproceedings{mirage,
+  title     = {Are Emergent Abilities of Large Language Models a Mirage?},
+  author    = {Schaeffer, Rylan and Miranda, Brando and Koyejo, Sanmi},
+  booktitle = {Advances in Neural Information Processing Systems},
+  volume    = {36},
+  pages     = {55565--55581},
+  publisher = {Curran Associates, Inc.},
+  year      = {2023},
+  doi       = {10.52202/075280-2425},
+  url       = {https://proceedings.neurips.cc/paper_files/paper/2023/hash/adc98a266f45005c403b8311ca7e8bd7-Abstract-Conference.html}
 }
 
-@article{verifystepbystep,
-  title   = {Let's Verify Step by Step},
-  author  = {Lightman, Hunter and Kosaraju, Vineet and Burda, Yura and
-             Edwards, Harri and Baker, Bowen and Lee, Teddy and
-             Leike, Jan and Schulman, John and Sutskever, Ilya and
-             Cobbe, Karl},
-  journal = {arXiv preprint arXiv:2305.20050},
-  year    = {2023}
+@inproceedings{verifystepbystep,
+  title     = {Let's Verify Step by Step},
+  author    = {Lightman, Hunter and Kosaraju, Vineet and Burda, Yuri and
+               Edwards, Harrison and Baker, Bowen and Lee, Teddy and
+               Leike, Jan and Schulman, John and Sutskever, Ilya and
+               Cobbe, Karl},
+  booktitle = {The Twelfth International Conference on Learning
+               Representations},
+  year      = {2024},
+  url       = {https://openreview.net/forum?id=v8L0pN6EOi}
 }
 
-@article{biasintheloop,
-  title   = {Bias in the Loop: Auditing {LLM-as-a-Judge} for Software
-             Engineering},
-  author  = {Zhao, Zixiao and Esmaeili, Amirreza and Fard, Fatemeh},
-  journal = {arXiv preprint arXiv:2604.16790},
-  year    = {2026}
+@inproceedings{mathllmjudges,
+  title     = {From Calculation to Adjudication: Examining {LLM} Judges on
+               Mathematical Reasoning Tasks},
+  author    = {Stephan, Andreas and Zhu, Dawei and
+               A{\ss}enmacher, Matthias and Shen, Xiaoyu and Roth, Benjamin},
+  booktitle = {Proceedings of the Fourth Workshop on Generation, Evaluation
+               and Metrics (GEM$^2$)},
+  month     = jul,
+  year      = {2025},
+  address   = {Vienna, Austria and virtual meeting},
+  publisher = {Association for Computational Linguistics},
+  pages     = {759--773},
+  url       = {https://aclanthology.org/2025.gem-1.65/}
+}
+
+@inproceedings{trickthegrader,
+  title     = {Can You Trick the Grader? Adversarial Persuasion of {LLM}
+               Judges},
+  author    = {Hwang, Yerin and Lee, Dongryeol and Kang, Taegwan and
+               Kim, Yongil and Jung, Kyomin},
+  booktitle = {Findings of the Association for Computational Linguistics:
+               EMNLP 2025},
+  month     = nov,
+  year      = {2025},
+  address   = {Suzhou, China},
+  publisher = {Association for Computational Linguistics},
+  pages     = {14632--14651},
+  doi       = {10.18653/v1/2025.findings-emnlp.790},
+  url       = {https://aclanthology.org/2025.findings-emnlp.790/}
+}
+
+% ------------------------------------------ handwritten mathematics grading
+@inproceedings{gpt4handwrittengrading,
+  title     = {Evaluating {GPT-4} at Grading Handwritten Solutions in Math
+               Exams},
+  author    = {Caraeni, Adriana and Scarlatos, Alexander and Lan, Andrew},
+  booktitle = {Companion Proceedings of the 15th International Conference on
+               Learning Analytics \& Knowledge (LAK25)},
+  pages     = {126--128},
+  year      = {2025},
+  url       = {https://www.solaresearch.org/wp-content/uploads/2025/02/LAK25-CompanionProceedings.pdf}
 }
 
 % Verified 2026-08-12 against BOTH the Oxford Academic article page
