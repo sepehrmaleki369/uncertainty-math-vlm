@@ -62,7 +62,7 @@
     "k_grading": 5,
     "k_transcription": 5,
     "scorer_note": "stored columns are authoritative; any local rescore is a separately named diagnostic",
-    "temperature": 1.0
+    "temperature": 0.7
   },
   "selection": {
     "loader": "pilot.data.load_fermat_balanced",

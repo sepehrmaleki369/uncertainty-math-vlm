@@ -1,0 +1,38 @@
+{
+ "alignment_status": "VERIFIED",
+ "dataset_revision": "80ff9934c38615bb8d3a33c24252db02e21774f0",
+ "forbidden": [
+  "selecting the best cell as a tuned headline",
+  "claiming robustness outside the declared grid",
+  "treating frozen-scorer correctness as human truth"
+ ],
+ "gate": {
+  "complete": true,
+  "interpretation": "protocol sensitivity across the declared grid; no condition was selected as a tuned winner",
+  "minority_at_least_30": true,
+  "paper_eligible": true
+ },
+ "generation_seed": 20260815,
+ "interpretation": "protocol sensitivity across the declared grid; no condition was selected as a tuned winner",
+ "k_values": [
+  3,
+  5,
+  10
+ ],
+ "latex_parser_available": true,
+ "max_new_tokens": 512,
+ "model_id": "Qwen/Qwen2.5-VL-3B-Instruct",
+ "n_items": 300,
+ "nested_prefixes": true,
+ "prompt_sha256": "68b63e0a618ab7814fbd951c9dd513b8eeca5d04f70a87f4310234c5952f3f07",
+ "repo_commit": "940dbd928c293b9132bd7950957cd789dbf77c72",
+ "sample_batch": 5,
+ "scorer": "strict_v1",
+ "status": "full",
+ "temperature_0p7_is_frozen_protocol": true,
+ "temperatures": [
+  0.3,
+  0.7,
+  1.0
+ ]
+}

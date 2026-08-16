@@ -1,9 +1,10 @@
 # WACV evaluation artifact — FERMAT n=300, audited subset, and a null
 
-**Status: two parts are complete and one is deliberately unfinished.**
-`alignment_status = PENDING_AUTHENTICATED_RUN` and `SECOND-RATER STATUS: PENDING`.
-Neither is an oversight; each names a step only a human with credentials can
-take, and the code refuses to fake either.
+**Status: the null and single-reader audit are complete.** Consult
+`provenance.json` for the current alignment status. If it is
+`PENDING_AUTHENTICATED_RUN`, Notebook 32 changes it to `VERIFIED` only after
+an authorized, pinned reconstruction aligns all 300 rows. No inter-rater statistic is claimed; the
+optional second-rater packet remains blank for possible future use.
 
 ## What is here
 
@@ -14,7 +15,7 @@ take, and the code refuses to fake either.
 | `fermat_n300_public_manifest.csv` | 300 items: ids, hashes, pinned revision, derived numbers | **public** |
 | `fermat_n300_private_manifest.csv` | gated text and raw generations | **do not release** |
 | `audit_labels_long.csv` | 312 rows, one per item per audit pass | public |
-| `second_rater_queue.csv`, `..._template_blank.csv`, `..._instructions.md` | the blinded packet | public |
+| `second_rater_queue.csv`, `..._template_blank.csv`, `..._instructions.md` | optional future blinded packet; no completed second rater is claimed | public |
 | `second_rater_blinding_key_PRIVATE.csv` | review id to item id | **do not release** |
 | `provenance.json` | hashes, prompts, protocol, claims not supported | public |
 
@@ -43,7 +44,7 @@ already had two items overlap between draws that should have been disjoint —
 so an index alone does not reproduce the sample. That is why per-item content
 hashes are published: they identify the items even if row order moves.
 
-**To complete it:** run notebook 30 Stage B once in an authenticated session.
+**To complete it:** run notebook 32 Stage B once in an authenticated session.
 `verify_reconstruction` requires all 300 of `orig_q`, `pert_a` and `has_error`
 to match; a partial or order-insensitive match is reported as FAILED.
 
