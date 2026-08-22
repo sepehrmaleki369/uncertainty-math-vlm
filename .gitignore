@@ -46,3 +46,8 @@ results/
 # paper figure of a dataset must be; the unrendered pages are not. Export with
 # pilot/31_export_figure2_pages.ipynb -- see paper/figures/pages/README.md.
 paper/figures/pages/*.jpg
+
+# The paper itself is not published here. WACV is double-blind and main.pdf
+# carries the author block, so a public repo of it is a deanonymisation risk.
+# Local files are untouched; the paper lives in Overleaf.
+paper/
