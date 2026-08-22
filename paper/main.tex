@@ -77,21 +77,20 @@ Repeated sampling provides a cheap, label-free uncertainty signal through
 model self-disagreement. We evaluate it on handwritten mathematics and find
 a useful transcription signal, no grading signal, and an evaluation artifact
 that can manufacture an apparent effect. Against the frozen transcription
-scorer, entropy reaches an AUROC of $0.835$, replicated at $0.828$ on a second model
+scorer, entropy reaches AUROC $0.835$, replicated at $0.828$ on a second model
 family. It survives parser and ceiling controls and outperforms token
 confidence and simpler summaries of the same samples. When all five samples
 disagree, the scorer marks $57$ of $61$ items incorrect. For grading, however,
 entropy is indistinguishable from chance (AUROC $0.520$).
 
-Stratifying grading by its ground-truth label appears to recover AUROCs
-ranging from $0.801$ to $0.854$ across three model families, but this effect is arithmetic.
+Stratifying grading by its ground-truth label appears to recover AUROC
+$0.801$--$0.854$ across three model families, but this effect is arithmetic.
 Within a fixed-label stratum, correctness is the same binary column as the
 model verdict, so uncertainty computed from those verdicts predicts
 correctness almost by construction; a signal-free biased coin outscores every
 model evaluated here. Transcription does not undergo this fixed-label
 collapse. Finally, an exploratory single-reader audit of all $104$ items the
-scorer marks incorrect attributes approximately three-quarters of these errors
-to the scoring
+scorer marks incorrect attributes approximately three-quarters to the scoring
 pipeline rather than to the model. Sampling disagreement can therefore
 support transcription deferral, but its evaluation must test whether the
 target construction or scorer creates the apparent signal.
