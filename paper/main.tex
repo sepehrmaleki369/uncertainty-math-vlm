@@ -73,34 +73,28 @@ Institution2\\
 \maketitle
 
 \begin{abstract}
-Sampling a vision--language model repeatedly and measuring its
-self-disagreement yields a cheap, label-free uncertainty signal. We
-evaluate this signal on handwritten mathematics and report a positive
-result, a negative result, and a mechanism by which the evaluation itself
-manufactures an effect that is not present. Against the frozen transcription
-scorer, the signal reaches AUROC $0.835$, replicated at $0.828$ on a second,
-architecturally independent model family. It survives the parser and
-ceiling controls we apply and is superior by resolved margins to both the
-model's own token confidence and to simpler reductions of the same
-samples. A rule that abstains whenever all five samples disagree marks
-$57$ of $61$ items as incorrect under that scorer. On
-grading the signal is absent: AUROC $0.520$ on a balanced sample,
-statistically indistinguishable from chance. The methodological risk lies
-between these two results. Stratifying the grading task by its
-ground-truth label, a natural response to a model exhibiting strong answer
-bias, appears to recover a substantial effect ($0.801$--$0.854$) that
-replicates across three independently trained model families. That effect
-is an artifact. Within a single-label stratum, ``was the model correct''
-is the same column as ``what did the model answer'', so an uncertainty
-measure computed from those answers predicts correctness almost by
-construction; a signal-free biased coin attains a \emph{higher} AUROC than
-any model evaluated here. We report the result we initially accepted, the
-diagnostic that retired it, and the property of the transcription task
-under which the same arithmetic collapse does not occur. Finally, an exploratory
-single-reader audit of all $104$ items the scorer marks incorrect introduces
-a third caution: approximately three-quarters are attributable to the scoring
-pipeline rather than to the model, so the correctness label against which
-these AUROCs are measured is itself noisy.
+Repeated sampling provides a cheap, label-free uncertainty signal through
+model self-disagreement. We evaluate it on handwritten mathematics and find
+a useful transcription signal, no grading signal, and an evaluation artifact
+that can manufacture an apparent effect. Against the frozen transcription
+scorer, entropy reaches an AUROC of $0.835$, replicated at $0.828$ on a second model
+family. It survives parser and ceiling controls and outperforms token
+confidence and simpler summaries of the same samples. When all five samples
+disagree, the scorer marks $57$ of $61$ items incorrect. For grading, however,
+entropy is indistinguishable from chance (AUROC $0.520$).
+
+Stratifying grading by its ground-truth label appears to recover AUROCs
+ranging from $0.801$ to $0.854$ across three model families, but this effect is arithmetic.
+Within a fixed-label stratum, correctness is the same binary column as the
+model verdict, so uncertainty computed from those verdicts predicts
+correctness almost by construction; a signal-free biased coin outscores every
+model evaluated here. Transcription does not undergo this fixed-label
+collapse. Finally, an exploratory single-reader audit of all $104$ items the
+scorer marks incorrect attributes approximately three-quarters of these errors
+to the scoring
+pipeline rather than to the model. Sampling disagreement can therefore
+support transcription deferral, but its evaluation must test whether the
+target construction or scorer creates the apparent signal.
 \end{abstract}
 
 % =====================================================================
